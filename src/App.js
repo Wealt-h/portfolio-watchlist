@@ -245,14 +245,28 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
               <button onClick={e => handleAiUpdate(e, "thesis")} disabled={!!aiLoading}
                 style={{ display: "flex", alignItems: "center", gap: 5, background: aiLoading==="thesis"?"rgba(199,125,255,0.05)":"rgba(199,125,255,0.1)", border: "1px solid rgba(199,125,255,0.25)", color: aiLoading==="thesis"?"#6a3d80":"#c77dff", borderRadius: 20, padding: "3px 10px", fontSize: 10, fontFamily: "monospace", cursor: aiLoading?"default":"pointer", letterSpacing: 1 }}>
                 <span style={{ display: "inline-block", animation: aiLoading==="thesis"?"spin 1s linear infinite":"none" }}>✦</span>
-                {aiLoading==="thesis" ? "WRITING..." : "AI THESIS"}
+                {aiLoading==="thesis" ? "WRITING..." : "THESIS"}
                 <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
               </button>
             </div>
-            {aiLoading==="thesis" && <div style={{ fontSize: 12, color: "#6a3d80", fontFamily: "monospace", fontStyle: "italic" }}>Analysing against your investment philosophy...</div>}
+            {aiLoading==="thesis" && <div style={{ fontSize: 12, color: "#6a3d80", fontFamily: "monospace", fontStyle: "italic" }}>Generating thesis...</div>}
             {asset.thesis && !aiLoading && (
-              <div style={{ background: "rgba(199,125,255,0.04)", border: "1px solid rgba(199,125,255,0.1)", borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ fontSize: 13, color: "#b09ac8", lineHeight: 1.7 }}>{asset.thesis}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {asset.thesis.split("\n").filter(l => l.trim()).map((line, i) => {
+                  const isPos = line.startsWith("+");
+                  const isNeg = line.startsWith("-");
+                  const text = (isPos || isNeg) ? line.slice(1).trim() : line.trim();
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                      {(isPos || isNeg) && (
+                        <span style={{ fontSize: 13, fontWeight: 800, color: isPos ? "#00ff9d" : "#ff6b6b", flexShrink: 0, marginTop: 1 }}>
+                          {isPos ? "+" : "−"}
+                        </span>
+                      )}
+                      <span style={{ fontSize: 13, color: isPos ? "#7adba8" : isNeg ? "#cc7a7a" : "#8aab96", lineHeight: 1.5 }}>{text}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
             {!asset.thesis && !aiLoading && (
@@ -267,14 +281,14 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
               <button onClick={e => handleAiUpdate(e, "notes")} disabled={!!aiLoading}
                 style={{ display: "flex", alignItems: "center", gap: 5, background: aiLoading==="notes"?"rgba(126,184,255,0.05)":"rgba(126,184,255,0.1)", border: "1px solid rgba(126,184,255,0.25)", color: aiLoading==="notes"?"#3d6080":"#7eb8ff", borderRadius: 20, padding: "3px 10px", fontSize: 10, fontFamily: "monospace", cursor: aiLoading?"default":"pointer", letterSpacing: 1 }}>
                 <span style={{ display: "inline-block", animation: aiLoading==="notes"?"spin 1s linear infinite":"none" }}>✦</span>
-                {aiLoading==="notes" ? "ANALYSING..." : "AI UPDATE"}
+                {aiLoading==="notes" ? "ANALYSING..." : "UPDATE"}
               </button>
             </div>
             {aiLoading==="notes" && (
               <div style={{ background: "rgba(126,184,255,0.05)", border: "1px solid rgba(126,184,255,0.15)", borderRadius: 10, padding: "12px 14px" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#7eb8ff", animation: "pulse 1s infinite" }} />
-                  <span style={{ fontSize: 12, color: "#4a7a9a", fontFamily: "monospace" }}>Analysing {asset.symbol} through your philosophy lens...</span>
+                  <span style={{ fontSize: 12, color: "#4a7a9a", fontFamily: "monospace" }}>Fetching market update...</span>
                   <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.2} }`}</style>
                 </div>
               </div>
