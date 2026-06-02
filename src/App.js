@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import React from "react";
 
 // ─── SIGNAL ENGINE ────────────────────────────────────────────────────────────
 function calcSignal({ currentPrice, high52w, rsi, ma200, fearGreed, type }) {
@@ -384,6 +385,147 @@ function WatchModal({ asset, onSave, onClose }) {
   );
 }
 
+// ─── ASSET SEARCH MODAL ──────────────────────────────────────────────────────
+function AssetSearchModal({ onAdd, onClose }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [adding, setAdding] = useState(null);
+  const [error, setError] = useState(null);
+  const debounceRef = React.useRef(null);
+
+  const search = async (q) => {
+    if (!q || q.length < 1) { setResults([]); return; }
+    setSearching(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q }),
+      });
+      const data = await res.json();
+      setResults(data.results || []);
+    } catch { setError("Search failed"); }
+    setSearching(false);
+  };
+
+  const handleInput = (e) => {
+    const q = e.target.value;
+    setQuery(q);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => search(q), 350);
+  };
+
+  const handleAdd = async (result) => {
+    setAdding(result.symbol);
+    setError(null);
+    try {
+      const res = await fetch("/api/asset-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: result.symbol }),
+      });
+      const details = await res.json();
+      if (details.error) throw new Error(details.error);
+      onAdd({
+        id: Date.now(),
+        symbol: result.symbol,
+        name: result.name,
+        type: result.type,
+        exchange: result.exchange,
+        currentPrice: details.currentPrice || 0,
+        change24h: details.change24h || 0,
+        high52w: details.high52w || 0,
+        low52w: details.low52w || 0,
+        ma200: details.ma200 || 0,
+        rsi: 50,
+        fearGreed: 0,
+        thesis: "",
+        notes: "",
+      });
+      onClose();
+    } catch (err) {
+      setError(`Failed to add ${result.symbol}: ${err.message}`);
+    }
+    setAdding(null);
+  };
+
+  const TYPE_COLOR = { stock: "#7eb8ff", crypto: "#00ff9d", etf: "#f5a623" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
+      <div style={{ background: "#0d1510", border: "1px solid rgba(0,255,157,0.2)", borderRadius: "18px 18px 0 0", padding: "20px 18px 40px", width: "100%", maxWidth: 520, maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontFamily: "monospace", fontSize: 13, color: "#00ff9d", letterSpacing: 2 }}>ADD ASSET</div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#4a6655", fontSize: 20, cursor: "pointer" }}>✕</button>
+        </div>
+
+        {/* Search input */}
+        <div style={{ position: "relative", marginBottom: 16 }}>
+          <input
+            autoFocus
+            value={query}
+            onChange={handleInput}
+            placeholder="Search stocks, crypto, ETFs..."
+            style={{ ...INP, paddingLeft: 36, fontSize: 14 }}
+          />
+          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#4a6655", fontSize: 14 }}>
+            {searching ? "⟳" : "⌕"}
+          </span>
+        </div>
+
+        {/* Results */}
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          {error && <div style={{ fontSize: 12, color: "#ff6b6b", fontFamily: "monospace", marginBottom: 10 }}>{error}</div>}
+
+          {results.length === 0 && !searching && query.length > 0 && (
+            <div style={{ textAlign: "center", color: "#3d5449", fontFamily: "monospace", fontSize: 12, padding: "30px 0" }}>NO RESULTS FOUND</div>
+          )}
+
+          {results.length === 0 && !query && (
+            <div style={{ color: "#2d4a3a", fontFamily: "monospace", fontSize: 11, lineHeight: 2 }}>
+              <div style={{ marginBottom: 12, color: "#3d5449" }}>POPULAR SEARCHES</div>
+              {["BTC", "AMZN", "NVDA", "AAPL", "MSFT", "ETH", "TSLA", "GOOGL"].map(s => (
+                <button key={s} onClick={() => { setQuery(s); search(s); }}
+                  style={{ background: "rgba(0,255,157,0.05)", border: "1px solid rgba(0,255,157,0.1)", color: "#4a8a6a", borderRadius: 8, padding: "5px 12px", fontSize: 11, fontFamily: "monospace", cursor: "pointer", marginRight: 8, marginBottom: 8 }}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {results.map(r => (
+            <div key={r.symbol}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: `${TYPE_COLOR[r.type] || "#7eb8ff"}15`, border: `1px solid ${TYPE_COLOR[r.type] || "#7eb8ff"}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: TYPE_COLOR[r.type] || "#7eb8ff", fontFamily: "monospace" }}>
+                  {r.symbol.slice(0, 2)}
+                </div>
+                <div>
+                  <div style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 14, color: "#e8f5ec" }}>{r.symbol}</div>
+                  <div style={{ fontSize: 11, color: "#4a6655", marginTop: 1 }}>{r.name.length > 30 ? r.name.slice(0, 30) + "..." : r.name}</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 9, color: TYPE_COLOR[r.type] || "#7eb8ff", fontFamily: "monospace", background: `${TYPE_COLOR[r.type] || "#7eb8ff"}15`, border: `1px solid ${TYPE_COLOR[r.type] || "#7eb8ff"}25`, borderRadius: 4, padding: "2px 6px" }}>
+                  {r.type.toUpperCase()}
+                </span>
+                <button onClick={() => handleAdd(r)} disabled={!!adding}
+                  style={{ background: adding === r.symbol ? "rgba(0,255,157,0.05)" : "rgba(0,255,157,0.1)", border: "1px solid rgba(0,255,157,0.3)", color: adding === r.symbol ? "#2d6644" : "#00ff9d", borderRadius: 8, padding: "6px 14px", fontSize: 11, fontFamily: "monospace", cursor: adding ? "default" : "pointer", letterSpacing: 1, minWidth: 60, textAlign: "center" }}>
+                  {adding === r.symbol ? "..." : "+ ADD"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── TRADE MODAL (BUY + SELL) ─────────────────────────────────────────────────
 function TradeModal({ watchlist, onSave, onClose, defaultType = "buy" }) {
   const [tradeType, setTradeType] = useState(defaultType);
@@ -656,6 +798,7 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [watchModal, setWatchModal] = useState(null);
   const [tradeModal, setTradeModal] = useState(null); // null | { defaultType, symbol? }
+  const [searchModal, setSearchModal] = useState(false);
   const [filterSig, setFilterSig] = useState("all");
   const [showLegend, setShowLegend] = useState(false);
   const [liveStatus, setLiveStatus] = useState("idle"); // idle | fetching | ok | error
@@ -785,7 +928,7 @@ export default function App() {
             ? <div style={{ textAlign:"center", color:"#3d5449", fontFamily:"monospace", fontSize:13, padding:"40px 0" }}>NO ASSETS MATCH FILTER</div>
             : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onEdit={a => setWatchModal({asset:a})} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} onThesisUpdate={(id, thesis) => setWatchlist(w => w.map(x => x.id === id ? {...x, thesis} : x))} />)
           }
-          <button onClick={() => setWatchModal({asset:null})} style={{ width:"100%", marginTop:8, background:"rgba(0,255,157,0.05)", border:"1px dashed rgba(0,255,157,0.2)", color:"#00ff9d", borderRadius:14, padding:"16px 0", fontSize:13, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ ADD ASSET</button>
+          <button onClick={() => setSearchModal(true)} style={{ width:"100%", marginTop:8, background:"rgba(0,255,157,0.05)", border:"1px dashed rgba(0,255,157,0.2)", color:"#00ff9d", borderRadius:14, padding:"16px 0", fontSize:13, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ ADD ASSET</button>
         </>
       )}
 
@@ -849,6 +992,7 @@ export default function App() {
       </div>
 
       {watchModal !== null && <WatchModal asset={watchModal.asset} onSave={saveWatch} onClose={() => setWatchModal(null)} />}
+      {searchModal && <AssetSearchModal onAdd={asset => { setWatchlist(w => [...w, asset]); }} onClose={() => setSearchModal(false)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
     </div>
   );
