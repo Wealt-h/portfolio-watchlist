@@ -949,33 +949,25 @@ export default function App() {
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            {/* Logo mark + wordmark */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: "linear-gradient(135deg, #0d2a1a, #0a1f12)",
-                border: "1px solid rgba(0,255,157,0.3)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 0 12px rgba(0,255,157,0.1)",
-                flexShrink: 0,
-              }}>
-                {/* A mark with upward bar */}
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M2 15L7 4L9 8.5L11 4L16 15" stroke="#00ff9d" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                  <line x1="4.5" y1="11" x2="13.5" y2="11" stroke="#00ff9d" strokeWidth="1.4" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <div>
-                <div style={{
-                  fontSize: 22, fontWeight: 900, letterSpacing: 4,
-                  background: "linear-gradient(90deg, #e8f5ec 0%, #00ff9d 60%, #7eb8ff 100%)",
-                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                  fontFamily: "monospace", lineHeight: 1,
-                }}>ACCRUE</div>
-                <div style={{ fontSize: 9, color: "#2d5040", letterSpacing: 3, fontFamily: "monospace", marginTop: 2 }}>
-                  DISCIPLINED INVESTMENT INTELLIGENCE
-                </div>
-              </div>
+            {/* ACCRUE wordmark — letter fade */}
+            <div style={{ display: "flex", alignItems: "center", gap: 0, lineHeight: 1 }}>
+              {[
+                ["A", 1.0],
+                ["C", 0.92],
+                ["C", 0.84],
+                ["R", 0.76],
+                ["U", 0.68],
+                ["E", 0.60],
+              ].map(([letter, opacity], i) => (
+                <span key={i} style={{
+                  fontSize: 28,
+                  fontWeight: 100,
+                  letterSpacing: 6,
+                  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+                  color: `rgba(232,245,236,${opacity})`,
+                  display: "inline-block",
+                }}>{letter}</span>
+              ))}
             </div>
           </div>
 
