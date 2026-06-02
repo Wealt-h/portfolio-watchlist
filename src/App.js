@@ -92,32 +92,19 @@ async function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
-// ─── REAL-TIME PRICES ────────────────────────────────────────────────────────
-const TICKER_MAP = {
-  BTC: "BTC-USD", ETH: "ETH-USD", SOL: "SOL-USD",
-  AMZN: "AMZN", HOOD: "HOOD", AAPL: "AAPL", MSFT: "MSFT",
-  NVDA: "NVDA", TSLA: "TSLA", GOOGL: "GOOGL", META: "META",
-};
-
+// ─── REAL-TIME PRICES (via serverless to avoid CORS) ─────────────────────────
 async function fetchLivePrices(symbols) {
-  const results = {};
-  await Promise.all(symbols.map(async (sym) => {
-    const ticker = TICKER_MAP[sym] || sym;
-    try {
-      const res = await fetch(
-        `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1m&range=1d`
-      );
-      const data = await res.json();
-      const meta = data?.chart?.result?.[0]?.meta;
-      if (meta) {
-        const price = meta.regularMarketPrice || meta.previousClose;
-        const prev = meta.previousClose || meta.chartPreviousClose;
-        const change24h = prev ? (((price - prev) / prev) * 100) : 0;
-        results[sym] = { price, change24h: parseFloat(change24h.toFixed(2)) };
-      }
-    } catch {}
-  }));
-  return results;
+  try {
+    const res = await fetch("/api/prices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols })
+    });
+    const data = await res.json();
+    return data.prices || {};
+  } catch {
+    return {};
+  }
 }
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
