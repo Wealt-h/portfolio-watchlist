@@ -5,7 +5,7 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
-  const apiKey = process.env.REACT_APP_ANTHROPIC_KEY;
+  const apiKey = process.env.ANTHROPIC_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "API key not configured" }), { status: 500 });
   }
