@@ -111,14 +111,34 @@ async function fetchLivePrices(symbols) {
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 const fmtUSD = (v, d = 2) => v == null || isNaN(v) ? "—" : "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const fmtPct = (v) => (v >= 0 ? "+" : "") + Number(v).toFixed(2) + "%";
-const INP = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(0,255,157,0.15)", borderRadius: 8, padding: "10px 12px", color: "#e8f5ec", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%", boxSizing: "border-box" };
-const LBL = { fontSize: 10, color: "#4a6655", fontFamily: "monospace", letterSpacing: 2, marginBottom: 4 };
+// ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
+const FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+const MONO = "'Courier New', monospace";
+const C = {
+  bg:       "#08090a",
+  surface:  "rgba(255,255,255,0.03)",
+  border:   "rgba(255,255,255,0.07)",
+  borderHover: "rgba(255,255,255,0.12)",
+  text1:    "rgba(232,238,234,0.95)",
+  text2:    "rgba(232,238,234,0.5)",
+  text3:    "rgba(232,238,234,0.25)",
+  green:    "#4ade80",
+  greenDim: "rgba(74,222,128,0.12)",
+  greenBorder: "rgba(74,222,128,0.2)",
+  red:      "#f87171",
+  redDim:   "rgba(248,113,113,0.1)",
+  amber:    "#fbbf24",
+  blue:     "#93c5fd",
+  blueDim:  "rgba(147,197,253,0.1)",
+};
+const INP = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", color: C.text1, fontSize: 13, fontFamily: FONT, fontWeight: 300, outline: "none", width: "100%", boxSizing: "border-box" };
+const LBL = { fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 4, textTransform: "uppercase" };
 
 // ─── SIGNAL BADGE ─────────────────────────────────────────────────────────────
 function SignalBadge({ sig, size = "md" }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: sig.bg, border: `1px solid ${sig.color}44`, borderRadius: 20, padding: size === "sm" ? "3px 10px" : "4px 12px", fontSize: size === "sm" ? 10 : 11, fontWeight: 700, color: sig.color, fontFamily: "monospace", letterSpacing: 1.5 }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: sig.color, boxShadow: `0 0 6px ${sig.color}`, display: "inline-block", flexShrink: 0 }} />
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${sig.color}10`, border: `1px solid ${sig.color}30`, borderRadius: 4, padding: size === "sm" ? "2px 8px" : "3px 10px", fontSize: size === "sm" ? 9 : 10, fontWeight: 400, color: sig.color, fontFamily: MONO, letterSpacing: 1.5, textTransform: "uppercase" }}>
+      <span style={{ width: 4, height: 4, borderRadius: "50%", background: sig.color, display: "inline-block", flexShrink: 0, opacity: 0.9 }} />
       {sig.label}
     </span>
   );
@@ -135,18 +155,18 @@ function SignalBreakdown({ asset }) {
   ].filter(Boolean);
 
   return (
-    <div style={{ marginTop: 14 }}>
-      <div style={{ fontSize: 10, color: "#4a6655", fontFamily: "monospace", letterSpacing: 2, marginBottom: 8 }}>SIGNAL BREAKDOWN · SCORE {sig.score}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+    <div style={{ marginTop: 16 }}>
+      <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>SIGNAL BREAKDOWN · SCORE {sig.score}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
         {indicators.map(ind => (
-          <div key={ind.label} style={{ background: ind.good ? "rgba(0,255,157,0.05)" : "rgba(255,107,107,0.05)", border: `1px solid ${ind.good ? "rgba(0,255,157,0.15)" : "rgba(255,107,107,0.12)"}`, borderRadius: 8, padding: "8px 10px" }}>
-            <div style={{ fontSize: 9, color: "#4a6655", fontFamily: "monospace", letterSpacing: 1.5 }}>{ind.label}</div>
-            <div style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 800, color: ind.good ? "#00ff9d" : "#ff6b6b", margin: "3px 0" }}>{ind.value}</div>
-            <div style={{ fontSize: 10, color: ind.good ? "#4a8a6a" : "#8a4a4a" }}>{ind.note}</div>
+          <div key={ind.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6, padding: "8px 10px" }}>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4 }}>{ind.label}</div>
+            <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 15, color: ind.good ? C.green : C.red, marginBottom: 2 }}>{ind.value}</div>
+            <div style={{ fontSize: 10, color: ind.good ? "rgba(74,222,128,0.5)" : "rgba(248,113,113,0.5)", fontFamily: MONO }}>{ind.note}</div>
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 10, fontSize: 12, color: "#6a9a7a", fontStyle: "italic" }}>{sig.description}</div>
+      <div style={{ marginTop: 10, fontSize: 11, color: C.text3, fontStyle: "italic", fontFamily: FONT, fontWeight: 300 }}>{sig.description}</div>
     </div>
   );
 }
@@ -156,18 +176,18 @@ function PriceBar({ low52w, high52w, current, ma200 }) {
   const pct = Math.min(100, Math.max(0, ((current - low52w) / (high52w - low52w)) * 100));
   const maPct = ma200 > 0 ? Math.min(100, Math.max(0, ((ma200 - low52w) / (high52w - low52w)) * 100)) : null;
   return (
-    <div style={{ marginTop: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#445544", marginBottom: 4, fontFamily: "monospace" }}>
+    <div style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.text3, marginBottom: 6, fontFamily: MONO, letterSpacing: 1 }}>
         <span>{fmtUSD(low52w, 0)}</span><span>52W RANGE</span><span>{fmtUSD(high52w, 0)}</span>
       </div>
-      <div style={{ position: "relative", height: 6, background: "rgba(255,255,255,0.07)", borderRadius: 3 }}>
-        <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct}%`, background: "linear-gradient(90deg,#1a3a2a,#00ff9d)", borderRadius: 3 }} />
-        {maPct !== null && <div style={{ position: "absolute", top: -4, left: `${maPct}%`, transform: "translateX(-50%)", width: 2, height: 14, background: "#f5a623", borderRadius: 1, opacity: 0.8 }} />}
-        <div style={{ position: "absolute", top: -3, left: `${pct}%`, transform: "translateX(-50%)", width: 12, height: 12, borderRadius: "50%", background: "#00ff9d", border: "2px solid #0a0f0d", boxShadow: "0 0 8px #00ff9d" }} />
+      <div style={{ position: "relative", height: 2, background: C.border, borderRadius: 2 }}>
+        <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct}%`, background: C.green, borderRadius: 2, opacity: 0.6 }} />
+        {maPct !== null && <div style={{ position: "absolute", top: -3, left: `${maPct}%`, transform: "translateX(-50%)", width: 1, height: 8, background: C.amber, opacity: 0.7 }} />}
+        <div style={{ position: "absolute", top: -3, left: `${pct}%`, transform: "translateX(-50%)", width: 8, height: 8, borderRadius: "50%", background: C.green, opacity: 0.9 }} />
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
-        <div style={{ fontSize: 10, color: "#00ff9d", fontFamily: "monospace" }}>{pct.toFixed(0)}% OF RANGE</div>
-        {maPct !== null && <div style={{ fontSize: 10, color: "#f5a623", fontFamily: "monospace" }}>▲ 200MA</div>}
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+        <div style={{ fontSize: 10, color: C.text3, fontFamily: MONO }}>{pct.toFixed(0)}% of range</div>
+        {maPct !== null && <div style={{ fontSize: 10, color: C.amber, fontFamily: MONO, opacity: 0.7 }}>200MA</div>}
       </div>
     </div>
   );
@@ -211,30 +231,30 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
   };
 
   return (
-    <div onClick={() => setOpen(!open)} style={{ background: "linear-gradient(145deg,#0d1510,#111a14)", border: "1px solid rgba(0,255,157,0.1)", borderRadius: 16, padding: "20px 22px", marginBottom: 14, cursor: "pointer", boxShadow: open ? "0 0 24px rgba(0,255,157,0.06)" : "none" }}>
+    <div onClick={() => setOpen(!open)} style={{ background: C.surface, border: `1px solid ${open ? C.borderHover : C.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${sig.color}18`, border: `1px solid ${sig.color}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: sig.color, fontFamily: "monospace" }}>
+          <div style={{ width: 38, height: 38, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 400, color: C.text2, fontFamily: MONO, letterSpacing: 1 }}>
             {asset.symbol.slice(0, 2)}
           </div>
           <div>
-            <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 17, color: "#e8f5ec", letterSpacing: 1 }}>{asset.symbol}</div>
-            <div style={{ fontSize: 12, color: "#4a6655" }}>{asset.name}</div>
+            <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 16, color: C.text1, letterSpacing: 0.3 }}>{asset.symbol}</div>
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 1 }}>{asset.name}</div>
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontFamily: "monospace", fontSize: 19, fontWeight: 800, color: "#e8f5ec" }}>{fmtUSD(asset.currentPrice)}</div>
-          <div style={{ fontSize: 12, color: asset.change24h < 0 ? "#ff6b6b" : "#00ff9d", fontFamily: "monospace", marginTop: 2 }}>
-            {asset.change24h > 0 ? "+" : ""}{asset.change24h}% 24H
+          <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 18, color: C.text1 }}>{fmtUSD(asset.currentPrice)}</div>
+          <div style={{ fontSize: 11, color: asset.change24h < 0 ? C.red : C.green, fontFamily: MONO, marginTop: 2, opacity: 0.8 }}>
+            {asset.change24h > 0 ? "+" : ""}{asset.change24h}%
           </div>
         </div>
       </div>
       <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
         <SignalBadge sig={sig} />
-        <span style={{ fontSize: 11, color: "#3d5449" }}>{open ? "▲" : "▼"}</span>
+        <span style={{ fontSize: 10, color: C.text3, marginLeft: 4 }}>{open ? "↑" : "↓"}</span>
       </div>
       {open && (
-        <div style={{ marginTop: 16, borderTop: "1px solid rgba(0,255,157,0.07)", paddingTop: 16 }} onClick={e => e.stopPropagation()}>
+        <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }} onClick={e => e.stopPropagation()}>
           <PriceBar low52w={asset.low52w} high52w={asset.high52w} current={asset.currentPrice} ma200={asset.ma200} />
           <SignalBreakdown asset={asset} />
 
@@ -244,15 +264,15 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
               <div style={LBL}>THESIS</div>
               <button onClick={e => handleAiUpdate(e, "thesis")} disabled={!!aiLoading}
-                style={{ display: "flex", alignItems: "center", gap: 5, background: aiLoading==="thesis"?"rgba(199,125,255,0.05)":"rgba(199,125,255,0.1)", border: "1px solid rgba(199,125,255,0.25)", color: aiLoading==="thesis"?"#6a3d80":"#c77dff", borderRadius: 20, padding: "3px 10px", fontSize: 10, fontFamily: "monospace", cursor: aiLoading?"default":"pointer", letterSpacing: 1 }}>
-                <span style={{ display: "inline-block", animation: aiLoading==="thesis"?"spin 1s linear infinite":"none" }}>✦</span>
-                {aiLoading==="thesis" ? "WRITING..." : "THESIS"}
+                style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 4, padding: "3px 10px", fontSize: 9, fontFamily: MONO, cursor: aiLoading?"default":"pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>
+                <span style={{ display: "inline-block", animation: aiLoading==="thesis"?"spin 1s linear infinite":"none", opacity: 0.6 }}>↻</span>
+                {aiLoading==="thesis" ? "writing..." : "thesis"}
                 <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
               </button>
             </div>
             {aiLoading==="thesis" && <div style={{ fontSize: 12, color: "#6a3d80", fontFamily: "monospace", fontStyle: "italic" }}>Generating thesis...</div>}
             {asset.thesis && !aiLoading && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {asset.thesis.split("\n").filter(l => l.trim()).map((line, i) => {
                   const isPos = line.startsWith("+");
                   const isNeg = line.startsWith("-");
@@ -260,11 +280,11 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
                   return (
                     <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                       {(isPos || isNeg) && (
-                        <span style={{ fontSize: 13, fontWeight: 800, color: isPos ? "#00ff9d" : "#ff6b6b", flexShrink: 0, marginTop: 1 }}>
+                        <span style={{ fontSize: 11, fontWeight: 300, color: isPos ? C.green : C.red, flexShrink: 0, marginTop: 1, opacity: 0.8 }}>
                           {isPos ? "+" : "−"}
                         </span>
                       )}
-                      <span style={{ fontSize: 13, color: isPos ? "#7adba8" : isNeg ? "#cc7a7a" : "#8aab96", lineHeight: 1.5 }}>{text}</span>
+                      <span style={{ fontSize: 12, color: isPos ? "rgba(74,222,128,0.7)" : isNeg ? "rgba(248,113,113,0.7)" : C.text2, lineHeight: 1.6, fontFamily: FONT, fontWeight: 300 }}>{text}</span>
                     </div>
                   );
                 })}
@@ -280,9 +300,9 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
               <div style={LBL}>DAILY INTEL</div>
               <button onClick={e => handleAiUpdate(e, "notes")} disabled={!!aiLoading}
-                style={{ display: "flex", alignItems: "center", gap: 5, background: aiLoading==="notes"?"rgba(126,184,255,0.05)":"rgba(126,184,255,0.1)", border: "1px solid rgba(126,184,255,0.25)", color: aiLoading==="notes"?"#3d6080":"#7eb8ff", borderRadius: 20, padding: "3px 10px", fontSize: 10, fontFamily: "monospace", cursor: aiLoading?"default":"pointer", letterSpacing: 1 }}>
-                <span style={{ display: "inline-block", animation: aiLoading==="notes"?"spin 1s linear infinite":"none" }}>✦</span>
-                {aiLoading==="notes" ? "ANALYSING..." : "UPDATE"}
+                style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 4, padding: "3px 10px", fontSize: 9, fontFamily: MONO, cursor: aiLoading?"default":"pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>
+                <span style={{ display: "inline-block", animation: aiLoading==="notes"?"spin 1s linear infinite":"none", opacity: 0.6 }}>↻</span>
+                {aiLoading==="notes" ? "updating..." : "update"}
               </button>
             </div>
             {aiLoading==="notes" && (
@@ -295,8 +315,8 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
               </div>
             )}
             {!aiLoading && asset.notes && (
-              <div style={{ background: "rgba(126,184,255,0.04)", border: "1px solid rgba(126,184,255,0.1)", borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ fontSize: 13, color: "#8aab96", lineHeight: 1.7 }}>{asset.notes}</div>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "12px 14px" }}>
+                <div style={{ fontSize: 12, color: C.text2, lineHeight: 1.7, fontFamily: FONT, fontWeight: 300 }}>{asset.notes}</div>
               </div>
             )}
             {!aiLoading && !asset.notes && (
@@ -306,8 +326,8 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
           </div>
 
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-            <button onClick={() => onEdit(asset)} style={{ flex: 1, background: "rgba(0,255,157,0.07)", border: "1px solid rgba(0,255,157,0.2)", color: "#00ff9d", borderRadius: 8, padding: "8px 0", fontSize: 12, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1 }}>EDIT</button>
-            <button onClick={() => onDelete(asset.id)} style={{ flex: 1, background: "rgba(255,107,107,0.07)", border: "1px solid rgba(255,107,107,0.2)", color: "#ff6b6b", borderRadius: 8, padding: "8px 0", fontSize: 12, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1 }}>REMOVE</button>
+            <button onClick={() => onEdit(asset)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>Edit</button>
+            <button onClick={() => onDelete(asset.id)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>Remove</button>
           </div>
         </div>
       )}
@@ -324,9 +344,9 @@ function WatchModal({ asset, onSave, onClose }) {
   const sig = parsed.currentPrice && parsed.high52w ? calcSignal(parsed) : null;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
-      <div style={{ background: "#0d1510", border: "1px solid rgba(0,255,157,0.2)", borderRadius: 18, padding: 28, width: "100%", maxWidth: 500, maxHeight: "92vh", overflowY: "auto" }}>
-        <div style={{ fontFamily: "monospace", fontSize: 13, color: "#00ff9d", letterSpacing: 2, marginBottom: 20 }}>{asset ? "EDIT ASSET" : "ADD ASSET"}</div>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
+      <div style={{ background: "#0e0f10", border: `1px solid ${C.border}`, borderRadius: 14, padding: 28, width: "100%", maxWidth: 500, maxHeight: "92vh", overflowY: "auto" }}>
+        <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 15, color: C.text1, marginBottom: 20, letterSpacing: 0.3 }}>{asset ? "Edit asset" : "Add asset"}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 13 }}>
           <div><div style={LBL}>SYMBOL</div><input value={f.symbol} onChange={e => set("symbol", e.target.value.toUpperCase())} placeholder="HOOD" style={INP} /></div>
           <div><div style={LBL}>NAME</div><input value={f.name} onChange={e => set("name", e.target.value)} placeholder="Robinhood" style={INP} /></div>
@@ -377,8 +397,8 @@ function WatchModal({ asset, onSave, onClose }) {
           <div key={k} style={{ marginBottom: 13 }}><div style={LBL}>{l}</div><textarea value={f[k]} onChange={e => set(k, e.target.value)} rows={2} placeholder={ph} style={{ ...INP, resize: "vertical" }} /></div>
         ))}
         <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => onSave({ ...f, ...parsed })} style={{ flex: 2, background: "rgba(0,255,157,0.1)", border: "1px solid rgba(0,255,157,0.3)", color: "#00ff9d", borderRadius: 10, padding: "12px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1 }}>SAVE</button>
-          <button onClick={onClose} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "#556", borderRadius: 10, padding: "12px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer" }}>CANCEL</button>
+          <button onClick={() => onSave({ ...f, ...parsed })} style={{ flex: 2, background: C.surface, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "12px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>Save</button>
+          <button onClick={onClose} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 8, padding: "12px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>Cancel</button>
         </div>
       </div>
     </div>
@@ -454,13 +474,12 @@ function AssetSearchModal({ onAdd, onClose }) {
   const TYPE_COLOR = { stock: "#7eb8ff", crypto: "#00ff9d", etf: "#f5a623" };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
-      <div style={{ background: "#0d1510", border: "1px solid rgba(0,255,157,0.2)", borderRadius: "18px 18px 0 0", padding: "20px 18px 40px", width: "100%", maxWidth: 520, maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
+      <div style={{ background: "#0e0f10", border: `1px solid ${C.border}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 40px", width: "100%", maxWidth: 520, maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
 
-        {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ fontFamily: "monospace", fontSize: 13, color: "#00ff9d", letterSpacing: 2 }}>ADD ASSET</div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#4a6655", fontSize: 20, cursor: "pointer" }}>✕</button>
+          <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 15, color: C.text1, letterSpacing: 0.3 }}>Add asset</div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
         </div>
 
         {/* Search input */}
@@ -486,36 +505,35 @@ function AssetSearchModal({ onAdd, onClose }) {
           )}
 
           {results.length === 0 && !query && (
-            <div style={{ color: "#2d4a3a", fontFamily: "monospace", fontSize: 11, lineHeight: 2 }}>
-              <div style={{ marginBottom: 12, color: "#3d5449" }}>POPULAR SEARCHES</div>
-              {["BTC", "AMZN", "NVDA", "AAPL", "MSFT", "ETH", "TSLA", "GOOGL"].map(s => (
-                <button key={s} onClick={() => { setQuery(s); search(s); }}
-                  style={{ background: "rgba(0,255,157,0.05)", border: "1px solid rgba(0,255,157,0.1)", color: "#4a8a6a", borderRadius: 8, padding: "5px 12px", fontSize: 11, fontFamily: "monospace", cursor: "pointer", marginRight: 8, marginBottom: 8 }}>
-                  {s}
-                </button>
-              ))}
+            <div>
+              <div style={{ marginBottom: 12, fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2 }}>POPULAR</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {["BTC", "AMZN", "NVDA", "AAPL", "MSFT", "ETH", "TSLA", "GOOGL"].map(s => (
+                  <button key={s} onClick={() => { setQuery(s); search(s); }}
+                    style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text2, borderRadius: 4, padding: "5px 12px", fontSize: 11, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
           {results.map(r => (
-            <div key={r.symbol}
-              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+            <div key={r.symbol} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${C.border}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: `${TYPE_COLOR[r.type] || "#7eb8ff"}15`, border: `1px solid ${TYPE_COLOR[r.type] || "#7eb8ff"}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: TYPE_COLOR[r.type] || "#7eb8ff", fontFamily: "monospace" }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: C.surface, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 400, color: C.text2, fontFamily: MONO }}>
                   {r.symbol.slice(0, 2)}
                 </div>
                 <div>
-                  <div style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 14, color: "#e8f5ec" }}>{r.symbol}</div>
-                  <div style={{ fontSize: 11, color: "#4a6655", marginTop: 1 }}>{r.name.length > 30 ? r.name.slice(0, 30) + "..." : r.name}</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 14, color: C.text1 }}>{r.symbol}</div>
+                  <div style={{ fontSize: 11, color: C.text3, marginTop: 1, fontFamily: FONT, fontWeight: 300 }}>{r.name.length > 32 ? r.name.slice(0, 32) + "…" : r.name}</div>
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 9, color: TYPE_COLOR[r.type] || "#7eb8ff", fontFamily: "monospace", background: `${TYPE_COLOR[r.type] || "#7eb8ff"}15`, border: `1px solid ${TYPE_COLOR[r.type] || "#7eb8ff"}25`, borderRadius: 4, padding: "2px 6px" }}>
-                  {r.type.toUpperCase()}
-                </span>
+                <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5 }}>{r.type.toUpperCase()}</span>
                 <button onClick={() => handleAdd(r)} disabled={!!adding}
-                  style={{ background: adding === r.symbol ? "rgba(0,255,157,0.05)" : "rgba(0,255,157,0.1)", border: "1px solid rgba(0,255,157,0.3)", color: adding === r.symbol ? "#2d6644" : "#00ff9d", borderRadius: 8, padding: "6px 14px", fontSize: 11, fontFamily: "monospace", cursor: adding ? "default" : "pointer", letterSpacing: 1, minWidth: 60, textAlign: "center" }}>
-                  {adding === r.symbol ? "..." : "+ ADD"}
+                  style={{ background: "transparent", border: `1px solid ${C.border}`, color: adding===r.symbol?C.text3:C.text1, borderRadius: 6, padding: "6px 14px", fontSize: 11, fontFamily: FONT, fontWeight: 300, cursor: adding?"default":"pointer", minWidth: 60, textAlign: "center" }}>
+                  {adding === r.symbol ? "…" : "+ Add"}
                 </button>
               </div>
             </div>
@@ -541,19 +559,18 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy" }) {
   const accent = isBuy ? "#00ff9d" : "#f5a623";
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
-      <div style={{ background: "#0d1510", border: `1px solid ${accent}33`, borderRadius: "18px 18px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
+      <div style={{ background: "#0e0f10", border: `1px solid ${C.border}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
 
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 6 }}>
             {["buy","sell"].map(t => (
-              <button key={t} onClick={() => setTradeType(t)} style={{ background: tradeType===t ? (t==="buy"?"rgba(0,255,157,0.15)":"rgba(245,166,35,0.15)") : "rgba(255,255,255,0.04)", border: `1px solid ${tradeType===t ? (t==="buy"?"rgba(0,255,157,0.4)":"rgba(245,166,35,0.4)") : "rgba(255,255,255,0.1)"}`, color: tradeType===t ? (t==="buy"?"#00ff9d":"#f5a623") : "#4a6655", borderRadius: 8, padding: "6px 16px", fontSize: 12, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1 }}>
-                {t.toUpperCase()}
+              <button key={t} onClick={() => setTradeType(t)} style={{ background: tradeType===t?C.surface:"transparent", border:`1px solid ${tradeType===t?C.borderHover:C.border}`, color:tradeType===t?C.text1:C.text3, borderRadius:4, padding:"6px 16px", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:0.3 }}>
+                {t.charAt(0).toUpperCase()+t.slice(1)}
               </button>
             ))}
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#4a6655", fontSize: 20, cursor: "pointer" }}>✕</button>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
         </div>
 
         {/* Symbol pills */}
@@ -604,9 +621,9 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy" }) {
           <textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={2} placeholder={isBuy?"Why I bought this dip...":"Why I'm taking profit / cutting loss..."} style={{ ...SML, resize: "none", width: "100%" }} />
         </div>
 
-        <button onClick={() => onSave({ id: Date.now(), type: tradeType, symbol: f.symbol, name: f.name, price: parseFloat(f.price)||0, units: parseFloat(f.units)||0, fees: parseFloat(f.fees)||0, date: f.date, notes: f.notes, total })}
-          style={{ width: "100%", background: isBuy?"linear-gradient(135deg,rgba(0,255,157,0.15),rgba(0,255,157,0.08))":"linear-gradient(135deg,rgba(245,166,35,0.15),rgba(245,166,35,0.08))", border: `1px solid ${accent}55`, color: accent, borderRadius: 12, padding: "13px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer", letterSpacing: 2, fontWeight: 700 }}>
-          LOG {tradeType.toUpperCase()}
+        <button onClick={() => onSave({ id: Date.now(), type: tradeType, symbol: f.symbol.toUpperCase().trim(), name: f.name, price: parseFloat(f.price)||0, units: parseFloat(f.units)||0, fees: parseFloat(f.fees)||0, date: f.date, notes: f.notes, total })}
+          style={{ width: "100%", background: C.surface, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.5 }}>
+          Log {tradeType}
         </button>
       </div>
     </div>
@@ -631,16 +648,15 @@ function EditTradeModal({ trade, onSave, onClose }) {
   const accent = trade.type === "buy" ? "#00ff9d" : "#f5a623";
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }}>
-      <div style={{ background: "#0d1510", border: `1px solid ${accent}33`, borderRadius: "18px 18px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }}>
+      <div style={{ background: "#0e0f10", border: `1px solid ${C.border}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520 }}>
 
-        {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: accent, background: `${accent}18`, border: `1px solid ${accent}33`, borderRadius: 6, padding: "2px 8px" }}>{trade.type.toUpperCase()}</span>
-            <span style={{ fontFamily: "monospace", fontSize: 13, color: "#e8f5ec", letterSpacing: 1 }}>{trade.symbol} · EDIT TRADE</span>
+            <span style={{ fontSize: 9, fontFamily: MONO, color: trade.type==="buy"?C.green:C.amber, letterSpacing: 2, textTransform: "uppercase" }}>{trade.type}</span>
+            <span style={{ fontFamily: FONT, fontWeight: 300, fontSize: 14, color: C.text1 }}>{trade.symbol} · Edit trade</span>
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#4a6655", fontSize: 20, cursor: "pointer" }}>✕</button>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
         </div>
 
         {/* Fields */}
@@ -669,8 +685,8 @@ function EditTradeModal({ trade, onSave, onClose }) {
         </div>
 
         <button onClick={() => onSave({ ...trade, price: parseFloat(f.price)||0, units: parseFloat(f.units)||0, fees: parseFloat(f.fees)||0, date: f.date, notes: f.notes, total })}
-          style={{ width: "100%", background: `linear-gradient(135deg,${accent}22,${accent}0a)`, border: `1px solid ${accent}44`, color: accent, borderRadius: 12, padding: "13px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer", letterSpacing: 2, fontWeight: 700 }}>
-          SAVE CHANGES
+          style={{ width: "100%", background: C.surface, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>
+          Save changes
         </button>
       </div>
     </div>
@@ -709,70 +725,58 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
   const hasSells = trades.some(t => t.type === "sell");
 
   return (
-    <div onClick={() => setOpen(!open)} style={{ background: "linear-gradient(145deg,#0d1510,#111a14)", border: `1px solid ${isUp?"rgba(0,255,157,0.15)":"rgba(255,107,107,0.15)"}`, borderRadius: 16, padding: "20px 22px", marginBottom: 14, cursor: "pointer" }}>
-      {/* Header */}
+    <div onClick={() => setOpen(!open)} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: isUp?"rgba(0,255,157,0.1)":"rgba(255,107,107,0.1)", border: `1px solid ${isUp?"rgba(0,255,157,0.25)":"rgba(255,107,107,0.25)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: isUp?"#00ff9d":"#ff6b6b", fontFamily: "monospace" }}>
+          <div style={{ width: 38, height: 38, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 400, color: C.text2, fontFamily: MONO, letterSpacing: 1 }}>
             {symbol.slice(0,2)}
           </div>
           <div>
-            <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 17, color: "#e8f5ec", letterSpacing: 1 }}>{symbol}</div>
-            <div style={{ fontSize: 12, color: "#4a6655" }}>{pos.unitsHeld.toLocaleString(undefined,{maximumFractionDigits:6})} units held</div>
+            <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 16, color: C.text1 }}>{symbol}</div>
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 1 }}>{pos.unitsHeld.toLocaleString(undefined,{maximumFractionDigits:6})} units</div>
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 800, color: isUp?"#00ff9d":"#ff6b6b" }}>{fmtPct(pos.unrealisedPct)}</div>
-          <div style={{ fontFamily: "monospace", fontSize: 12, color: isUp?"#00cc7a":"#cc4444", marginTop: 2 }}>{pos.unrealisedPnl>=0?"+":""}{fmtUSD(pos.unrealisedPnl)}</div>
+          <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 18, color: isUp?C.green:C.red }}>{fmtPct(pos.unrealisedPct)}</div>
+          <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 12, color: isUp?"rgba(74,222,128,0.6)":"rgba(248,113,113,0.6)", marginTop: 2 }}>{pos.unrealisedPnl>=0?"+":""}{fmtUSD(pos.unrealisedPnl)}</div>
         </div>
       </div>
 
-      {/* Key stats grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 14 }}>
-        {[
-          ["AVG BUY", fmtUSD(pos.avgBuyPrice)],
-          ["BREAK EVEN", fmtUSD(pos.breakEven)],
-          ["CURRENT VAL", fmtUSD(pos.currentValue)],
-        ].map(([l,v]) => (
-          <div key={l} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "8px 10px" }}>
-            <div style={{ fontSize: 9, color: "#3d5449", fontFamily: "monospace", letterSpacing: 1.5 }}>{l}</div>
-            <div style={{ fontFamily: "monospace", fontSize: 12, color: "#c8dfd1", fontWeight: 700, marginTop: 3 }}>{v}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginTop: 14 }}>
+        {[["Avg buy", fmtUSD(pos.avgBuyPrice)], ["Break even", fmtUSD(pos.breakEven)], ["Value", fmtUSD(pos.currentValue)]].map(([l,v]) => (
+          <div key={l}>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 3, textTransform: "uppercase" }}>{l}</div>
+            <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 13, color: C.text2 }}>{v}</div>
           </div>
         ))}
       </div>
 
-      {/* Realised P&L badge if any sells */}
       {hasSells && (
-        <div style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, background: pos.realisedPnl>=0?"rgba(0,255,157,0.07)":"rgba(255,107,107,0.07)", border: `1px solid ${pos.realisedPnl>=0?"rgba(0,255,157,0.2)":"rgba(255,107,107,0.2)"}`, borderRadius: 20, padding: "4px 12px" }}>
-          <span style={{ fontSize: 10, color: "#4a6655", fontFamily: "monospace" }}>REALISED P&L</span>
-          <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: pos.realisedPnl>=0?"#00ff9d":"#ff6b6b" }}>{pos.realisedPnl>=0?"+":""}{fmtUSD(pos.realisedPnl)}</span>
+        <div style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5 }}>REALISED</span>
+          <span style={{ fontSize: 12, fontFamily: FONT, fontWeight: 300, color: pos.realisedPnl>=0?C.green:C.red }}>{pos.realisedPnl>=0?"+":""}{fmtUSD(pos.realisedPnl)}</span>
         </div>
       )}
 
       {/* Expanded detail */}
       {open && (
-        <div style={{ marginTop: 16, borderTop: "1px solid rgba(0,255,157,0.08)", paddingTop: 16 }} onClick={e => e.stopPropagation()}>
+        <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }} onClick={e => e.stopPropagation()}>
 
           {/* Full stats */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-            {[
-              ["COST BASIS", fmtUSD(pos.costBasis)],
-              ["CURRENT PRICE", fmtUSD(currentPrice)],
-              ["TOTAL BOUGHT", `${pos.totalBuyUnits.toLocaleString(undefined,{maximumFractionDigits:6})} units`],
-              ["TOTAL SOLD", `${pos.totalSellUnits.toLocaleString(undefined,{maximumFractionDigits:6})} units`],
-            ].map(([l,v]) => (
-              <div key={l} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 8, padding: "8px 10px" }}>
-                <div style={{ fontSize: 9, color: "#3d5449", fontFamily: "monospace", letterSpacing: 1.5 }}>{l}</div>
-                <div style={{ fontFamily: "monospace", fontSize: 12, color: "#8aab96", marginTop: 3 }}>{v}</div>
+            {[["Cost basis", fmtUSD(pos.costBasis)], ["Current price", fmtUSD(currentPrice)], ["Total bought", `${pos.totalBuyUnits.toLocaleString(undefined,{maximumFractionDigits:6})} units`], ["Total sold", `${pos.totalSellUnits.toLocaleString(undefined,{maximumFractionDigits:6})} units`]].map(([l,v]) => (
+              <div key={l}>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 3, textTransform: "uppercase" }}>{l}</div>
+                <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 13, color: C.text2 }}>{v}</div>
               </div>
             ))}
           </div>
 
           {/* Trade log tabs */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
             {["summary","trades"].map(v => (
-              <button key={v} onClick={() => setView(v)} style={{ background: view===v?"rgba(0,255,157,0.1)":"transparent", border: `1px solid ${view===v?"rgba(0,255,157,0.3)":"rgba(255,255,255,0.08)"}`, color: view===v?"#00ff9d":"#4a6655", borderRadius: 20, padding: "4px 14px", fontSize: 10, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1.5 }}>
-                {v.toUpperCase()}
+              <button key={v} onClick={() => setView(v)} style={{ background: view===v?C.surface:"transparent", border:`1px solid ${view===v?C.borderHover:C.border}`, color:view===v?C.text1:C.text3, borderRadius:4, padding:"4px 14px", fontSize:10, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:0.3 }}>
+                {v.charAt(0).toUpperCase()+v.slice(1)}
               </button>
             ))}
           </div>
@@ -780,22 +784,22 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
           {view === "trades" && (
             <div>
               {trades.sort((a,b) => new Date(b.date)-new Date(a.date)).map((t,i) => (
-                <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
                   <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 700, color: t.type==="buy"?"#00ff9d":"#f5a623", background: t.type==="buy"?"rgba(0,255,157,0.1)":"rgba(245,166,35,0.1)", border: `1px solid ${t.type==="buy"?"rgba(0,255,157,0.2)":"rgba(245,166,35,0.2)"}`, borderRadius: 4, padding: "1px 6px" }}>{t.type.toUpperCase()}</span>
-                      <span style={{ fontFamily: "monospace", fontSize: 11, color: "#8aab96" }}>{t.date}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 9, fontFamily: MONO, color: t.type==="buy"?C.green:C.amber, letterSpacing: 1.5, textTransform: "uppercase" }}>{t.type}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 10, color: C.text3 }}>{t.date}</span>
                     </div>
-                    {t.notes && <div style={{ fontSize: 11, color: "#3d5449", marginTop: 3 }}>{t.notes}</div>}
-                    {t.fees > 0 && <div style={{ fontSize: 10, color: "#3d5449", marginTop: 2, fontFamily: "monospace" }}>FEE: {fmtUSD(t.fees)}</div>}
+                    {t.notes && <div style={{ fontSize: 11, color: C.text3, marginTop: 3, fontFamily: FONT, fontWeight: 300 }}>{t.notes}</div>}
+                    {t.fees > 0 && <div style={{ fontSize: 10, color: C.text3, marginTop: 2, fontFamily: MONO, opacity: 0.6 }}>fee {fmtUSD(t.fees)}</div>}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#e8f5ec" }}>{fmtUSD(t.price)} × {t.units}</div>
-                      <div style={{ fontFamily: "monospace", fontSize: 11, color: t.type==="buy"?"#4a6655":"#f5a623" }}>{t.type==="buy"?"-":"+"}{ fmtUSD(t.price*t.units)}</div>
+                      <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 13, color: C.text1 }}>{fmtUSD(t.price)} × {t.units}</div>
+                      <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 11, color: C.text3 }}>{t.type==="buy"?"-":"+"}{ fmtUSD(t.price*t.units)}</div>
                     </div>
-                    <button onClick={() => onEdit(t)} style={{ background: "rgba(126,184,255,0.08)", border: "1px solid rgba(126,184,255,0.2)", color: "#7eb8ff", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontFamily: "monospace", cursor: "pointer" }}>✎</button>
-                    <button onClick={() => onDelete(t.id)} style={{ background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.2)", color: "#ff6b6b", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontFamily: "monospace", cursor: "pointer" }}>✕</button>
+                    <button onClick={() => onEdit(t)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 4, padding: "4px 8px", fontSize: 10, fontFamily: MONO, cursor: "pointer" }}>✎</button>
+                    <button onClick={() => onDelete(t.id)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 4, padding: "4px 8px", fontSize: 10, fontFamily: MONO, cursor: "pointer" }}>✕</button>
                   </div>
                 </div>
               ))}
@@ -803,21 +807,13 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
           )}
 
           {view === "summary" && (
-            <div>
-              <div style={{ background: "rgba(255,255,255,0.02)", borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 11, color: "#4a6655", fontFamily: "monospace" }}>UNREALISED P&L</span>
-                  <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 800, color: pos.unrealisedPnl>=0?"#00ff9d":"#ff6b6b" }}>{pos.unrealisedPnl>=0?"+":""}{fmtUSD(pos.unrealisedPnl)} ({fmtPct(pos.unrealisedPct)})</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {[["Unrealised P&L", `${pos.unrealisedPnl>=0?"+":""}${fmtUSD(pos.unrealisedPnl)} (${fmtPct(pos.unrealisedPct)})`, pos.unrealisedPnl], ...(hasSells?[["Realised P&L", `${pos.realisedPnl>=0?"+":""}${fmtUSD(pos.realisedPnl)}`, pos.realisedPnl]]:[]), ["Total P&L", `${(pos.unrealisedPnl+pos.realisedPnl)>=0?"+":""}${fmtUSD(pos.unrealisedPnl+pos.realisedPnl)}`, pos.unrealisedPnl+pos.realisedPnl]].map(([l,v,n]) => (
+                <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, textTransform: "uppercase" }}>{l}</span>
+                  <span style={{ fontFamily: FONT, fontWeight: 300, fontSize: 14, color: n>=0?C.green:C.red }}>{v}</span>
                 </div>
-                {hasSells && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 11, color: "#4a6655", fontFamily: "monospace" }}>REALISED P&L</span>
-                  <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 800, color: pos.realisedPnl>=0?"#00ff9d":"#ff6b6b" }}>{pos.realisedPnl>=0?"+":""}{fmtUSD(pos.realisedPnl)}</span>
-                </div>}
-                <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8 }}>
-                  <span style={{ fontSize: 11, color: "#4a6655", fontFamily: "monospace" }}>TOTAL P&L</span>
-                  <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 800, color: (pos.unrealisedPnl+pos.realisedPnl)>=0?"#00ff9d":"#ff6b6b" }}>{(pos.unrealisedPnl+pos.realisedPnl)>=0?"+":""}{fmtUSD(pos.unrealisedPnl+pos.realisedPnl)}</span>
-                </div>
-              </div>
+              ))}
             </div>
           )}
 
@@ -838,16 +834,16 @@ function SignalLegend() {
     { sig: { label: "AVOID",      color: "#ff6b6b", bg: "rgba(255,107,107,0.1)" }, rule: "Overbought / greed territory" },
   ];
   return (
-    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "16px 18px", marginBottom: 20 }}>
-      <div style={{ fontSize: 10, color: "#3d5449", fontFamily: "monospace", letterSpacing: 2, marginBottom: 12 }}>SIGNAL LOGIC · AUTO-CALCULATED</div>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 18px", marginBottom: 20 }}>
+      <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 14, textTransform: "uppercase" }}>Signal logic</div>
       {rules.map(({ sig, rule }) => (
         <div key={sig.label} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <SignalBadge sig={sig} size="sm" />
-          <span style={{ fontSize: 11, color: "#4a6655" }}>{rule}</span>
+          <span style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300 }}>{rule}</span>
         </div>
       ))}
-      <div style={{ marginTop: 10, fontSize: 11, color: "#3d5449", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10 }}>
-        Inputs: RSI · 52W High · 200-Day MA · Fear & Greed (crypto only)
+      <div style={{ marginTop: 12, fontSize: 10, color: C.text3, borderTop: `1px solid ${C.border}`, paddingTop: 10, fontFamily: MONO, letterSpacing: 1, opacity: 0.6 }}>
+        Inputs: RSI · 52W High · 200-Day MA · Fear & Greed (crypto)
       </div>
     </div>
   );
@@ -938,13 +934,13 @@ export default function App() {
   const buyableCount = watchlist.filter(a => ["strong-buy","dip"].includes(calcSignal(a).signal)).length;
 
   if (!loaded) return (
-    <div style={{ minHeight: "100vh", background: "#070c09", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ fontFamily: "monospace", color: "#00ff9d", fontSize: 13, letterSpacing: 3, opacity: 0.5 }}>LOADING...</div>
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ fontFamily: FONT, fontWeight: 100, color: C.text3, fontSize: 18, letterSpacing: 8 }}>accrue</div>
     </div>
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#070c09", color: "#e8f5ec", fontFamily: "'Georgia', serif", padding: "24px 20px 80px" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "28px 20px 80px" }}>
       {/* ── ACCRUE HEADER ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -973,106 +969,86 @@ export default function App() {
 
           {/* Refresh + live status */}
           <button onClick={() => refreshPrices()} disabled={liveStatus==="fetching"}
-            style={{
-              background: "rgba(0,255,157,0.06)", border: "1px solid rgba(0,255,157,0.15)",
-              color: liveStatus==="fetching" ? "#2d6644" : "#00ff9d",
-              borderRadius: 10, padding: "8px 12px", fontSize: 10,
-              fontFamily: "monospace", cursor: liveStatus==="fetching" ? "default" : "pointer",
-              letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 6, marginTop: 2,
-            }}>
-            <span style={{ display: "inline-block", animation: liveStatus==="fetching" ? "spin 1s linear infinite" : "none", fontSize: 13 }}>↻</span>
+            style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 6, padding: "7px 10px", fontSize: 13, fontFamily: FONT, cursor: liveStatus==="fetching"?"default":"pointer", display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
+            <span style={{ display: "inline-block", animation: liveStatus==="fetching"?"spin 1s linear infinite":"none" }}>↻</span>
             <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
           </button>
         </div>
 
         {/* Divider with live status */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
-          <div style={{ flex: 1, height: 1, background: "rgba(0,255,157,0.08)" }} />
+          <div style={{ flex: 1, height: 1, background: C.border }} />
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <div style={{
-              width: 5, height: 5, borderRadius: "50%",
-              background: liveStatus==="ok" ? "#00ff9d" : liveStatus==="fetching" ? "#f5a623" : liveStatus==="error" ? "#ff6b6b" : "#3d5449",
-              boxShadow: liveStatus==="ok" ? "0 0 5px #00ff9d" : "none",
-            }} />
-            <span style={{ fontSize: 9, color: "#2d5040", fontFamily: "monospace", letterSpacing: 2 }}>
-              {liveStatus==="ok" ? "LIVE" : liveStatus==="fetching" ? "UPDATING" : liveStatus==="error" ? "OFFLINE" : "INITIALISING"}
+            <div style={{ width: 4, height: 4, borderRadius: "50%", background: liveStatus==="ok"?C.green:liveStatus==="error"?C.red:C.text3, opacity: 0.7 }} />
+            <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, opacity: 0.6 }}>
+              {liveStatus==="ok" ? "live" : liveStatus==="fetching" ? "updating" : liveStatus==="error" ? "offline" : "loading"}
             </span>
           </div>
-          <div style={{ flex: 1, height: 1, background: "rgba(0,255,157,0.08)" }} />
+          <div style={{ flex: 1, height: 1, background: C.border }} />
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 0, marginBottom: 24, background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
-        {[["watchlist","WATCHLIST"],["portfolio","PORTFOLIO"]].map(([t,l]) => (
-          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, background: tab===t?"rgba(0,255,157,0.1)":"transparent", border: tab===t?"1px solid rgba(0,255,157,0.25)":"1px solid transparent", color: tab===t?"#00ff9d":"#3d5449", borderRadius: 9, padding: "10px 0", fontSize: 12, fontFamily: "monospace", cursor: "pointer", letterSpacing: 2, transition: "all 0.15s" }}>{l}</button>
+      <div style={{ display: "flex", gap: 0, marginBottom: 28, background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.border}` }}>
+        {[["watchlist","Watchlist"],["portfolio","Portfolio"]].map(([t,l]) => (
+          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, background: tab===t?"rgba(255,255,255,0.06)":"transparent", border: "1px solid transparent", color: tab===t?C.text1:C.text3, borderRadius: 6, padding: "9px 0", fontSize: 12, fontFamily: FONT, fontWeight: tab===t?400:300, cursor: "pointer", letterSpacing: 0.3, transition: "all 0.15s" }}>{l}</button>
         ))}
       </div>
 
       {tab === "watchlist" && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 18 }}>
-            {[{l:"ASSETS",v:watchlist.length,c:"#7eb8ff"},{l:"BUY NOW",v:buyableCount,c:"#00ff9d"},{l:"WATCHING",v:watchlist.filter(a=>calcSignal(a).signal==="watch").length,c:"#f5a623"}].map(s => (
-              <div key={s.l} style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:12, padding:"12px 0", textAlign:"center" }}>
-                <div style={{ fontSize:22, fontWeight:900, fontFamily:"monospace", color:s.c }}>{s.v}</div>
-                <div style={{ fontSize:9, color:"#3d5449", fontFamily:"monospace", letterSpacing:2, marginTop:2 }}>{s.l}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 24 }}>
+            {[{l:"Assets",v:watchlist.length},{l:"Buy now",v:buyableCount},{l:"Watching",v:watchlist.filter(a=>calcSignal(a).signal==="watch").length}].map(s => (
+              <div key={s.l} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "12px 0", textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 200, fontFamily: FONT, color: C.text1 }}>{s.v}</div>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginTop: 3 }}>{s.l.toUpperCase()}</div>
               </div>
             ))}
           </div>
 
-          <button onClick={() => setShowLegend(!showLegend)} style={{ width:"100%", background:"transparent", border:"1px solid rgba(255,255,255,0.07)", color:"#4a6655", borderRadius:10, padding:"8px 0", fontSize:11, fontFamily:"monospace", cursor:"pointer", letterSpacing:2, marginBottom:14 }}>
-            {showLegend ? "▲ HIDE" : "▼ SHOW"} SIGNAL LOGIC
+          <button onClick={() => setShowLegend(!showLegend)} style={{ width:"100%", background:"transparent", border:`1px solid ${C.border}`, color:C.text3, borderRadius:6, padding:"8px 0", fontSize:10, fontFamily:MONO, cursor:"pointer", letterSpacing:2, marginBottom:14, textTransform:"uppercase" }}>
+            {showLegend ? "↑ hide" : "↓ show"} signal logic
           </button>
           {showLegend && <SignalLegend />}
 
-          <div style={{ display:"flex", gap:8, marginBottom:16, overflowX:"auto", paddingBottom:2 }}>
-            {[["all","ALL"],["strong-buy","STRONG BUY"],["dip","BUY DIP"],["watch","WATCHING"],["near-high","WAIT"],["crypto","CRYPTO"],["stock","STOCK"]].map(([f,l]) => (
-              <button key={f} onClick={() => setFilterSig(f)} style={{ background:filterSig===f?"rgba(0,255,157,0.1)":"transparent", border:`1px solid ${filterSig===f?"rgba(0,255,157,0.3)":"rgba(255,255,255,0.08)"}`, color:filterSig===f?"#00ff9d":"#4a6655", borderRadius:20, padding:"5px 13px", fontSize:10, fontFamily:"monospace", cursor:"pointer", letterSpacing:1.5, whiteSpace:"nowrap" }}>{l}</button>
+          <div style={{ display:"flex", gap:6, marginBottom:18, overflowX:"auto", paddingBottom:2 }}>
+            {[["all","All"],["strong-buy","Strong buy"],["dip","Buy dip"],["watch","Watching"],["near-high","Wait"],["crypto","Crypto"],["stock","Stock"]].map(([f,l]) => (
+              <button key={f} onClick={() => setFilterSig(f)} style={{ background: filterSig===f?C.surface:"transparent", border:`1px solid ${filterSig===f?C.borderHover:C.border}`, color:filterSig===f?C.text1:C.text3, borderRadius:4, padding:"4px 12px", fontSize:10, fontFamily:FONT, fontWeight:300, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.3 }}>{l}</button>
             ))}
           </div>
 
           {filteredWatch.length === 0
-            ? <div style={{ textAlign:"center", color:"#3d5449", fontFamily:"monospace", fontSize:13, padding:"40px 0" }}>NO ASSETS MATCH FILTER</div>
+            ? <div style={{ textAlign:"center", color:C.text3, fontFamily:FONT, fontWeight:300, fontSize:13, padding:"40px 0" }}>No assets match filter</div>
             : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onEdit={a => setWatchModal({asset:a})} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} onThesisUpdate={(id, thesis) => setWatchlist(w => w.map(x => x.id === id ? {...x, thesis} : x))} />)
           }
-          <button onClick={() => setSearchModal(true)} style={{ width:"100%", marginTop:8, background:"rgba(0,255,157,0.05)", border:"1px dashed rgba(0,255,157,0.2)", color:"#00ff9d", borderRadius:14, padding:"16px 0", fontSize:13, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ ADD ASSET</button>
+          <button onClick={() => setSearchModal(true)} style={{ width:"100%", marginTop:10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"16px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Add asset</button>
         </>
       )}
 
       {tab === "portfolio" && (
         <>
           {portfolio.length > 0 && (
-            <div style={{ background:"linear-gradient(135deg,#0d1a10,#0a1a14)", border:"1px solid rgba(0,255,157,0.15)", borderRadius:16, padding:"20px 22px", marginBottom:20 }}>
-              <div style={{ fontSize:10, color:"#4a6655", fontFamily:"monospace", letterSpacing:2, marginBottom:14 }}>PORTFOLIO SUMMARY</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
-                {[["COST BASIS",fmtUSD(totalCostBasis),"#7eb8ff"],["CURRENT VALUE",fmtUSD(totalCurrentValue),"#e8f5ec"]].map(([l,v,c]) => (
-                  <div key={l} style={{ background:"rgba(255,255,255,0.03)", borderRadius:10, padding:"10px 12px" }}>
-                    <div style={{ fontSize:9, color:"#3d5449", fontFamily:"monospace", letterSpacing:1.5 }}>{l}</div>
-                    <div style={{ fontFamily:"monospace", fontSize:16, fontWeight:800, color:c, marginTop:4 }}>{v}</div>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "20px 20px", marginBottom: 20 }}>
+              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 16, textTransform: "uppercase" }}>Portfolio Summary</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                {[["Cost basis", fmtUSD(totalCostBasis)], ["Current value", fmtUSD(totalCurrentValue)]].map(([l,v]) => (
+                  <div key={l}>
+                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4, textTransform: "uppercase" }}>{l}</div>
+                    <div style={{ fontFamily: FONT, fontWeight: 200, fontSize: 20, color: C.text1 }}>{v}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
-                <div style={{ background:"rgba(255,255,255,0.03)", borderRadius:10, padding:"10px 12px" }}>
-                  <div style={{ fontSize:9, color:"#3d5449", fontFamily:"monospace", letterSpacing:1.5 }}>UNREALISED P&L</div>
-                  <div style={{ fontFamily:"monospace", fontSize:15, fontWeight:800, color:totalUnrealisedPnl>=0?"#00ff9d":"#ff6b6b", marginTop:4 }}>{totalUnrealisedPnl>=0?"+":""}{fmtUSD(totalUnrealisedPnl)}</div>
-                  <div style={{ fontFamily:"monospace", fontSize:11, color:totalUnrealisedPnl>=0?"#2d6644":"#8a3333" }}>{fmtPct(totalPnlPct)}</div>
-                </div>
-                <div style={{ background:"rgba(255,255,255,0.03)", borderRadius:10, padding:"10px 12px" }}>
-                  <div style={{ fontSize:9, color:"#3d5449", fontFamily:"monospace", letterSpacing:1.5 }}>REALISED P&L</div>
-                  <div style={{ fontFamily:"monospace", fontSize:15, fontWeight:800, color:totalRealisedPnl>=0?"#00ff9d":"#ff6b6b", marginTop:4 }}>{totalRealisedPnl>=0?"+":""}{fmtUSD(totalRealisedPnl)}</div>
-                  <div style={{ fontFamily:"monospace", fontSize:11, color:"#3d5449" }}>LOCKED IN</div>
-                </div>
-              </div>
-              <div style={{ borderTop:"1px solid rgba(255,255,255,0.05)", paddingTop:12, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                <div style={{ fontSize:10, color:"#4a6655", fontFamily:"monospace", letterSpacing:2 }}>TOTAL P&L</div>
-                <div>
-                  <span style={{ fontFamily:"monospace", fontSize:20, fontWeight:900, color:totalPnl>=0?"#00ff9d":"#ff6b6b" }}>{totalPnl>=0?"+":""}{fmtUSD(totalPnl)}</span>
-                </div>
+              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                {[["Unrealised", `${totalUnrealisedPnl>=0?"+":""}${fmtUSD(totalUnrealisedPnl)}`, totalUnrealisedPnl], ["Realised", `${totalRealisedPnl>=0?"+":""}${fmtUSD(totalRealisedPnl)}`, totalRealisedPnl], ["Total P&L", `${totalPnl>=0?"+":""}${fmtUSD(totalPnl)}`, totalPnl]].map(([l,v,n]) => (
+                  <div key={l}>
+                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 3, textTransform: "uppercase" }}>{l}</div>
+                    <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 14, color: n>=0?C.green:C.red }}>{v}</div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
           {positionSummaries.length === 0
-            ? <div style={{ textAlign:"center", color:"#3d5449", fontFamily:"monospace", fontSize:13, padding:"40px 0", lineHeight:2 }}>NO POSITIONS YET<br/><span style={{fontSize:11}}>Log your first trade below</span></div>
+            ? <div style={{ textAlign:"center", color:C.text3, fontFamily:FONT, fontWeight:300, fontSize:13, padding:"40px 0", lineHeight:2 }}>No positions yet<br/><span style={{fontSize:11, opacity:0.6}}>Log your first trade below</span></div>
             : positionSummaries.map(({sym, trades}) => (
                 <PositionCard key={sym} trades={trades} currentPrice={getLivePrice(sym)}
                   onDelete={id => setPortfolio(p => p.filter(x => x.id !== id))}
@@ -1080,12 +1056,12 @@ export default function App() {
                   onEdit={(trade) => setEditTradeModal(trade)} />
               ))
           }
-          <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ width:"100%", marginTop:8, background:"rgba(0,255,157,0.07)", border:"1px dashed rgba(0,255,157,0.25)", color:"#00ff9d", borderRadius:14, padding:"14px 0", fontSize:12, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ LOG TRADE</button>
+          <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ width:"100%", marginTop:10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Log trade</button>
         </>
       )}
 
-      <div style={{ textAlign:"center", marginTop:28, fontSize:9, color:"#1a2e20", fontFamily:"monospace", letterSpacing:3 }}>
-        ACCRUE · {lastUpdated ? `LAST SYNC ${lastUpdated.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}` : "ACCRUE INVESTMENT INTELLIGENCE"}
+      <div style={{ textAlign:"center", marginTop:32, fontSize:9, color:C.text3, fontFamily:MONO, letterSpacing:2, opacity:0.4 }}>
+        {lastUpdated ? `Last sync ${lastUpdated.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}` : "Accrue"}
       </div>
 
       {watchModal !== null && <WatchModal asset={watchModal.asset} onSave={saveWatch} onClose={() => setWatchModal(null)} />}
