@@ -192,6 +192,8 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate }) {
           name: asset.name,
           type: asset.type,
           thesis: asset.thesis,
+          currentPrice: asset.currentPrice,
+          change24h: asset.change24h,
         }),
       });
       const data = await res.json();
