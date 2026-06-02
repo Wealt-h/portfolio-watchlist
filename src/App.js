@@ -348,91 +348,127 @@ function WatchModal({ asset, onSave, onClose }) {
   );
 }
 
-// ─── BUY MODAL ────────────────────────────────────────────────────────────────
-function BuyModal({ watchlist, onSave, onClose }) {
-  const [f, setF] = useState({ symbol: "", name: "", buyPrice: "", units: "", date: new Date().toISOString().slice(0,10), currentPrice: "", notes: "" });
+// ─── TRADE MODAL (BUY + SELL) ─────────────────────────────────────────────────
+function TradeModal({ watchlist, onSave, onClose, defaultType = "buy" }) {
+  const [tradeType, setTradeType] = useState(defaultType);
+  const [f, setF] = useState({ symbol: "", name: "", price: "", units: "", fees: "", date: new Date().toISOString().slice(0,10), notes: "" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
-  const pick = (sym) => { const a = watchlist.find(x => x.symbol === sym); if (a) setF(p => ({ ...p, symbol: a.symbol, name: a.name, currentPrice: a.currentPrice })); else setF(p => ({ ...p, symbol: sym })); };
-  const cost = parseFloat(f.buyPrice) * parseFloat(f.units) || 0;
+  const pick = (sym) => { const a = watchlist.find(x => x.symbol === sym); if (a) setF(p => ({ ...p, symbol: a.symbol, name: a.name })); else setF(p => ({ ...p, symbol: sym })); };
+  const subtotal = (parseFloat(f.price)||0) * (parseFloat(f.units)||0);
+  const fees = parseFloat(f.fees)||0;
+  const total = tradeType === "buy" ? subtotal + fees : subtotal - fees;
   const SML = { ...INP, padding: "7px 10px", fontSize: 12 };
   const LBL2 = { ...LBL, marginBottom: 3 };
+  const isBuy = tradeType === "buy";
+  const accent = isBuy ? "#00ff9d" : "#f5a623";
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
-      <div style={{ background: "#0d1510", border: "1px solid rgba(0,255,157,0.2)", borderRadius: "18px 18px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
+      <div style={{ background: "#0d1510", border: `1px solid ${accent}33`, borderRadius: "18px 18px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
 
-        {/* Header row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ fontFamily: "monospace", fontSize: 13, color: "#00ff9d", letterSpacing: 2 }}>LOG A BUY</div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#4a6655", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            {["buy","sell"].map(t => (
+              <button key={t} onClick={() => setTradeType(t)} style={{ background: tradeType===t ? (t==="buy"?"rgba(0,255,157,0.15)":"rgba(245,166,35,0.15)") : "rgba(255,255,255,0.04)", border: `1px solid ${tradeType===t ? (t==="buy"?"rgba(0,255,157,0.4)":"rgba(245,166,35,0.4)") : "rgba(255,255,255,0.1)"}`, color: tradeType===t ? (t==="buy"?"#00ff9d":"#f5a623") : "#4a6655", borderRadius: 8, padding: "6px 16px", fontSize: 12, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1 }}>
+                {t.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#4a6655", fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
 
         {/* Symbol pills */}
         <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 12 }}>
-          {watchlist.map(a => { const s = calcSignal(a); return (
+          {watchlist.map(a => (
             <button key={a.symbol} onClick={() => pick(a.symbol)}
-              style={{ background: f.symbol===a.symbol?`${s.color}22`:"rgba(255,255,255,0.05)", border: `1px solid ${f.symbol===a.symbol?s.color+"66":"rgba(255,255,255,0.1)"}`, color: f.symbol===a.symbol?s.color:"#6a8a7a", borderRadius: 20, padding: "5px 14px", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}>
+              style={{ background: f.symbol===a.symbol?"rgba(255,255,255,0.1)":"rgba(255,255,255,0.04)", border: `1px solid ${f.symbol===a.symbol?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.1)"}`, color: f.symbol===a.symbol?"#e8f5ec":"#6a8a7a", borderRadius: 20, padding: "5px 14px", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}>
               {a.symbol}
             </button>
-          );})}
+          ))}
           <input value={f.symbol.length && !watchlist.find(x=>x.symbol===f.symbol) ? f.symbol : ""} onChange={e => pick(e.target.value.toUpperCase())} placeholder="OTHER" style={{ ...SML, width: 80, borderRadius: 20, padding: "5px 12px", textAlign: "center" }} />
         </div>
 
-        {/* Price + Units row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
-          <div>
-            <div style={LBL2}>BUY PRICE</div>
-            <input value={f.buyPrice} onChange={e => set("buyPrice", e.target.value)} type="number" placeholder="0.00" style={SML} />
-          </div>
-          <div>
-            <div style={LBL2}>UNITS</div>
-            <input value={f.units} onChange={e => set("units", e.target.value)} type="number" placeholder="0" style={SML} />
-          </div>
-          <div>
-            <div style={LBL2}>DATE</div>
-            <input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark" }} />
-          </div>
+        {/* Price / Units / Date */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+          <div><div style={LBL2}>{isBuy?"BUY":"SELL"} PRICE</div><input value={f.price} onChange={e => set("price", e.target.value)} type="number" placeholder="0.00" style={SML} /></div>
+          <div><div style={LBL2}>UNITS</div><input value={f.units} onChange={e => set("units", e.target.value)} type="number" placeholder="0" style={SML} /></div>
+          <div><div style={LBL2}>DATE</div><input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark" }} /></div>
         </div>
 
-        {/* Total cost pill */}
-        {cost > 0 && (
-          <div style={{ background: "rgba(0,255,157,0.06)", border: "1px solid rgba(0,255,157,0.15)", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontFamily: "monospace", fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "#4a6655" }}>TOTAL COST</span>
-            <span style={{ color: "#00ff9d", fontWeight: 800 }}>{fmtUSD(cost)}</span>
+        {/* Fees */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={LBL2}>BROKERAGE FEE <span style={{ color: "#2d4a3a" }}>(optional)</span></div>
+          <input value={f.fees} onChange={e => set("fees", e.target.value)} type="number" placeholder="0.00" style={{ ...SML, width: "50%" }} />
+        </div>
+
+        {/* Summary pill */}
+        {subtotal > 0 && (
+          <div style={{ background: isBuy?"rgba(0,255,157,0.06)":"rgba(245,166,35,0.06)", border: `1px solid ${isBuy?"rgba(0,255,157,0.15)":"rgba(245,166,35,0.15)"}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 12, marginBottom: fees>0?4:0 }}>
+              <span style={{ color: "#4a6655" }}>SUBTOTAL</span>
+              <span style={{ color: "#c8dfd1" }}>{fmtUSD(subtotal)}</span>
+            </div>
+            {fees > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 12, marginBottom: 4 }}>
+              <span style={{ color: "#4a6655" }}>FEES</span>
+              <span style={{ color: "#ff6b6b" }}>+{fmtUSD(fees)}</span>
+            </div>}
+            <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 13, borderTop: fees>0?"1px solid rgba(255,255,255,0.06)":"none", paddingTop: fees>0?4:0 }}>
+              <span style={{ color: "#4a6655" }}>{isBuy?"TOTAL COST":"NET PROCEEDS"}</span>
+              <span style={{ color: accent, fontWeight: 800 }}>{fmtUSD(total)}</span>
+            </div>
           </div>
         )}
 
         {/* Notes */}
         <div style={{ marginBottom: 14 }}>
-          <div style={LBL2}>NOTES <span style={{ color: "#2d4a3a", fontWeight: 400 }}>(optional)</span></div>
-          <textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={2} placeholder="Why I bought this dip..." style={{ ...SML, resize: "none", width: "100%" }} />
+          <div style={LBL2}>NOTES <span style={{ color: "#2d4a3a" }}>(optional)</span></div>
+          <textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={2} placeholder={isBuy?"Why I bought this dip...":"Why I'm taking profit / cutting loss..."} style={{ ...SML, resize: "none", width: "100%" }} />
         </div>
 
-        {/* Action buttons */}
-        <button onClick={() => onSave({ ...f, id: Date.now(), buyPrice: parseFloat(f.buyPrice), units: parseFloat(f.units), currentPrice: parseFloat(f.currentPrice)||parseFloat(f.buyPrice) })}
-          style={{ width: "100%", background: "linear-gradient(135deg, rgba(0,255,157,0.15), rgba(0,255,157,0.08))", border: "1px solid rgba(0,255,157,0.35)", color: "#00ff9d", borderRadius: 12, padding: "13px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer", letterSpacing: 2, fontWeight: 700 }}>
-          LOG BUY
+        <button onClick={() => onSave({ id: Date.now(), type: tradeType, symbol: f.symbol, name: f.name, price: parseFloat(f.price)||0, units: parseFloat(f.units)||0, fees: parseFloat(f.fees)||0, date: f.date, notes: f.notes, total })}
+          style={{ width: "100%", background: isBuy?"linear-gradient(135deg,rgba(0,255,157,0.15),rgba(0,255,157,0.08))":"linear-gradient(135deg,rgba(245,166,35,0.15),rgba(245,166,35,0.08))", border: `1px solid ${accent}55`, color: accent, borderRadius: 12, padding: "13px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer", letterSpacing: 2, fontWeight: 700 }}>
+          LOG {tradeType.toUpperCase()}
         </button>
       </div>
     </div>
   );
 }
 
+// ─── POSITION HELPERS ────────────────────────────────────────────────────────
+function calcPosition(trades, currentPrice) {
+  const buys = trades.filter(t => t.type === "buy");
+  const sells = trades.filter(t => t.type === "sell");
+  const totalBuyUnits = buys.reduce((s,t) => s+t.units, 0);
+  const totalSellUnits = sells.reduce((s,t) => s+t.units, 0);
+  const unitsHeld = totalBuyUnits - totalSellUnits;
+  const totalCostWithFees = buys.reduce((s,t) => s+(t.price*t.units)+(t.fees||0), 0);
+  const totalBuyUnitsForAvg = totalBuyUnits || 1;
+  const avgBuyPrice = buys.reduce((s,t) => s+t.price*t.units, 0) / totalBuyUnitsForAvg;
+  const totalFeesOnBuys = buys.reduce((s,t) => s+(t.fees||0), 0);
+  const breakEven = unitsHeld > 0 ? (totalCostWithFees - sells.reduce((s,t) => s+(t.price*t.units)-(t.fees||0),0)) / unitsHeld : 0;
+  const currentValue = currentPrice * unitsHeld;
+  const costBasis = avgBuyPrice * unitsHeld + (unitsHeld/totalBuyUnitsForAvg)*totalFeesOnBuys;
+  const unrealisedPnl = currentValue - costBasis;
+  const unrealisedPct = costBasis > 0 ? (unrealisedPnl/costBasis)*100 : 0;
+  // Realised P&L: for each sell, profit = (sellPrice - avgBuyPrice) * units - fees
+  const realisedPnl = sells.reduce((s,t) => s + (t.price - avgBuyPrice)*t.units - (t.fees||0), 0);
+  return { unitsHeld, avgBuyPrice, breakEven, currentValue, costBasis, unrealisedPnl, unrealisedPct, realisedPnl, totalBuyUnits, totalSellUnits };
+}
+
 // ─── POSITION CARD ────────────────────────────────────────────────────────────
-function PositionCard({ buys, onDelete, onUpdatePrice }) {
+function PositionCard({ trades, currentPrice, onDelete, onAddTrade }) {
   const [open, setOpen] = useState(false);
-  const [editPrice, setEditPrice] = useState(false);
-  const [newPrice, setNewPrice] = useState("");
-  const symbol = buys[0].symbol;
-  const totalUnits = buys.reduce((s,b) => s+b.units, 0);
-  const totalCost = buys.reduce((s,b) => s+b.buyPrice*b.units, 0);
-  const avgBuy = totalCost / totalUnits;
-  const currentPrice = buys[buys.length-1].currentPrice;
-  const currentValue = currentPrice * totalUnits;
-  const pnl = currentValue - totalCost;
-  const pnlPct = (pnl / totalCost) * 100;
-  const isUp = pnl >= 0;
+  const [view, setView] = useState("summary"); // summary | trades
+  const symbol = trades[0].symbol;
+  const name = trades[0].name;
+  const pos = calcPosition(trades, currentPrice);
+  const isUp = pos.unrealisedPnl >= 0;
+  const hasSells = trades.some(t => t.type === "sell");
+
   return (
     <div onClick={() => setOpen(!open)} style={{ background: "linear-gradient(145deg,#0d1510,#111a14)", border: `1px solid ${isUp?"rgba(0,255,157,0.15)":"rgba(255,107,107,0.15)"}`, borderRadius: 16, padding: "20px 22px", marginBottom: 14, cursor: "pointer" }}>
+      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: isUp?"rgba(0,255,157,0.1)":"rgba(255,107,107,0.1)", border: `1px solid ${isUp?"rgba(0,255,157,0.25)":"rgba(255,107,107,0.25)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: isUp?"#00ff9d":"#ff6b6b", fontFamily: "monospace" }}>
@@ -440,54 +476,111 @@ function PositionCard({ buys, onDelete, onUpdatePrice }) {
           </div>
           <div>
             <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 17, color: "#e8f5ec", letterSpacing: 1 }}>{symbol}</div>
-            <div style={{ fontSize: 12, color: "#4a6655" }}>{totalUnits.toLocaleString(undefined,{maximumFractionDigits:6})} units · {buys.length} buy{buys.length>1?"s":""}</div>
+            <div style={{ fontSize: 12, color: "#4a6655" }}>{pos.unitsHeld.toLocaleString(undefined,{maximumFractionDigits:6})} units held</div>
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 800, color: isUp?"#00ff9d":"#ff6b6b" }}>{fmtPct(pnlPct)}</div>
-          <div style={{ fontFamily: "monospace", fontSize: 13, color: isUp?"#00cc7a":"#cc4444", marginTop: 2 }}>{isUp?"+":""}{fmtUSD(pnl)}</div>
+          <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 800, color: isUp?"#00ff9d":"#ff6b6b" }}>{fmtPct(pos.unrealisedPct)}</div>
+          <div style={{ fontFamily: "monospace", fontSize: 12, color: isUp?"#00cc7a":"#cc4444", marginTop: 2 }}>{pos.unrealisedPnl>=0?"+":""}{fmtUSD(pos.unrealisedPnl)}</div>
         </div>
       </div>
+
+      {/* Key stats grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 14 }}>
-        {[["INVESTED",fmtUSD(totalCost)],["CURRENT VAL",fmtUSD(currentValue)],["AVG BUY",fmtUSD(avgBuy)]].map(([l,v]) => (
+        {[
+          ["AVG BUY", fmtUSD(pos.avgBuyPrice)],
+          ["BREAK EVEN", fmtUSD(pos.breakEven)],
+          ["CURRENT VAL", fmtUSD(pos.currentValue)],
+        ].map(([l,v]) => (
           <div key={l} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "8px 10px" }}>
             <div style={{ fontSize: 9, color: "#3d5449", fontFamily: "monospace", letterSpacing: 1.5 }}>{l}</div>
             <div style={{ fontFamily: "monospace", fontSize: 12, color: "#c8dfd1", fontWeight: 700, marginTop: 3 }}>{v}</div>
           </div>
         ))}
       </div>
+
+      {/* Realised P&L badge if any sells */}
+      {hasSells && (
+        <div style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, background: pos.realisedPnl>=0?"rgba(0,255,157,0.07)":"rgba(255,107,107,0.07)", border: `1px solid ${pos.realisedPnl>=0?"rgba(0,255,157,0.2)":"rgba(255,107,107,0.2)"}`, borderRadius: 20, padding: "4px 12px" }}>
+          <span style={{ fontSize: 10, color: "#4a6655", fontFamily: "monospace" }}>REALISED P&L</span>
+          <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: pos.realisedPnl>=0?"#00ff9d":"#ff6b6b" }}>{pos.realisedPnl>=0?"+":""}{fmtUSD(pos.realisedPnl)}</span>
+        </div>
+      )}
+
+      {/* Expanded detail */}
       {open && (
         <div style={{ marginTop: 16, borderTop: "1px solid rgba(0,255,157,0.08)", paddingTop: 16 }} onClick={e => e.stopPropagation()}>
-          <div style={{ fontSize: 10, color: "#4a6655", fontFamily: "monospace", letterSpacing: 2, marginBottom: 10 }}>BUY HISTORY</div>
-          {buys.map((b,i) => (
-            <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-              <div>
-                <div style={{ fontFamily: "monospace", fontSize: 12, color: "#8aab96" }}>#{i+1} · {b.date}</div>
-                {b.notes && <div style={{ fontSize: 11, color: "#3d5449", marginTop: 2 }}>{b.notes}</div>}
+
+          {/* Full stats */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+            {[
+              ["COST BASIS", fmtUSD(pos.costBasis)],
+              ["CURRENT PRICE", fmtUSD(currentPrice)],
+              ["TOTAL BOUGHT", `${pos.totalBuyUnits.toLocaleString(undefined,{maximumFractionDigits:6})} units`],
+              ["TOTAL SOLD", `${pos.totalSellUnits.toLocaleString(undefined,{maximumFractionDigits:6})} units`],
+            ].map(([l,v]) => (
+              <div key={l} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 8, padding: "8px 10px" }}>
+                <div style={{ fontSize: 9, color: "#3d5449", fontFamily: "monospace", letterSpacing: 1.5 }}>{l}</div>
+                <div style={{ fontFamily: "monospace", fontSize: 12, color: "#8aab96", marginTop: 3 }}>{v}</div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontFamily: "monospace", fontSize: 12, color: "#e8f5ec" }}>{fmtUSD(b.buyPrice)} × {b.units}</div>
-                  <div style={{ fontFamily: "monospace", fontSize: 11, color: "#4a6655" }}>{fmtUSD(b.buyPrice*b.units)}</div>
+            ))}
+          </div>
+
+          {/* Trade log tabs */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {["summary","trades"].map(v => (
+              <button key={v} onClick={() => setView(v)} style={{ background: view===v?"rgba(0,255,157,0.1)":"transparent", border: `1px solid ${view===v?"rgba(0,255,157,0.3)":"rgba(255,255,255,0.08)"}`, color: view===v?"#00ff9d":"#4a6655", borderRadius: 20, padding: "4px 14px", fontSize: 10, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1.5 }}>
+                {v.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          {view === "trades" && (
+            <div>
+              {trades.sort((a,b) => new Date(b.date)-new Date(a.date)).map((t,i) => (
+                <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 700, color: t.type==="buy"?"#00ff9d":"#f5a623", background: t.type==="buy"?"rgba(0,255,157,0.1)":"rgba(245,166,35,0.1)", border: `1px solid ${t.type==="buy"?"rgba(0,255,157,0.2)":"rgba(245,166,35,0.2)"}`, borderRadius: 4, padding: "1px 6px" }}>{t.type.toUpperCase()}</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 11, color: "#8aab96" }}>{t.date}</span>
+                    </div>
+                    {t.notes && <div style={{ fontSize: 11, color: "#3d5449", marginTop: 3 }}>{t.notes}</div>}
+                    {t.fees > 0 && <div style={{ fontSize: 10, color: "#3d5449", marginTop: 2, fontFamily: "monospace" }}>FEE: {fmtUSD(t.fees)}</div>}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#e8f5ec" }}>{fmtUSD(t.price)} × {t.units}</div>
+                      <div style={{ fontFamily: "monospace", fontSize: 11, color: t.type==="buy"?"#4a6655":"#f5a623" }}>{t.type==="buy"?"-":"+"}{ fmtUSD(t.price*t.units)}</div>
+                    </div>
+                    <button onClick={() => onDelete(t.id)} style={{ background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.2)", color: "#ff6b6b", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontFamily: "monospace", cursor: "pointer" }}>✕</button>
+                  </div>
                 </div>
-                <button onClick={() => onDelete(b.id)} style={{ background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.2)", color: "#ff6b6b", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontFamily: "monospace", cursor: "pointer" }}>✕</button>
+              ))}
+            </div>
+          )}
+
+          {view === "summary" && (
+            <div>
+              <div style={{ background: "rgba(255,255,255,0.02)", borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: "#4a6655", fontFamily: "monospace" }}>UNREALISED P&L</span>
+                  <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 800, color: pos.unrealisedPnl>=0?"#00ff9d":"#ff6b6b" }}>{pos.unrealisedPnl>=0?"+":""}{fmtUSD(pos.unrealisedPnl)} ({fmtPct(pos.unrealisedPct)})</span>
+                </div>
+                {hasSells && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: "#4a6655", fontFamily: "monospace" }}>REALISED P&L</span>
+                  <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 800, color: pos.realisedPnl>=0?"#00ff9d":"#ff6b6b" }}>{pos.realisedPnl>=0?"+":""}{fmtUSD(pos.realisedPnl)}</span>
+                </div>}
+                <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8 }}>
+                  <span style={{ fontSize: 11, color: "#4a6655", fontFamily: "monospace" }}>TOTAL P&L</span>
+                  <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 800, color: (pos.unrealisedPnl+pos.realisedPnl)>=0?"#00ff9d":"#ff6b6b" }}>{(pos.unrealisedPnl+pos.realisedPnl)>=0?"+":""}{fmtUSD(pos.unrealisedPnl+pos.realisedPnl)}</span>
+                </div>
               </div>
             </div>
-          ))}
-          <div style={{ marginTop: 14 }}>
-            <div style={LBL}>UPDATE CURRENT PRICE</div>
-            {editPrice ? (
-              <div style={{ display: "flex", gap: 8 }}>
-                <input value={newPrice} onChange={e => setNewPrice(e.target.value)} type="number" placeholder={String(currentPrice)} style={{ flex: 1, ...INP }} />
-                <button onClick={() => { onUpdatePrice(symbol, parseFloat(newPrice)); setEditPrice(false); setNewPrice(""); }} style={{ background: "rgba(0,255,157,0.1)", border: "1px solid rgba(0,255,157,0.3)", color: "#00ff9d", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}>SET</button>
-                <button onClick={() => setEditPrice(false)} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#556", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}>✕</button>
-              </div>
-            ) : (
-              <button onClick={() => setEditPrice(true)} style={{ background: "rgba(126,184,255,0.07)", border: "1px solid rgba(126,184,255,0.2)", color: "#7eb8ff", borderRadius: 8, padding: "8px 16px", fontSize: 12, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1 }}>
-                CURRENT: {fmtUSD(currentPrice)} · UPDATE
-              </button>
-            )}
-          </div>
+          )}
+
+          <button onClick={() => onAddTrade(symbol)} style={{ width:"100%", marginTop:14, background:"rgba(0,255,157,0.05)", border:"1px dashed rgba(0,255,157,0.2)", color:"#00ff9d", borderRadius:10, padding:"10px 0", fontSize:12, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>
+            + LOG TRADE
+          </button>
         </div>
       )}
     </div>
@@ -526,7 +619,7 @@ export default function App() {
   const [portfolio, setPortfolio] = useState(DEFAULT_PORTFOLIO);
   const [loaded, setLoaded] = useState(false);
   const [watchModal, setWatchModal] = useState(null);
-  const [buyModal, setBuyModal] = useState(false);
+  const [tradeModal, setTradeModal] = useState(null); // null | { defaultType, symbol? }
   const [filterSig, setFilterSig] = useState("all");
   const [showLegend, setShowLegend] = useState(false);
   const [liveStatus, setLiveStatus] = useState("idle"); // idle | fetching | ok | error
@@ -562,12 +655,12 @@ export default function App() {
   useEffect(() => {
     (async () => {
       const w = await load("pf_watchlist_v3", DEFAULT_WATCHLIST);
-      const p = await load("pf_portfolio_v3", DEFAULT_PORTFOLIO);
+      const p = await load("pf_portfolio_v4", DEFAULT_PORTFOLIO);
       setWatchlist(w); setPortfolio(p); setLoaded(true);
     })();
   }, []);
   useEffect(() => { if (loaded) save("pf_watchlist_v3", watchlist); }, [watchlist, loaded]);
-  useEffect(() => { if (loaded) save("pf_portfolio_v3", portfolio); }, [portfolio, loaded]);
+  useEffect(() => { if (loaded) save("pf_portfolio_v4", portfolio); }, [portfolio, loaded]);
 
   const saveWatch = (form) => {
     if (watchModal?.asset) setWatchlist(w => w.map(x => x.id === watchModal.asset.id ? { ...form, id: x.id } : x));
@@ -575,11 +668,18 @@ export default function App() {
     setWatchModal(null);
   };
 
-  const positions = portfolio.reduce((acc, b) => { if (!acc[b.symbol]) acc[b.symbol]=[]; acc[b.symbol].push(b); return acc; }, {});
-  const totalInvested = portfolio.reduce((s,b) => s+b.buyPrice*b.units, 0);
-  const totalValue = Object.values(positions).reduce((s, buys) => s + buys[buys.length-1].currentPrice * buys.reduce((u,b)=>u+b.units,0), 0);
-  const totalPnl = totalValue - totalInvested;
-  const totalPnlPct = totalInvested > 0 ? (totalPnl/totalInvested)*100 : 0;
+  // Group trades by symbol
+  const positions = portfolio.reduce((acc, t) => { if (!acc[t.symbol]) acc[t.symbol]=[]; acc[t.symbol].push(t); return acc; }, {});
+
+  // Portfolio summary using live prices from watchlist
+  const getLivePrice = (sym) => { const a = watchlist.find(x => x.symbol===sym); return a?.currentPrice || 0; };
+  const positionSummaries = Object.entries(positions).map(([sym, trades]) => ({ sym, trades, pos: calcPosition(trades, getLivePrice(sym)) }));
+  const totalCostBasis = positionSummaries.reduce((s,{pos}) => s+pos.costBasis, 0);
+  const totalCurrentValue = positionSummaries.reduce((s,{pos}) => s+pos.currentValue, 0);
+  const totalUnrealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.unrealisedPnl, 0);
+  const totalRealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.realisedPnl, 0);
+  const totalPnl = totalUnrealisedPnl + totalRealisedPnl;
+  const totalPnlPct = totalCostBasis > 0 ? (totalUnrealisedPnl/totalCostBasis)*100 : 0;
 
   const filterMap = {
     all: watchlist,
@@ -657,26 +757,47 @@ export default function App() {
         <>
           {portfolio.length > 0 && (
             <div style={{ background:"linear-gradient(135deg,#0d1a10,#0a1a14)", border:"1px solid rgba(0,255,157,0.15)", borderRadius:16, padding:"20px 22px", marginBottom:20 }}>
-              <div style={{ fontSize:10, color:"#4a6655", fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>TOTAL PORTFOLIO</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                {[["INVESTED",fmtUSD(totalInvested),"#7eb8ff"],["CURRENT VALUE",fmtUSD(totalValue),"#e8f5ec"]].map(([l,v,c]) => (
-                  <div key={l}><div style={{ fontSize:10, color:"#3d5449", fontFamily:"monospace", letterSpacing:1.5 }}>{l}</div><div style={{ fontFamily:"monospace", fontSize:18, fontWeight:800, color:c, marginTop:4 }}>{v}</div></div>
+              <div style={{ fontSize:10, color:"#4a6655", fontFamily:"monospace", letterSpacing:2, marginBottom:14 }}>PORTFOLIO SUMMARY</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
+                {[["COST BASIS",fmtUSD(totalCostBasis),"#7eb8ff"],["CURRENT VALUE",fmtUSD(totalCurrentValue),"#e8f5ec"]].map(([l,v,c]) => (
+                  <div key={l} style={{ background:"rgba(255,255,255,0.03)", borderRadius:10, padding:"10px 12px" }}>
+                    <div style={{ fontSize:9, color:"#3d5449", fontFamily:"monospace", letterSpacing:1.5 }}>{l}</div>
+                    <div style={{ fontFamily:"monospace", fontSize:16, fontWeight:800, color:c, marginTop:4 }}>{v}</div>
+                  </div>
                 ))}
               </div>
-              <div style={{ marginTop:14, paddingTop:14, borderTop:"1px solid rgba(255,255,255,0.05)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
+                <div style={{ background:"rgba(255,255,255,0.03)", borderRadius:10, padding:"10px 12px" }}>
+                  <div style={{ fontSize:9, color:"#3d5449", fontFamily:"monospace", letterSpacing:1.5 }}>UNREALISED P&L</div>
+                  <div style={{ fontFamily:"monospace", fontSize:15, fontWeight:800, color:totalUnrealisedPnl>=0?"#00ff9d":"#ff6b6b", marginTop:4 }}>{totalUnrealisedPnl>=0?"+":""}{fmtUSD(totalUnrealisedPnl)}</div>
+                  <div style={{ fontFamily:"monospace", fontSize:11, color:totalUnrealisedPnl>=0?"#2d6644":"#8a3333" }}>{fmtPct(totalPnlPct)}</div>
+                </div>
+                <div style={{ background:"rgba(255,255,255,0.03)", borderRadius:10, padding:"10px 12px" }}>
+                  <div style={{ fontSize:9, color:"#3d5449", fontFamily:"monospace", letterSpacing:1.5 }}>REALISED P&L</div>
+                  <div style={{ fontFamily:"monospace", fontSize:15, fontWeight:800, color:totalRealisedPnl>=0?"#00ff9d":"#ff6b6b", marginTop:4 }}>{totalRealisedPnl>=0?"+":""}{fmtUSD(totalRealisedPnl)}</div>
+                  <div style={{ fontFamily:"monospace", fontSize:11, color:"#3d5449" }}>LOCKED IN</div>
+                </div>
+              </div>
+              <div style={{ borderTop:"1px solid rgba(255,255,255,0.05)", paddingTop:12, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <div style={{ fontSize:10, color:"#4a6655", fontFamily:"monospace", letterSpacing:2 }}>TOTAL P&L</div>
                 <div>
-                  <span style={{ fontFamily:"monospace", fontSize:20, fontWeight:900, color:totalPnl>=0?"#00ff9d":"#ff6b6b" }}>{fmtPct(totalPnlPct)}</span>
-                  <span style={{ fontFamily:"monospace", fontSize:14, color:totalPnl>=0?"#00cc7a":"#cc4444", marginLeft:10 }}>{totalPnl>=0?"+":""}{fmtUSD(totalPnl)}</span>
+                  <span style={{ fontFamily:"monospace", fontSize:20, fontWeight:900, color:totalPnl>=0?"#00ff9d":"#ff6b6b" }}>{totalPnl>=0?"+":""}{fmtUSD(totalPnl)}</span>
                 </div>
               </div>
             </div>
           )}
-          {Object.keys(positions).length === 0
-            ? <div style={{ textAlign:"center", color:"#3d5449", fontFamily:"monospace", fontSize:13, padding:"40px 0", lineHeight:2 }}>NO POSITIONS YET<br/><span style={{fontSize:11}}>Log your first buy below</span></div>
-            : Object.entries(positions).map(([sym,buys]) => <PositionCard key={sym} buys={buys} onDelete={id=>setPortfolio(p=>p.filter(x=>x.id!==id))} onUpdatePrice={(sym,price)=>setPortfolio(p=>p.map(b=>b.symbol===sym?{...b,currentPrice:price}:b))} />)
+          {positionSummaries.length === 0
+            ? <div style={{ textAlign:"center", color:"#3d5449", fontFamily:"monospace", fontSize:13, padding:"40px 0", lineHeight:2 }}>NO POSITIONS YET<br/><span style={{fontSize:11}}>Log your first trade below</span></div>
+            : positionSummaries.map(({sym, trades}) => (
+                <PositionCard key={sym} trades={trades} currentPrice={getLivePrice(sym)}
+                  onDelete={id => setPortfolio(p => p.filter(x => x.id !== id))}
+                  onAddTrade={(sym) => setTradeModal({ defaultType:"buy", symbol:sym })} />
+              ))
           }
-          <button onClick={() => setBuyModal(true)} style={{ width:"100%", marginTop:8, background:"rgba(0,255,157,0.07)", border:"1px dashed rgba(0,255,157,0.25)", color:"#00ff9d", borderRadius:14, padding:"16px 0", fontSize:13, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ LOG A BUY</button>
+          <div style={{ display:"flex", gap:10, marginTop:8 }}>
+            <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ flex:1, background:"rgba(0,255,157,0.07)", border:"1px dashed rgba(0,255,157,0.25)", color:"#00ff9d", borderRadius:14, padding:"14px 0", fontSize:12, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ LOG BUY</button>
+            <button onClick={() => setTradeModal({defaultType:"sell"})} style={{ flex:1, background:"rgba(245,166,35,0.07)", border:"1px dashed rgba(245,166,35,0.25)", color:"#f5a623", borderRadius:14, padding:"14px 0", fontSize:12, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ LOG SELL</button>
+          </div>
         </>
       )}
 
@@ -692,7 +813,7 @@ export default function App() {
       </div>
 
       {watchModal !== null && <WatchModal asset={watchModal.asset} onSave={saveWatch} onClose={() => setWatchModal(null)} />}
-      {buyModal && <BuyModal watchlist={watchlist} onSave={buy=>{setPortfolio(p=>[...p,buy]);setBuyModal(false);}} onClose={() => setBuyModal(false)} />}
+      {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
     </div>
   );
 }
