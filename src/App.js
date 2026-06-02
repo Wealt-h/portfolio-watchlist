@@ -92,6 +92,34 @@ async function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
+// ─── REAL-TIME PRICES ────────────────────────────────────────────────────────
+const TICKER_MAP = {
+  BTC: "BTC-USD", ETH: "ETH-USD", SOL: "SOL-USD",
+  AMZN: "AMZN", HOOD: "HOOD", AAPL: "AAPL", MSFT: "MSFT",
+  NVDA: "NVDA", TSLA: "TSLA", GOOGL: "GOOGL", META: "META",
+};
+
+async function fetchLivePrices(symbols) {
+  const results = {};
+  await Promise.all(symbols.map(async (sym) => {
+    const ticker = TICKER_MAP[sym] || sym;
+    try {
+      const res = await fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1m&range=1d`
+      );
+      const data = await res.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (meta) {
+        const price = meta.regularMarketPrice || meta.previousClose;
+        const prev = meta.previousClose || meta.chartPreviousClose;
+        const change24h = prev ? (((price - prev) / prev) * 100) : 0;
+        results[sym] = { price, change24h: parseFloat(change24h.toFixed(2)) };
+      }
+    } catch {}
+  }));
+  return results;
+}
+
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 const fmtUSD = (v, d = 2) => v == null || isNaN(v) ? "—" : "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const fmtPct = (v) => (v >= 0 ? "+" : "") + Number(v).toFixed(2) + "%";
@@ -158,9 +186,39 @@ function PriceBar({ low52w, high52w, current, ma200 }) {
 }
 
 // ─── WATCH CARD ───────────────────────────────────────────────────────────────
-function WatchCard({ asset, onEdit, onDelete }) {
+function WatchCard({ asset, onEdit, onDelete, onNotesUpdate }) {
   const [open, setOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
   const sig = calcSignal(asset);
+
+  const handleAiUpdate = async (e) => {
+    e.stopPropagation();
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch("/api/update-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: asset.symbol,
+          name: asset.name,
+          type: asset.type,
+          thesis: asset.thesis,
+        }),
+      });
+      const data = await res.json();
+      if (data.note) {
+        onNotesUpdate(asset.id, data.note);
+      } else {
+        setAiError("Could not fetch update");
+      }
+    } catch {
+      setAiError("Network error");
+    }
+    setAiLoading(false);
+  };
+
   return (
     <div onClick={() => setOpen(!open)} style={{ background: "linear-gradient(145deg,#0d1510,#111a14)", border: "1px solid rgba(0,255,157,0.1)", borderRadius: 16, padding: "20px 22px", marginBottom: 14, cursor: "pointer", boxShadow: open ? "0 0 24px rgba(0,255,157,0.06)" : "none" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -189,7 +247,38 @@ function WatchCard({ asset, onEdit, onDelete }) {
           <PriceBar low52w={asset.low52w} high52w={asset.high52w} current={asset.currentPrice} ma200={asset.ma200} />
           <SignalBreakdown asset={asset} />
           {asset.thesis && <div style={{ marginTop: 14 }}><div style={LBL}>THESIS</div><div style={{ fontSize: 13, color: "#8aab96", lineHeight: 1.6 }}>{asset.thesis}</div></div>}
-          {asset.notes && <div style={{ marginTop: 12 }}><div style={LBL}>NOTES</div><div style={{ fontSize: 13, color: "#8aab96", lineHeight: 1.6 }}>{asset.notes}</div></div>}
+
+          {/* AI-powered notes section */}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div style={LBL}>DAILY INTEL</div>
+              <button onClick={handleAiUpdate} disabled={aiLoading}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: aiLoading ? "rgba(126,184,255,0.05)" : "rgba(126,184,255,0.1)", border: "1px solid rgba(126,184,255,0.25)", color: aiLoading ? "#3d6080" : "#7eb8ff", borderRadius: 20, padding: "3px 10px", fontSize: 10, fontFamily: "monospace", cursor: aiLoading ? "default" : "pointer", letterSpacing: 1 }}>
+                <span style={{ display: "inline-block", animation: aiLoading ? "spin 1s linear infinite" : "none" }}>✦</span>
+                {aiLoading ? "ANALYSING..." : "AI UPDATE"}
+                <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+              </button>
+            </div>
+            {aiLoading && (
+              <div style={{ background: "rgba(126,184,255,0.05)", border: "1px solid rgba(126,184,255,0.15)", borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#7eb8ff", animation: "pulse 1s infinite" }} />
+                  <span style={{ fontSize: 12, color: "#4a7a9a", fontFamily: "monospace" }}>Searching latest news for {asset.symbol}...</span>
+                </div>
+                <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.2} }`}</style>
+              </div>
+            )}
+            {!aiLoading && asset.notes && (
+              <div style={{ background: "rgba(126,184,255,0.04)", border: "1px solid rgba(126,184,255,0.1)", borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ fontSize: 13, color: "#8aab96", lineHeight: 1.7 }}>{asset.notes}</div>
+              </div>
+            )}
+            {!aiLoading && !asset.notes && (
+              <div style={{ fontSize: 12, color: "#2d4a3a", fontStyle: "italic", fontFamily: "monospace" }}>Tap AI UPDATE for today's market briefing →</div>
+            )}
+            {aiError && <div style={{ fontSize: 11, color: "#ff6b6b", marginTop: 6, fontFamily: "monospace" }}>{aiError}</div>}
+          </div>
+
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
             <button onClick={() => onEdit(asset)} style={{ flex: 1, background: "rgba(0,255,157,0.07)", border: "1px solid rgba(0,255,157,0.2)", color: "#00ff9d", borderRadius: 8, padding: "8px 0", fontSize: 12, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1 }}>EDIT</button>
             <button onClick={() => onDelete(asset.id)} style={{ flex: 1, background: "rgba(255,107,107,0.07)", border: "1px solid rgba(255,107,107,0.2)", color: "#ff6b6b", borderRadius: 8, padding: "8px 0", fontSize: 12, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1 }}>REMOVE</button>
@@ -276,37 +365,64 @@ function BuyModal({ watchlist, onSave, onClose }) {
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const pick = (sym) => { const a = watchlist.find(x => x.symbol === sym); if (a) setF(p => ({ ...p, symbol: a.symbol, name: a.name, currentPrice: a.currentPrice })); else setF(p => ({ ...p, symbol: sym })); };
   const cost = parseFloat(f.buyPrice) * parseFloat(f.units) || 0;
+  const SML = { ...INP, padding: "7px 10px", fontSize: 12 };
+  const LBL2 = { ...LBL, marginBottom: 3 };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
-      <div style={{ background: "#0d1510", border: "1px solid rgba(0,255,157,0.2)", borderRadius: 18, padding: 28, width: "100%", maxWidth: 480, maxHeight: "92vh", overflowY: "auto" }}>
-        <div style={{ fontFamily: "monospace", fontSize: 13, color: "#00ff9d", letterSpacing: 2, marginBottom: 20 }}>LOG A BUY</div>
-        <div style={{ marginBottom: 13 }}>
-          <div style={LBL}>SYMBOL</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-            {watchlist.map(a => { const s = calcSignal(a); return (
-              <button key={a.symbol} onClick={() => pick(a.symbol)} style={{ background: f.symbol===a.symbol?`${s.color}20`:"rgba(255,255,255,0.04)", border: `1px solid ${f.symbol===a.symbol?s.color+"55":"rgba(255,255,255,0.1)"}`, color: f.symbol===a.symbol?s.color:"#8aab96", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}>
-                {a.symbol}
-              </button>
-            );})}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
+      <div style={{ background: "#0d1510", border: "1px solid rgba(0,255,157,0.2)", borderRadius: "18px 18px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
+
+        {/* Header row */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontFamily: "monospace", fontSize: 13, color: "#00ff9d", letterSpacing: 2 }}>LOG A BUY</div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#4a6655", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
+        </div>
+
+        {/* Symbol pills */}
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 12 }}>
+          {watchlist.map(a => { const s = calcSignal(a); return (
+            <button key={a.symbol} onClick={() => pick(a.symbol)}
+              style={{ background: f.symbol===a.symbol?`${s.color}22`:"rgba(255,255,255,0.05)", border: `1px solid ${f.symbol===a.symbol?s.color+"66":"rgba(255,255,255,0.1)"}`, color: f.symbol===a.symbol?s.color:"#6a8a7a", borderRadius: 20, padding: "5px 14px", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}>
+              {a.symbol}
+            </button>
+          );})}
+          <input value={f.symbol.length && !watchlist.find(x=>x.symbol===f.symbol) ? f.symbol : ""} onChange={e => pick(e.target.value.toUpperCase())} placeholder="OTHER" style={{ ...SML, width: 80, borderRadius: 20, padding: "5px 12px", textAlign: "center" }} />
+        </div>
+
+        {/* Price + Units row */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+          <div>
+            <div style={LBL2}>BUY PRICE</div>
+            <input value={f.buyPrice} onChange={e => set("buyPrice", e.target.value)} type="number" placeholder="0.00" style={SML} />
           </div>
-          <input value={f.symbol} onChange={e => pick(e.target.value.toUpperCase())} placeholder="Or type symbol" style={INP} />
+          <div>
+            <div style={LBL2}>UNITS</div>
+            <input value={f.units} onChange={e => set("units", e.target.value)} type="number" placeholder="0" style={SML} />
+          </div>
+          <div>
+            <div style={LBL2}>DATE</div>
+            <input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark" }} />
+          </div>
         </div>
-        <div style={{ marginBottom: 13 }}><div style={LBL}>NAME</div><input value={f.name} onChange={e => set("name", e.target.value)} style={INP} /></div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 13 }}>
-          <div><div style={LBL}>BUY PRICE ($)</div><input value={f.buyPrice} onChange={e => set("buyPrice", e.target.value)} type="number" style={INP} /></div>
-          <div><div style={LBL}>UNITS / SHARES</div><input value={f.units} onChange={e => set("units", e.target.value)} type="number" style={INP} /></div>
+
+        {/* Total cost pill */}
+        {cost > 0 && (
+          <div style={{ background: "rgba(0,255,157,0.06)", border: "1px solid rgba(0,255,157,0.15)", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontFamily: "monospace", fontSize: 12, display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: "#4a6655" }}>TOTAL COST</span>
+            <span style={{ color: "#00ff9d", fontWeight: 800 }}>{fmtUSD(cost)}</span>
+          </div>
+        )}
+
+        {/* Notes */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={LBL2}>NOTES <span style={{ color: "#2d4a3a", fontWeight: 400 }}>(optional)</span></div>
+          <textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={2} placeholder="Why I bought this dip..." style={{ ...SML, resize: "none", width: "100%" }} />
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 13 }}>
-          <div><div style={LBL}>DATE</div><input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...INP, colorScheme: "dark" }} /></div>
-          <div><div style={LBL}>CURRENT PRICE ($)</div><input value={f.currentPrice} onChange={e => set("currentPrice", e.target.value)} type="number" style={INP} /></div>
-        </div>
-        {cost > 0 && <div style={{ background: "rgba(0,255,157,0.06)", border: "1px solid rgba(0,255,157,0.15)", borderRadius: 10, padding: "12px 16px", marginBottom: 13, fontFamily: "monospace", fontSize: 13 }}><span style={{ color: "#4a6655" }}>TOTAL COST </span><span style={{ color: "#00ff9d", fontWeight: 800 }}>{fmtUSD(cost)}</span></div>}
-        <div style={{ marginBottom: 13 }}><div style={LBL}>NOTES</div><textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={2} placeholder="Why I bought this dip..." style={{ ...INP, resize: "vertical" }} /></div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => onSave({ ...f, id: Date.now(), buyPrice: parseFloat(f.buyPrice), units: parseFloat(f.units), currentPrice: parseFloat(f.currentPrice)||parseFloat(f.buyPrice) })}
-            style={{ flex: 2, background: "rgba(0,255,157,0.1)", border: "1px solid rgba(0,255,157,0.3)", color: "#00ff9d", borderRadius: 10, padding: "12px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1 }}>LOG BUY</button>
-          <button onClick={onClose} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "#556", borderRadius: 10, padding: "12px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer" }}>CANCEL</button>
-        </div>
+
+        {/* Action buttons */}
+        <button onClick={() => onSave({ ...f, id: Date.now(), buyPrice: parseFloat(f.buyPrice), units: parseFloat(f.units), currentPrice: parseFloat(f.currentPrice)||parseFloat(f.buyPrice) })}
+          style={{ width: "100%", background: "linear-gradient(135deg, rgba(0,255,157,0.15), rgba(0,255,157,0.08))", border: "1px solid rgba(0,255,157,0.35)", color: "#00ff9d", borderRadius: 12, padding: "13px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer", letterSpacing: 2, fontWeight: 700 }}>
+          LOG BUY
+        </button>
       </div>
     </div>
   );
@@ -424,6 +540,35 @@ export default function App() {
   const [buyModal, setBuyModal] = useState(false);
   const [filterSig, setFilterSig] = useState("all");
   const [showLegend, setShowLegend] = useState(false);
+  const [liveStatus, setLiveStatus] = useState("idle"); // idle | fetching | ok | error
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  // ── Live price refresh
+  const refreshPrices = async (wl) => {
+    const list = wl || watchlist;
+    if (!list.length) return;
+    setLiveStatus("fetching");
+    const symbols = [...new Set(list.map(a => a.symbol))];
+    const prices = await fetchLivePrices(symbols);
+    if (Object.keys(prices).length > 0) {
+      setWatchlist(prev => prev.map(a =>
+        prices[a.symbol]
+          ? { ...a, currentPrice: prices[a.symbol].price, change24h: prices[a.symbol].change24h }
+          : a
+      ));
+      setLastUpdated(new Date());
+      setLiveStatus("ok");
+    } else {
+      setLiveStatus("error");
+    }
+  };
+
+  useEffect(() => {
+    if (!loaded) return;
+    refreshPrices(watchlist);
+    const interval = setInterval(() => refreshPrices(), 60000);
+    return () => clearInterval(interval);
+  }, [loaded]);
 
   useEffect(() => {
     (async () => {
@@ -472,7 +617,15 @@ export default function App() {
         <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0, letterSpacing: -1, background: "linear-gradient(90deg,#00ff9d,#7eb8ff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
           {tab === "watchlist" ? "WATCHLIST" : "PORTFOLIO"}
         </h1>
-        <div style={{ fontSize: 13, color: "#3d5449", marginTop: 3 }}>Buy quality assets on red days</div>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:6 }}>
+          <div style={{ fontSize: 13, color: "#3d5449" }}>Buy quality assets on red days</div>
+          <button onClick={() => refreshPrices()} disabled={liveStatus==="fetching"}
+            style={{ background:"rgba(0,255,157,0.07)", border:"1px solid rgba(0,255,157,0.2)", color: liveStatus==="fetching"?"#2d6644":"#00ff9d", borderRadius:8, padding:"6px 12px", fontSize:10, fontFamily:"monospace", cursor: liveStatus==="fetching"?"default":"pointer", letterSpacing:1.5, display:"flex", alignItems:"center", gap:6 }}>
+            <span style={{ display:"inline-block", animation: liveStatus==="fetching"?"spin 1s linear infinite":"none" }}>↻</span>
+            {liveStatus==="fetching" ? "..." : "REFRESH"}
+            <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 0, marginBottom: 24, background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -505,7 +658,7 @@ export default function App() {
 
           {filteredWatch.length === 0
             ? <div style={{ textAlign:"center", color:"#3d5449", fontFamily:"monospace", fontSize:13, padding:"40px 0" }}>NO ASSETS MATCH FILTER</div>
-            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onEdit={a => setWatchModal({asset:a})} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} />)
+            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onEdit={a => setWatchModal({asset:a})} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} />)
           }
           <button onClick={() => setWatchModal({asset:null})} style={{ width:"100%", marginTop:8, background:"rgba(0,255,157,0.05)", border:"1px dashed rgba(0,255,157,0.2)", color:"#00ff9d", borderRadius:14, padding:"16px 0", fontSize:13, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ ADD ASSET</button>
         </>
@@ -538,7 +691,16 @@ export default function App() {
         </>
       )}
 
-      <div style={{ textAlign:"center", marginTop:28, fontSize:10, color:"#1e3028", fontFamily:"monospace", letterSpacing:2 }}>AUTO-SIGNALS · PERSISTENT · JUNE 2026</div>
+      <div style={{ textAlign:"center", marginTop:28, fontSize:10, fontFamily:"monospace", letterSpacing:2, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <div style={{ width:7, height:7, borderRadius:"50%", background: liveStatus==="ok" ? "#00ff9d" : liveStatus==="fetching" ? "#f5a623" : liveStatus==="error" ? "#ff6b6b" : "#3d5449", boxShadow: liveStatus==="ok" ? "0 0 6px #00ff9d" : "none", animation: liveStatus==="fetching" ? "pulse 1s infinite" : "none" }} />
+          <span style={{ color: liveStatus==="ok" ? "#2d6644" : liveStatus==="fetching" ? "#7a5a20" : "#3d5449" }}>
+            {liveStatus==="fetching" ? "UPDATING PRICES..." : liveStatus==="ok" ? "LIVE · AUTO-REFRESH 60s" : liveStatus==="error" ? "PRICE FETCH FAILED" : "INITIALISING..."}
+          </span>
+        </div>
+        {lastUpdated && <div style={{ color:"#1e3028" }}>LAST UPDATED {lastUpdated.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}</div>}
+        <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
+      </div>
 
       {watchModal !== null && <WatchModal asset={watchModal.asset} onSave={saveWatch} onClose={() => setWatchModal(null)} />}
       {buyModal && <BuyModal watchlist={watchlist} onSave={buy=>{setPortfolio(p=>[...p,buy]);setBuyModal(false);}} onClose={() => setBuyModal(false)} />}
