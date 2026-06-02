@@ -613,6 +613,70 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy" }) {
   );
 }
 
+// ─── EDIT TRADE MODAL ────────────────────────────────────────────────────────
+function EditTradeModal({ trade, onSave, onClose }) {
+  const [f, setF] = useState({
+    price: trade.price,
+    units: trade.units,
+    fees: trade.fees || 0,
+    date: trade.date,
+    notes: trade.notes || "",
+  });
+  const set = (k, v) => setF(p => ({ ...p, [k]: v }));
+  const subtotal = (parseFloat(f.price)||0) * (parseFloat(f.units)||0);
+  const fees = parseFloat(f.fees)||0;
+  const total = trade.type === "buy" ? subtotal + fees : subtotal - fees;
+  const SML = { ...INP, padding: "7px 10px", fontSize: 12 };
+  const LBL2 = { ...LBL, marginBottom: 3 };
+  const accent = trade.type === "buy" ? "#00ff9d" : "#f5a623";
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }}>
+      <div style={{ background: "#0d1510", border: `1px solid ${accent}33`, borderRadius: "18px 18px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520 }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: accent, background: `${accent}18`, border: `1px solid ${accent}33`, borderRadius: 6, padding: "2px 8px" }}>{trade.type.toUpperCase()}</span>
+            <span style={{ fontFamily: "monospace", fontSize: 13, color: "#e8f5ec", letterSpacing: 1 }}>{trade.symbol} · EDIT TRADE</span>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#4a6655", fontSize: 20, cursor: "pointer" }}>✕</button>
+        </div>
+
+        {/* Fields */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+          <div><div style={LBL2}>PRICE ($)</div><input value={f.price} onChange={e => set("price", e.target.value)} type="number" style={SML} /></div>
+          <div><div style={LBL2}>UNITS</div><input value={f.units} onChange={e => set("units", e.target.value)} type="number" style={SML} /></div>
+          <div><div style={LBL2}>DATE</div><input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark" }} /></div>
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          <div style={LBL2}>BROKERAGE FEE</div>
+          <input value={f.fees} onChange={e => set("fees", e.target.value)} type="number" style={{ ...SML, width: "50%" }} />
+        </div>
+
+        {/* Summary */}
+        {subtotal > 0 && (
+          <div style={{ background: `${accent}08`, border: `1px solid ${accent}20`, borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontFamily: "monospace", fontSize: 12, display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: "#4a6655" }}>{trade.type === "buy" ? "TOTAL COST" : "NET PROCEEDS"}</span>
+            <span style={{ color: accent, fontWeight: 800 }}>{fmtUSD(total)}</span>
+          </div>
+        )}
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={LBL2}>NOTES</div>
+          <textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={2} style={{ ...SML, resize: "none", width: "100%" }} />
+        </div>
+
+        <button onClick={() => onSave({ ...trade, price: parseFloat(f.price)||0, units: parseFloat(f.units)||0, fees: parseFloat(f.fees)||0, date: f.date, notes: f.notes, total })}
+          style={{ width: "100%", background: `linear-gradient(135deg,${accent}22,${accent}0a)`, border: `1px solid ${accent}44`, color: accent, borderRadius: 12, padding: "13px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer", letterSpacing: 2, fontWeight: 700 }}>
+          SAVE CHANGES
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── POSITION HELPERS ────────────────────────────────────────────────────────
 function calcPosition(trades, currentPrice) {
   const buys = trades.filter(t => t.type === "buy");
@@ -635,7 +699,7 @@ function calcPosition(trades, currentPrice) {
 }
 
 // ─── POSITION CARD ────────────────────────────────────────────────────────────
-function PositionCard({ trades, currentPrice, onDelete, onAddTrade }) {
+function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState("summary"); // summary | trades
   const symbol = trades[0].symbol;
@@ -725,11 +789,12 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade }) {
                     {t.notes && <div style={{ fontSize: 11, color: "#3d5449", marginTop: 3 }}>{t.notes}</div>}
                     {t.fees > 0 && <div style={{ fontSize: 10, color: "#3d5449", marginTop: 2, fontFamily: "monospace" }}>FEE: {fmtUSD(t.fees)}</div>}
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontFamily: "monospace", fontSize: 12, color: "#e8f5ec" }}>{fmtUSD(t.price)} × {t.units}</div>
                       <div style={{ fontFamily: "monospace", fontSize: 11, color: t.type==="buy"?"#4a6655":"#f5a623" }}>{t.type==="buy"?"-":"+"}{ fmtUSD(t.price*t.units)}</div>
                     </div>
+                    <button onClick={() => onEdit(t)} style={{ background: "rgba(126,184,255,0.08)", border: "1px solid rgba(126,184,255,0.2)", color: "#7eb8ff", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontFamily: "monospace", cursor: "pointer" }}>✎</button>
                     <button onClick={() => onDelete(t.id)} style={{ background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.2)", color: "#ff6b6b", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontFamily: "monospace", cursor: "pointer" }}>✕</button>
                   </div>
                 </div>
@@ -756,9 +821,7 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade }) {
             </div>
           )}
 
-          <button onClick={() => onAddTrade(symbol)} style={{ width:"100%", marginTop:14, background:"rgba(0,255,157,0.05)", border:"1px dashed rgba(0,255,157,0.2)", color:"#00ff9d", borderRadius:10, padding:"10px 0", fontSize:12, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>
-            + LOG TRADE
-          </button>
+
         </div>
       )}
     </div>
@@ -799,6 +862,7 @@ export default function App() {
   const [watchModal, setWatchModal] = useState(null);
   const [tradeModal, setTradeModal] = useState(null); // null | { defaultType, symbol? }
   const [searchModal, setSearchModal] = useState(false);
+  const [editTradeModal, setEditTradeModal] = useState(null); // null | trade object
   const [filterSig, setFilterSig] = useState("all");
   const [showLegend, setShowLegend] = useState(false);
   const [liveStatus, setLiveStatus] = useState("idle"); // idle | fetching | ok | error
@@ -880,19 +944,68 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#070c09", color: "#e8f5ec", fontFamily: "'Georgia', serif", padding: "24px 20px 80px" }}>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontFamily: "monospace", fontSize: 10, color: "#2d5040", letterSpacing: 4, marginBottom: 6 }}>PORTFOLIO RESEARCH SYSTEM</div>
-        <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0, letterSpacing: -1, background: "linear-gradient(90deg,#00ff9d,#7eb8ff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-          {tab === "watchlist" ? "WATCHLIST" : "PORTFOLIO"}
-        </h1>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:6 }}>
-          <div style={{ fontSize: 13, color: "#3d5449" }}>Buy quality assets on red days</div>
+      {/* ── ACCRUE HEADER ── */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            {/* Logo mark + wordmark */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: "linear-gradient(135deg, #0d2a1a, #0a1f12)",
+                border: "1px solid rgba(0,255,157,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 0 12px rgba(0,255,157,0.1)",
+                flexShrink: 0,
+              }}>
+                {/* A mark with upward bar */}
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M2 15L7 4L9 8.5L11 4L16 15" stroke="#00ff9d" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  <line x1="4.5" y1="11" x2="13.5" y2="11" stroke="#00ff9d" strokeWidth="1.4" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div style={{
+                  fontSize: 22, fontWeight: 900, letterSpacing: 4,
+                  background: "linear-gradient(90deg, #e8f5ec 0%, #00ff9d 60%, #7eb8ff 100%)",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  fontFamily: "monospace", lineHeight: 1,
+                }}>ACCRUE</div>
+                <div style={{ fontSize: 9, color: "#2d5040", letterSpacing: 3, fontFamily: "monospace", marginTop: 2 }}>
+                  DISCIPLINED INVESTMENT INTELLIGENCE
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Refresh + live status */}
           <button onClick={() => refreshPrices()} disabled={liveStatus==="fetching"}
-            style={{ background:"rgba(0,255,157,0.07)", border:"1px solid rgba(0,255,157,0.2)", color: liveStatus==="fetching"?"#2d6644":"#00ff9d", borderRadius:8, padding:"6px 12px", fontSize:10, fontFamily:"monospace", cursor: liveStatus==="fetching"?"default":"pointer", letterSpacing:1.5, display:"flex", alignItems:"center", gap:6 }}>
-            <span style={{ display:"inline-block", animation: liveStatus==="fetching"?"spin 1s linear infinite":"none" }}>↻</span>
-            {liveStatus==="fetching" ? "..." : "REFRESH"}
+            style={{
+              background: "rgba(0,255,157,0.06)", border: "1px solid rgba(0,255,157,0.15)",
+              color: liveStatus==="fetching" ? "#2d6644" : "#00ff9d",
+              borderRadius: 10, padding: "8px 12px", fontSize: 10,
+              fontFamily: "monospace", cursor: liveStatus==="fetching" ? "default" : "pointer",
+              letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 6, marginTop: 2,
+            }}>
+            <span style={{ display: "inline-block", animation: liveStatus==="fetching" ? "spin 1s linear infinite" : "none", fontSize: 13 }}>↻</span>
             <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
           </button>
+        </div>
+
+        {/* Divider with live status */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+          <div style={{ flex: 1, height: 1, background: "rgba(0,255,157,0.08)" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{
+              width: 5, height: 5, borderRadius: "50%",
+              background: liveStatus==="ok" ? "#00ff9d" : liveStatus==="fetching" ? "#f5a623" : liveStatus==="error" ? "#ff6b6b" : "#3d5449",
+              boxShadow: liveStatus==="ok" ? "0 0 5px #00ff9d" : "none",
+            }} />
+            <span style={{ fontSize: 9, color: "#2d5040", fontFamily: "monospace", letterSpacing: 2 }}>
+              {liveStatus==="ok" ? "LIVE" : liveStatus==="fetching" ? "UPDATING" : liveStatus==="error" ? "OFFLINE" : "INITIALISING"}
+            </span>
+          </div>
+          <div style={{ flex: 1, height: 1, background: "rgba(0,255,157,0.08)" }} />
         </div>
       </div>
 
@@ -970,29 +1083,21 @@ export default function App() {
             : positionSummaries.map(({sym, trades}) => (
                 <PositionCard key={sym} trades={trades} currentPrice={getLivePrice(sym)}
                   onDelete={id => setPortfolio(p => p.filter(x => x.id !== id))}
-                  onAddTrade={(sym) => setTradeModal({ defaultType:"buy", symbol:sym })} />
+                  onAddTrade={(sym) => setTradeModal({ defaultType:"buy", symbol:sym })}
+                  onEdit={(trade) => setEditTradeModal(trade)} />
               ))
           }
-          <div style={{ display:"flex", gap:10, marginTop:8 }}>
-            <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ flex:1, background:"rgba(0,255,157,0.07)", border:"1px dashed rgba(0,255,157,0.25)", color:"#00ff9d", borderRadius:14, padding:"14px 0", fontSize:12, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ LOG BUY</button>
-            <button onClick={() => setTradeModal({defaultType:"sell"})} style={{ flex:1, background:"rgba(245,166,35,0.07)", border:"1px dashed rgba(245,166,35,0.25)", color:"#f5a623", borderRadius:14, padding:"14px 0", fontSize:12, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ LOG SELL</button>
-          </div>
+          <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ width:"100%", marginTop:8, background:"rgba(0,255,157,0.07)", border:"1px dashed rgba(0,255,157,0.25)", color:"#00ff9d", borderRadius:14, padding:"14px 0", fontSize:12, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ LOG TRADE</button>
         </>
       )}
 
-      <div style={{ textAlign:"center", marginTop:28, fontSize:10, fontFamily:"monospace", letterSpacing:2, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <div style={{ width:7, height:7, borderRadius:"50%", background: liveStatus==="ok" ? "#00ff9d" : liveStatus==="fetching" ? "#f5a623" : liveStatus==="error" ? "#ff6b6b" : "#3d5449", boxShadow: liveStatus==="ok" ? "0 0 6px #00ff9d" : "none", animation: liveStatus==="fetching" ? "pulse 1s infinite" : "none" }} />
-          <span style={{ color: liveStatus==="ok" ? "#2d6644" : liveStatus==="fetching" ? "#7a5a20" : "#3d5449" }}>
-            {liveStatus==="fetching" ? "UPDATING PRICES..." : liveStatus==="ok" ? "LIVE · AUTO-REFRESH 60s" : liveStatus==="error" ? "PRICE FETCH FAILED" : "INITIALISING..."}
-          </span>
-        </div>
-        {lastUpdated && <div style={{ color:"#1e3028" }}>LAST UPDATED {lastUpdated.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}</div>}
-        <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
+      <div style={{ textAlign:"center", marginTop:28, fontSize:9, color:"#1a2e20", fontFamily:"monospace", letterSpacing:3 }}>
+        ACCRUE · {lastUpdated ? `LAST SYNC ${lastUpdated.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}` : "ACCRUE INVESTMENT INTELLIGENCE"}
       </div>
 
       {watchModal !== null && <WatchModal asset={watchModal.asset} onSave={saveWatch} onClose={() => setWatchModal(null)} />}
       {searchModal && <AssetSearchModal onAdd={asset => { setWatchlist(w => [...w, asset]); }} onClose={() => setSearchModal(false)} />}
+      {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
     </div>
   );
