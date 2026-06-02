@@ -173,15 +173,15 @@ function PriceBar({ low52w, high52w, current, ma200 }) {
 }
 
 // ─── WATCH CARD ───────────────────────────────────────────────────────────────
-function WatchCard({ asset, onEdit, onDelete, onNotesUpdate }) {
+function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
   const [open, setOpen] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(null); // null | "notes" | "thesis"
   const [aiError, setAiError] = useState(null);
   const sig = calcSignal(asset);
 
-  const handleAiUpdate = async (e) => {
+  const handleAiUpdate = async (e, mode = "notes") => {
     e.stopPropagation();
-    setAiLoading(true);
+    setAiLoading(mode);
     setAiError(null);
     try {
       const res = await fetch("/api/update-notes", {
@@ -191,21 +191,22 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate }) {
           symbol: asset.symbol,
           name: asset.name,
           type: asset.type,
-          thesis: asset.thesis,
           currentPrice: asset.currentPrice,
           change24h: asset.change24h,
+          mode,
         }),
       });
       const data = await res.json();
       if (data.note) {
-        onNotesUpdate(asset.id, data.note);
+        if (mode === "thesis") onThesisUpdate(asset.id, data.note);
+        else onNotesUpdate(asset.id, data.note);
       } else {
         setAiError("Could not fetch update");
       }
     } catch {
       setAiError("Network error");
     }
-    setAiLoading(false);
+    setAiLoading(null);
   };
 
   return (
@@ -235,26 +236,47 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate }) {
         <div style={{ marginTop: 16, borderTop: "1px solid rgba(0,255,157,0.07)", paddingTop: 16 }} onClick={e => e.stopPropagation()}>
           <PriceBar low52w={asset.low52w} high52w={asset.high52w} current={asset.currentPrice} ma200={asset.ma200} />
           <SignalBreakdown asset={asset} />
-          {asset.thesis && <div style={{ marginTop: 14 }}><div style={LBL}>THESIS</div><div style={{ fontSize: 13, color: "#8aab96", lineHeight: 1.6 }}>{asset.thesis}</div></div>}
 
-          {/* AI-powered notes section */}
+
+          {/* Thesis section */}
           <div style={{ marginTop: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <div style={LBL}>DAILY INTEL</div>
-              <button onClick={handleAiUpdate} disabled={aiLoading}
-                style={{ display: "flex", alignItems: "center", gap: 5, background: aiLoading ? "rgba(126,184,255,0.05)" : "rgba(126,184,255,0.1)", border: "1px solid rgba(126,184,255,0.25)", color: aiLoading ? "#3d6080" : "#7eb8ff", borderRadius: 20, padding: "3px 10px", fontSize: 10, fontFamily: "monospace", cursor: aiLoading ? "default" : "pointer", letterSpacing: 1 }}>
-                <span style={{ display: "inline-block", animation: aiLoading ? "spin 1s linear infinite" : "none" }}>✦</span>
-                {aiLoading ? "ANALYSING..." : "AI UPDATE"}
+              <div style={LBL}>THESIS</div>
+              <button onClick={e => handleAiUpdate(e, "thesis")} disabled={!!aiLoading}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: aiLoading==="thesis"?"rgba(199,125,255,0.05)":"rgba(199,125,255,0.1)", border: "1px solid rgba(199,125,255,0.25)", color: aiLoading==="thesis"?"#6a3d80":"#c77dff", borderRadius: 20, padding: "3px 10px", fontSize: 10, fontFamily: "monospace", cursor: aiLoading?"default":"pointer", letterSpacing: 1 }}>
+                <span style={{ display: "inline-block", animation: aiLoading==="thesis"?"spin 1s linear infinite":"none" }}>✦</span>
+                {aiLoading==="thesis" ? "WRITING..." : "AI THESIS"}
                 <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
               </button>
             </div>
-            {aiLoading && (
+            {aiLoading==="thesis" && <div style={{ fontSize: 12, color: "#6a3d80", fontFamily: "monospace", fontStyle: "italic" }}>Analysing against your investment philosophy...</div>}
+            {asset.thesis && !aiLoading && (
+              <div style={{ background: "rgba(199,125,255,0.04)", border: "1px solid rgba(199,125,255,0.1)", borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ fontSize: 13, color: "#b09ac8", lineHeight: 1.7 }}>{asset.thesis}</div>
+              </div>
+            )}
+            {!asset.thesis && !aiLoading && (
+              <div style={{ fontSize: 12, color: "#2d4a3a", fontStyle: "italic", fontFamily: "monospace" }}>Tap AI THESIS to generate a philosophy-aligned thesis →</div>
+            )}
+          </div>
+
+          {/* Daily Intel section */}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div style={LBL}>DAILY INTEL</div>
+              <button onClick={e => handleAiUpdate(e, "notes")} disabled={!!aiLoading}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: aiLoading==="notes"?"rgba(126,184,255,0.05)":"rgba(126,184,255,0.1)", border: "1px solid rgba(126,184,255,0.25)", color: aiLoading==="notes"?"#3d6080":"#7eb8ff", borderRadius: 20, padding: "3px 10px", fontSize: 10, fontFamily: "monospace", cursor: aiLoading?"default":"pointer", letterSpacing: 1 }}>
+                <span style={{ display: "inline-block", animation: aiLoading==="notes"?"spin 1s linear infinite":"none" }}>✦</span>
+                {aiLoading==="notes" ? "ANALYSING..." : "AI UPDATE"}
+              </button>
+            </div>
+            {aiLoading==="notes" && (
               <div style={{ background: "rgba(126,184,255,0.05)", border: "1px solid rgba(126,184,255,0.15)", borderRadius: 10, padding: "12px 14px" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#7eb8ff", animation: "pulse 1s infinite" }} />
-                  <span style={{ fontSize: 12, color: "#4a7a9a", fontFamily: "monospace" }}>Searching latest news for {asset.symbol}...</span>
+                  <span style={{ fontSize: 12, color: "#4a7a9a", fontFamily: "monospace" }}>Analysing {asset.symbol} through your philosophy lens...</span>
+                  <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.2} }`}</style>
                 </div>
-                <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.2} }`}</style>
               </div>
             )}
             {!aiLoading && asset.notes && (
@@ -747,7 +769,7 @@ export default function App() {
 
           {filteredWatch.length === 0
             ? <div style={{ textAlign:"center", color:"#3d5449", fontFamily:"monospace", fontSize:13, padding:"40px 0" }}>NO ASSETS MATCH FILTER</div>
-            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onEdit={a => setWatchModal({asset:a})} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} />)
+            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onEdit={a => setWatchModal({asset:a})} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} onThesisUpdate={(id, thesis) => setWatchlist(w => w.map(x => x.id === id ? {...x, thesis} : x))} />)
           }
           <button onClick={() => setWatchModal({asset:null})} style={{ width:"100%", marginTop:8, background:"rgba(0,255,157,0.05)", border:"1px dashed rgba(0,255,157,0.2)", color:"#00ff9d", borderRadius:14, padding:"16px 0", fontSize:13, fontFamily:"monospace", cursor:"pointer", letterSpacing:2 }}>+ ADD ASSET</button>
         </>
