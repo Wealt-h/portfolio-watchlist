@@ -912,7 +912,8 @@ export default function App() {
   };
 
   // Group trades by symbol
-  const positions = portfolio.reduce((acc, t) => { if (!acc[t.symbol]) acc[t.symbol]=[]; acc[t.symbol].push(t); return acc; }, {});
+  // Normalise symbols to uppercase to prevent duplicate positions
+  const positions = portfolio.reduce((acc, t) => { const sym = (t.symbol||"").toUpperCase().trim(); if (!acc[sym]) acc[sym]=[]; acc[sym].push({...t, symbol: sym}); return acc; }, {});
 
   // Portfolio summary using live prices from watchlist
   const getLivePrice = (sym) => { const a = watchlist.find(x => x.symbol===sym); return a?.currentPrice || 0; };
