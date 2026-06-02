@@ -1,23 +1,16 @@
-export const config = { runtime: "edge" };
-
-export default async function handler(req) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   const apiKey = process.env.ANTHROPIC_KEY;
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: "API key not configured" }), { status: 500 });
+    return res.status(500).json({ error: "API key not configured" });
   }
 
-  let body;
-  try { body = await req.json(); } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
-  }
-
-  const { symbol, name, type, thesis } = body;
+  const { symbol, name, type, thesis } = req.body;
   if (!symbol) {
-    return new Response(JSON.stringify({ error: "Missing symbol" }), { status: 400 });
+    return res.status(400).json({ error: "Missing symbol" });
   }
 
   const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -46,7 +39,6 @@ Be specific with numbers where possible. Be concise — max 4 sentences. Do not 
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
-        "anthropic-beta": "interleaved-thinking-2025-01-01"
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
@@ -59,10 +51,9 @@ Be specific with numbers where possible. Be concise — max 4 sentences. Do not 
     const data = await response.json();
 
     if (!response.ok) {
-      return new Response(JSON.stringify({ error: data.error?.message || "API error" }), { status: 500 });
+      return res.status(500).json({ error: data.error?.message || "API error" });
     }
 
-    // Extract text from response content blocks
     const text = (data.content || [])
       .filter(b => b.type === "text")
       .map(b => b.text)
@@ -70,15 +61,12 @@ Be specific with numbers where possible. Be concise — max 4 sentences. Do not 
       .trim();
 
     if (!text) {
-      return new Response(JSON.stringify({ error: "No content returned" }), { status: 500 });
+      return res.status(500).json({ error: "No content returned" });
     }
 
-    return new Response(JSON.stringify({ note: text }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+    return res.status(200).json({ note: text });
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    return res.status(500).json({ error: err.message });
   }
 }
