@@ -72,14 +72,19 @@ CORE BELIEF: Buy exceptional quality assets during periods of weakness. Patience
 You are writing a personal investment thesis for ${name} (${symbol}) — a ${type} asset.
 Current price: $${currentPrice}
 
-Based strictly on the investment philosophy above, write a 3-5 sentence thesis explaining:
-1. Why this asset fits (or doesn't fit) the philosophy
-2. Which specific principles it satisfies (moat, AI wave, Bitcoin Standard, macro, etc.)
-3. What the long-term bull case is
-4. Any key risks to the thesis
+Based strictly on the investment philosophy above, output ONLY bullet points in this exact format:
++ [positive reason this fits the philosophy]
++ [another positive]
+- [risk or reason it doesn't fit]
+- [another risk or negative]
 
-Be honest — if it doesn't fit the philosophy, say so. Be specific and analytical, not generic.
-Write in first person as the investor. No bullet points.`
+Rules:
+- Start each line with + for positives or - for negatives
+- 3-5 positives, 2-3 negatives
+- Each point max 12 words
+- Be specific — reference moat, AI infrastructure, Bitcoin fundamentals, macro conditions, valuation etc.
+- Write in objective third-person analyst voice. No "your", no "you", no personal language.
+- No intro text, no conclusion, no headers. Just the bullet lines.`
 
     : `${PHILOSOPHY}
 
@@ -88,12 +93,12 @@ Today: ${today}
 Current price: $${currentPrice}
 24H change: ${change24h}%
 
-Write a 3-4 sentence daily note covering:
-1. What today's price action means in context of the investment philosophy
-2. Whether current conditions represent a buying opportunity based on the entry discipline principles
-3. Any relevant macro or sector factors
+Write a 3-4 sentence professional analyst note covering:
+1. Current price action and what it signals technically
+2. Whether conditions align with disciplined entry criteria (RSI, 52W high distance, 200MA)
+3. Key macro or sector factors relevant to the thesis
 
-Be specific with the price. Be concise. No bullet points. Write like a personal investment journal entry.`;
+Be specific with numbers. Write in objective third-person analyst voice. No "your", no "you". Concise. No bullet points.`;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
