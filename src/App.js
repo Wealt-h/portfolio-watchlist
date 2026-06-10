@@ -1211,93 +1211,95 @@ export default function App() {
             ? <div style={{ textAlign:"center", color:C.text3, fontFamily:FONT, fontWeight:300, fontSize:13, padding:"40px 0", lineHeight:2 }}>No positions yet<br/><span style={{fontSize:11, opacity:0.6}}>Log your first trade below</span></div>
             : (
               <>
-                {/* Allocation donut */}
-                {positionSummaries.length > 1 && (() => {
+                {/* Combined analytics card */}
+                {(() => {
+                  if (portfolio.length === 0) return null;
+
                   const COLORS = [C.green, C.blue, C.amber, "#c77dff", "#f87171", "#67e8f9"];
                   const total = positionSummaries.reduce((s,{pos}) => s + pos.currentValue, 0);
-                  const donutData = positionSummaries.map(({sym, pos}, i) => ({
-                    name: sym,
-                    value: parseFloat(((pos.currentValue / total) * 100).toFixed(1)),
-                    color: COLORS[i % COLORS.length],
-                  }));
-                  return (
-                    <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 20px", marginBottom: 14 }}>
-                      <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 12 }}>ALLOCATION</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                        <PieChart width={100} height={100}>
-                          <Pie data={donutData} cx={45} cy={45} innerRadius={28} outerRadius={45} dataKey="value" strokeWidth={0}>
-                            {donutData.map((d, i) => <Cell key={i} fill={d.color} opacity={0.85} />)}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
-                            itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
-                            formatter={(v, n) => [`${v}%`, n]}
-                          />
-                        </PieChart>
-                        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-                          {donutData.map((d, i) => (
-                            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <div style={{ width: 6, height: 6, borderRadius: "50%", background: d.color }} />
-                                <span style={{ fontFamily: MONO, fontSize: 10, color: C.text2, letterSpacing: 1 }}>{d.name}</span>
-                              </div>
-                              <span style={{ fontFamily: FONT, fontWeight: 400, fontSize: 12, color: C.text1 }}>{d.value}%</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
+                  const donutData = positionSummaries.length > 1
+                    ? positionSummaries.map(({sym, pos}, i) => ({
+                        name: sym,
+                        value: parseFloat(((pos.currentValue / total) * 100).toFixed(1)),
+                        color: COLORS[i % COLORS.length],
+                      }))
+                    : null;
 
-                {/* Portfolio P&L chart — built from trade history */}
-                {(() => {
-                  // Build daily portfolio value from trades + current prices
-                  if (portfolio.length === 0) return null;
                   const allDates = [...new Set(portfolio.map(t => t.date))].sort();
-                  if (allDates.length < 2) return null;
-
-                  // For each date, calc cumulative cost and approx value
-                  const chartData = allDates.map(date => {
+                  const hasChart = allDates.length >= 2;
+                  const chartData = hasChart ? allDates.map(date => {
                     const tradesUpTo = portfolio.filter(t => t.date <= date);
                     const cost = tradesUpTo.filter(t => t.type === "buy").reduce((s,t) => s + t.price * t.units + (t.fees||0), 0)
                                - tradesUpTo.filter(t => t.type === "sell").reduce((s,t) => s + t.price * t.units - (t.fees||0), 0);
                     return { date: date.slice(5), cost: parseFloat(cost.toFixed(2)) };
-                  });
+                  }) : [];
+                  if (hasChart) chartData.push({ date: "Now", cost: parseFloat(total.toFixed(2)) });
 
-                  // Add today's current value
-                  const todayValue = positionSummaries.reduce((s,{pos}) => s + pos.currentValue, 0);
-                  chartData.push({ date: "Now", cost: parseFloat(todayValue.toFixed(2)), isNow: true });
-
-                  const isUp = todayValue >= chartData[0]?.cost;
-                  const color = isUp ? C.green : C.red;
+                  const todayValue = total;
+                  const isUp = !hasChart || todayValue >= (chartData[0]?.cost || 0);
+                  const lineColor = isUp ? C.green : C.red;
 
                   return (
                     <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 20px", marginBottom: 14 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2 }}>PORTFOLIO VALUE</div>
-                        <div style={{ fontSize: 12, fontFamily: FONT, fontWeight: 400, color }}>
-                          {isUp ? "+" : ""}{fmtUSD(todayValue - (chartData[0]?.cost || 0))}
-                        </div>
+
+                      {/* Header row */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2 }}>ANALYTICS</div>
+                        {hasChart && (
+                          <div style={{ fontSize: 12, fontFamily: FONT, fontWeight: 400, color: lineColor }}>
+                            {isUp ? "+" : ""}{fmtUSD(todayValue - (chartData[0]?.cost || 0))}
+                          </div>
+                        )}
                       </div>
-                      <ResponsiveContainer width="100%" height={90}>
-                        <AreaChart data={chartData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-                          <defs>
-                            <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor={color} stopOpacity={0.25} />
-                              <stop offset="95%" stopColor={color} stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                          <Area type="monotone" dataKey="cost" stroke={color} strokeWidth={1.5} fill="url(#portfolioGrad)" dot={false} />
-                          <Tooltip
-                            contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
-                            labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
-                            itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
-                            formatter={v => [fmtUSD(v), "Value"]}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
+
+                      {/* Donut + legend side by side (only if 2+ positions) */}
+                      {donutData && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: hasChart ? 16 : 0, paddingBottom: hasChart ? 16 : 0, borderBottom: hasChart ? `1px solid ${C.border}` : "none" }}>
+                          <PieChart width={80} height={80}>
+                            <Pie data={donutData} cx={36} cy={36} innerRadius={22} outerRadius={36} dataKey="value" strokeWidth={0}>
+                              {donutData.map((d, i) => <Cell key={i} fill={d.color} opacity={0.9} />)}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
+                              itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
+                              formatter={(v, n) => [`${v}%`, n]}
+                            />
+                          </PieChart>
+                          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+                            {donutData.map((d, i) => (
+                              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: d.color }} />
+                                  <span style={{ fontFamily: MONO, fontSize: 10, color: C.text2, letterSpacing: 1 }}>{d.name}</span>
+                                </div>
+                                <span style={{ fontFamily: FONT, fontWeight: 400, fontSize: 12, color: C.text1 }}>{d.value}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Portfolio value chart */}
+                      {hasChart && (
+                        <ResponsiveContainer width="100%" height={80}>
+                          <AreaChart data={chartData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                            <defs>
+                              <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor={lineColor} stopOpacity={0.2} />
+                                <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                            <Area type="monotone" dataKey="cost" stroke={lineColor} strokeWidth={1.5} fill="url(#portfolioGrad)" dot={false} />
+                            <Tooltip
+                              contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
+                              labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
+                              itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
+                              formatter={v => [fmtUSD(v), "Value"]}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      )}
                     </div>
                   );
                 })()}
