@@ -115,30 +115,32 @@ const fmtPct = (v) => (v >= 0 ? "+" : "") + Number(v).toFixed(2) + "%";
 const FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 const MONO = "'Courier New', monospace";
 const C = {
-  bg:       "#08090a",
-  surface:  "rgba(255,255,255,0.03)",
-  border:   "rgba(255,255,255,0.07)",
-  borderHover: "rgba(255,255,255,0.12)",
-  text1:    "rgba(232,238,234,0.95)",
-  text2:    "rgba(232,238,234,0.5)",
-  text3:    "rgba(232,238,234,0.25)",
-  green:    "#4ade80",
-  greenDim: "rgba(74,222,128,0.12)",
-  greenBorder: "rgba(74,222,128,0.2)",
-  red:      "#f87171",
-  redDim:   "rgba(248,113,113,0.1)",
-  amber:    "#fbbf24",
-  blue:     "#93c5fd",
-  blueDim:  "rgba(147,197,253,0.1)",
+  bg:          "#08090a",
+  surface:     "#0f1114",
+  surfaceHigh: "#141619",
+  border:      "rgba(255,255,255,0.08)",
+  borderHover: "rgba(255,255,255,0.16)",
+  borderAccent:"rgba(74,222,128,0.35)",
+  text1:       "rgba(240,245,242,1)",
+  text2:       "rgba(240,245,242,0.55)",
+  text3:       "rgba(240,245,242,0.28)",
+  green:       "#4ade80",
+  greenDim:    "rgba(74,222,128,0.12)",
+  greenBorder: "rgba(74,222,128,0.25)",
+  red:         "#f87171",
+  redDim:      "rgba(248,113,113,0.1)",
+  amber:       "#fbbf24",
+  blue:        "#93c5fd",
+  blueDim:     "rgba(147,197,253,0.1)",
 };
-const INP = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", color: C.text1, fontSize: 13, fontFamily: FONT, fontWeight: 300, outline: "none", width: "100%", boxSizing: "border-box" };
+const INP = { background: C.surfaceHigh, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", color: C.text1, fontSize: 13, fontFamily: FONT, fontWeight: 300, outline: "none", width: "100%", boxSizing: "border-box" };
 const LBL = { fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 4, textTransform: "uppercase" };
 
 // ─── SIGNAL BADGE ─────────────────────────────────────────────────────────────
 function SignalBadge({ sig, size = "md" }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${sig.color}10`, border: `1px solid ${sig.color}30`, borderRadius: 4, padding: size === "sm" ? "2px 8px" : "3px 10px", fontSize: size === "sm" ? 9 : 10, fontWeight: 400, color: sig.color, fontFamily: MONO, letterSpacing: 1.5, textTransform: "uppercase" }}>
-      <span style={{ width: 4, height: 4, borderRadius: "50%", background: sig.color, display: "inline-block", flexShrink: 0, opacity: 0.9 }} />
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${sig.color}14`, border: `1px solid ${sig.color}45`, borderRadius: 4, padding: size === "sm" ? "2px 8px" : "4px 11px", fontSize: size === "sm" ? 9 : 10, fontWeight: 500, color: sig.color, fontFamily: MONO, letterSpacing: 1.5, textTransform: "uppercase" }}>
+      <span style={{ width: 5, height: 5, borderRadius: "50%", background: sig.color, display: "inline-block", flexShrink: 0, boxShadow: `0 0 4px ${sig.color}` }} />
       {sig.label}
     </span>
   );
@@ -159,10 +161,10 @@ function SignalBreakdown({ asset }) {
       <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>SIGNAL BREAKDOWN · SCORE {sig.score}</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
         {indicators.map(ind => (
-          <div key={ind.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6, padding: "8px 10px" }}>
+          <div key={ind.label} style={{ background: ind.good ? C.greenDim : C.redDim, border: `1px solid ${ind.good ? C.greenBorder : "rgba(248,113,113,0.2)"}`, borderRadius: 6, padding: "8px 10px" }}>
             <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4 }}>{ind.label}</div>
-            <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 15, color: ind.good ? C.green : C.red, marginBottom: 2 }}>{ind.value}</div>
-            <div style={{ fontSize: 10, color: ind.good ? "rgba(74,222,128,0.5)" : "rgba(248,113,113,0.5)", fontFamily: MONO }}>{ind.note}</div>
+            <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 15, color: ind.good ? C.green : C.red, marginBottom: 2 }}>{ind.value}</div>
+            <div style={{ fontSize: 10, color: ind.good ? "rgba(74,222,128,0.6)" : "rgba(248,113,113,0.6)", fontFamily: MONO }}>{ind.note}</div>
           </div>
         ))}
       </div>
@@ -180,10 +182,10 @@ function PriceBar({ low52w, high52w, current, ma200 }) {
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.text3, marginBottom: 6, fontFamily: MONO, letterSpacing: 1 }}>
         <span>{fmtUSD(low52w, 0)}</span><span>52W RANGE</span><span>{fmtUSD(high52w, 0)}</span>
       </div>
-      <div style={{ position: "relative", height: 2, background: C.border, borderRadius: 2 }}>
-        <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct}%`, background: C.green, borderRadius: 2, opacity: 0.6 }} />
-        {maPct !== null && <div style={{ position: "absolute", top: -3, left: `${maPct}%`, transform: "translateX(-50%)", width: 1, height: 8, background: C.amber, opacity: 0.7 }} />}
-        <div style={{ position: "absolute", top: -3, left: `${pct}%`, transform: "translateX(-50%)", width: 8, height: 8, borderRadius: "50%", background: C.green, opacity: 0.9 }} />
+      <div style={{ position: "relative", height: 3, background: C.surfaceHigh, borderRadius: 3 }}>
+        <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${C.green}40, ${C.green})`, borderRadius: 3 }} />
+        {maPct !== null && <div style={{ position: "absolute", top: -4, left: `${maPct}%`, transform: "translateX(-50%)", width: 1, height: 11, background: C.amber, opacity: 0.8 }} />}
+        <div style={{ position: "absolute", top: -3, left: `${pct}%`, transform: "translateX(-50%)", width: 9, height: 9, borderRadius: "50%", background: C.green, boxShadow: `0 0 6px ${C.green}80` }} />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
         <div style={{ fontSize: 10, color: C.text3, fontFamily: MONO }}>{pct.toFixed(0)}% of range</div>
@@ -231,20 +233,20 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
   };
 
   return (
-    <div onClick={() => setOpen(!open)} style={{ background: C.surface, border: `1px solid ${open ? C.borderHover : C.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer" }}>
+    <div onClick={() => setOpen(!open)} style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${open ? C.borderAccent : C.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `2px solid ${C.green}` : `1px solid ${C.border}`, transition: "border-color 0.2s, background 0.2s" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 400, color: C.text2, fontFamily: MONO, letterSpacing: 1 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: `linear-gradient(135deg, ${C.surfaceHigh}, ${C.surface})`, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 500, color: C.text1, fontFamily: MONO, letterSpacing: 1 }}>
             {asset.symbol.slice(0, 2)}
           </div>
           <div>
-            <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 16, color: C.text1, letterSpacing: 0.3 }}>{asset.symbol}</div>
-            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 1 }}>{asset.name}</div>
+            <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 16, color: C.text1, letterSpacing: 0.2 }}>{asset.symbol}</div>
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 2 }}>{asset.name}</div>
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 18, color: C.text1 }}>{fmtUSD(asset.currentPrice)}</div>
-          <div style={{ fontSize: 11, color: asset.change24h < 0 ? C.red : C.green, fontFamily: MONO, marginTop: 2, opacity: 0.8 }}>
+          <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 20, color: C.text1, letterSpacing: -0.5 }}>{fmtUSD(asset.currentPrice)}</div>
+          <div style={{ fontSize: 11, color: asset.change24h < 0 ? C.red : C.green, fontFamily: MONO, marginTop: 3, fontWeight: 500 }}>
             {asset.change24h > 0 ? "+" : ""}{asset.change24h}%
           </div>
         </div>
@@ -725,20 +727,20 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
   const hasSells = trades.some(t => t.type === "sell");
 
   return (
-    <div onClick={() => setOpen(!open)} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer" }}>
+    <div onClick={() => setOpen(!open)} style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${open ? C.borderAccent : C.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `2px solid ${isUp ? C.green : C.red}` : `1px solid ${C.border}`, transition: "border-color 0.2s, background 0.2s" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 400, color: C.text2, fontFamily: MONO, letterSpacing: 1 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: `linear-gradient(135deg, ${C.surfaceHigh}, ${C.surface})`, border: `1px solid ${isUp ? "rgba(74,222,128,0.2)" : "rgba(248,113,113,0.2)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 500, color: isUp ? C.green : C.red, fontFamily: MONO, letterSpacing: 1 }}>
             {symbol.slice(0,2)}
           </div>
           <div>
-            <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 16, color: C.text1 }}>{symbol}</div>
-            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 1 }}>{pos.unitsHeld.toLocaleString(undefined,{maximumFractionDigits:6})} units</div>
+            <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 16, color: C.text1 }}>{symbol}</div>
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 2 }}>{pos.unitsHeld.toLocaleString(undefined,{maximumFractionDigits:6})} units</div>
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 18, color: isUp?C.green:C.red }}>{fmtPct(pos.unrealisedPct)}</div>
-          <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 12, color: isUp?"rgba(74,222,128,0.6)":"rgba(248,113,113,0.6)", marginTop: 2 }}>{pos.unrealisedPnl>=0?"+":""}{fmtUSD(pos.unrealisedPnl)}</div>
+          <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 20, color: isUp?C.green:C.red, letterSpacing: -0.5 }}>{fmtPct(pos.unrealisedPct)}</div>
+          <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 12, color: isUp?"rgba(74,222,128,0.7)":"rgba(248,113,113,0.7)", marginTop: 3 }}>{pos.unrealisedPnl>=0?"+":""}{fmtUSD(pos.unrealisedPnl)}</div>
         </div>
       </div>
 
@@ -783,26 +785,54 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
 
           {view === "trades" && (
             <div>
-              {trades.sort((a,b) => new Date(b.date)-new Date(a.date)).map((t,i) => (
-                <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
-                  <div>
+              {trades.sort((a,b) => new Date(b.date)-new Date(a.date)).map((t,i) => {
+                // Per-trade P&L (only meaningful for buys)
+                const tradeCost = t.price * t.units + (t.fees || 0);
+                const tradeCurrentVal = currentPrice * t.units;
+                const tradePnl = t.type === "buy" ? tradeCurrentVal - tradeCost : null;
+                const tradePnlPct = tradePnl !== null && tradeCost > 0 ? (tradePnl / tradeCost) * 100 : null;
+                const tradeIsUp = tradePnl >= 0;
+                return (
+                <div key={t.id} style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}` }}>
+                  {/* Top row: type + date + edit/delete */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontSize: 9, fontFamily: MONO, color: t.type==="buy"?C.green:C.amber, letterSpacing: 1.5, textTransform: "uppercase" }}>{t.type}</span>
                       <span style={{ fontFamily: MONO, fontSize: 10, color: C.text3 }}>{t.date}</span>
                     </div>
-                    {t.notes && <div style={{ fontSize: 11, color: C.text3, marginTop: 3, fontFamily: FONT, fontWeight: 300 }}>{t.notes}</div>}
-                    {t.fees > 0 && <div style={{ fontSize: 10, color: C.text3, marginTop: 2, fontFamily: MONO, opacity: 0.6 }}>fee {fmtUSD(t.fees)}</div>}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 13, color: C.text1 }}>{fmtUSD(t.price)} × {t.units}</div>
-                      <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 11, color: C.text3 }}>{t.type==="buy"?"-":"+"}{ fmtUSD(t.price*t.units)}</div>
+                    <div style={{ display: "flex", gap: 5 }}>
+                      <button onClick={() => onEdit(t)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 4, padding: "3px 7px", fontSize: 10, fontFamily: MONO, cursor: "pointer" }}>✎</button>
+                      <button onClick={() => onDelete(t.id)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 4, padding: "3px 7px", fontSize: 10, fontFamily: MONO, cursor: "pointer" }}>✕</button>
                     </div>
-                    <button onClick={() => onEdit(t)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 4, padding: "4px 8px", fontSize: 10, fontFamily: MONO, cursor: "pointer" }}>✎</button>
-                    <button onClick={() => onDelete(t.id)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 4, padding: "4px 8px", fontSize: 10, fontFamily: MONO, cursor: "pointer" }}>✕</button>
                   </div>
+                  {/* Bottom row: price x units | cost | P&L */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
+                    <div>
+                      <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2 }}>PRICE × UNITS</div>
+                      <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 12, color: C.text1 }}>{fmtUSD(t.price)}</div>
+                      <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 10, color: C.text3 }}>× {t.units}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2 }}>COST</div>
+                      <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 12, color: C.text1 }}>{fmtUSD(tradeCost)}</div>
+                      {t.fees > 0 && <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 10, color: C.text3 }}>+{fmtUSD(t.fees)} fee</div>}
+                    </div>
+                    {tradePnlPct !== null && (
+                      <div>
+                        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2 }}>P&L</div>
+                        <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 13, color: tradeIsUp ? C.green : C.red }}>
+                          {tradePnl >= 0 ? "+" : ""}{fmtUSD(tradePnl)}
+                        </div>
+                        <div style={{ fontFamily: MONO, fontSize: 10, color: tradeIsUp ? "rgba(74,222,128,0.8)" : "rgba(248,113,113,0.8)", fontWeight: 500 }}>
+                          {tradePnlPct >= 0 ? "+" : ""}{tradePnlPct.toFixed(2)}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {t.notes && <div style={{ fontSize: 11, color: C.text3, marginTop: 6, fontFamily: FONT, fontWeight: 300, fontStyle: "italic" }}>{t.notes}</div>}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -940,7 +970,7 @@ export default function App() {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "28px 20px 80px" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "28px 20px 80px" }}>
       {/* ── ACCRUE HEADER ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -956,11 +986,11 @@ export default function App() {
                 ["E", 0.60],
               ].map(([letter, opacity], i) => (
                 <span key={i} style={{
-                  fontSize: 28,
-                  fontWeight: 100,
-                  letterSpacing: 6,
+                  fontSize: 30,
+                  fontWeight: 200,
+                  letterSpacing: 7,
                   fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-                  color: `rgba(232,245,236,${opacity})`,
+                  color: `rgba(240,245,242,${opacity})`,
                   display: "inline-block",
                 }}>{letter}</span>
               ))}
@@ -990,7 +1020,7 @@ export default function App() {
 
       <div style={{ display: "flex", gap: 0, marginBottom: 28, background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.border}` }}>
         {[["watchlist","Watchlist"],["portfolio","Portfolio"]].map(([t,l]) => (
-          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, background: tab===t?"rgba(255,255,255,0.06)":"transparent", border: "1px solid transparent", color: tab===t?C.text1:C.text3, borderRadius: 6, padding: "9px 0", fontSize: 12, fontFamily: FONT, fontWeight: tab===t?400:300, cursor: "pointer", letterSpacing: 0.3, transition: "all 0.15s" }}>{l}</button>
+          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, background: tab===t?C.surfaceHigh:"transparent", border: `1px solid ${tab===t?C.border:"transparent"}`, color: tab===t?C.text1:C.text3, borderRadius: 6, padding: "9px 0", fontSize: 12, fontFamily: FONT, fontWeight: tab===t?500:300, cursor: "pointer", letterSpacing: 0.3, transition: "all 0.15s" }}>{l}</button>
         ))}
       </div>
 
@@ -999,8 +1029,8 @@ export default function App() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 24 }}>
             {[{l:"Assets",v:watchlist.length},{l:"Buy now",v:buyableCount},{l:"Watching",v:watchlist.filter(a=>calcSignal(a).signal==="watch").length}].map(s => (
               <div key={s.l} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "12px 0", textAlign: "center" }}>
-                <div style={{ fontSize: 22, fontWeight: 200, fontFamily: FONT, color: C.text1 }}>{s.v}</div>
-                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginTop: 3 }}>{s.l.toUpperCase()}</div>
+                <div style={{ fontSize: 26, fontWeight: 400, fontFamily: FONT, color: C.text1 }}>{s.v}</div>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginTop: 4 }}>{s.l.toUpperCase()}</div>
               </div>
             ))}
           </div>
@@ -1028,12 +1058,12 @@ export default function App() {
         <>
           {portfolio.length > 0 && (
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "20px 20px", marginBottom: 20 }}>
-              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 16, textTransform: "uppercase" }}>Portfolio Summary</div>
+              <div style={{ fontSize: 9, color: C.text2, fontFamily: MONO, letterSpacing: 3, marginBottom: 16, textTransform: "uppercase" }}>Portfolio Summary</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
                 {[["Cost basis", fmtUSD(totalCostBasis)], ["Current value", fmtUSD(totalCurrentValue)]].map(([l,v]) => (
                   <div key={l}>
-                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4, textTransform: "uppercase" }}>{l}</div>
-                    <div style={{ fontFamily: FONT, fontWeight: 200, fontSize: 20, color: C.text1 }}>{v}</div>
+                    <div style={{ fontSize: 9, color: C.text2, fontFamily: MONO, letterSpacing: 2, marginBottom: 5, textTransform: "uppercase" }}>{l}</div>
+                    <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 22, color: C.text1, letterSpacing: -0.5 }}>{v}</div>
                   </div>
                 ))}
               </div>
@@ -1041,7 +1071,7 @@ export default function App() {
                 {[["Unrealised", `${totalUnrealisedPnl>=0?"+":""}${fmtUSD(totalUnrealisedPnl)}`, totalUnrealisedPnl], ["Realised", `${totalRealisedPnl>=0?"+":""}${fmtUSD(totalRealisedPnl)}`, totalRealisedPnl], ["Total P&L", `${totalPnl>=0?"+":""}${fmtUSD(totalPnl)}`, totalPnl]].map(([l,v,n]) => (
                   <div key={l}>
                     <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 3, textTransform: "uppercase" }}>{l}</div>
-                    <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 14, color: n>=0?C.green:C.red }}>{v}</div>
+                    <div style={{ fontFamily: FONT, fontWeight: n===totalPnl?600:400, fontSize: n===totalPnl?18:14, color: n>=0?C.green:C.red, letterSpacing: n===totalPnl?-0.5:0 }}>{v}</div>
                   </div>
                 ))}
               </div>
