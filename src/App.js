@@ -198,14 +198,33 @@ function PriceBar({ low52w, high52w, current, ma200 }) {
 
 // ─── ASSET LOGO ──────────────────────────────────────────────────────────────
 function AssetLogo({ symbol, size = 40, color = "rgba(240,245,242,0.7)" }) {
-  const [err, setErr] = useState(false);
-  const ticker = symbol.replace("-USD", "").replace("-", "").toUpperCase();
-  const url = `https://img.logo.dev/ticker/${ticker}?token=pk_free&size=64&format=png`;
+  const [srcIndex, setSrcIndex] = useState(0);
+  const ticker = symbol.replace("-USD","").replace("-","").toUpperCase();
+  const isCrypto = ["BTC","ETH","SOL","DOGE","ADA","XRP","BNB","AVAX","MATIC","DOT","LINK","LTC","UNI","ATOM","NEAR","APT"].includes(ticker);
+
+  // Try multiple sources in order
+  const sources = isCrypto ? [
+    `https://assets.coincap.io/assets/icons/${ticker.toLowerCase()}@2x.png`,
+    `https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/${ticker.toLowerCase()}.png`,
+    `https://cryptoicons.org/api/icon/${ticker.toLowerCase()}/64`,
+  ] : [
+    `https://logo.clearbit.com/${ticker.toLowerCase()}.com`,
+    `https://assets.coingecko.com/coins/images/1/large/bitcoin.png`, // fallback never used for stocks
+  ];
+
+  const url = sources[srcIndex];
+  const failed = srcIndex >= sources.length;
+
   return (
     <div style={{ width: size, height: size, borderRadius: size * 0.25, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
-      {!err
-        ? <img src={url} alt={symbol} onError={() => setErr(true)} style={{ width: size * 0.65, height: size * 0.65, objectFit: "contain" }} />
-        : <span style={{ fontSize: size * 0.28, fontWeight: 500, color, fontFamily: MONO, letterSpacing: 1 }}>{symbol.slice(0, 2)}</span>
+      {!failed
+        ? <img
+            src={url}
+            alt={symbol}
+            onError={() => setSrcIndex(i => i + 1)}
+            style={{ width: size * 0.65, height: size * 0.65, objectFit: "contain" }}
+          />
+        : <span style={{ fontSize: size * 0.28, fontWeight: 500, color, fontFamily: MONO, letterSpacing: 1 }}>{symbol.slice(0,2)}</span>
       }
     </div>
   );
@@ -1291,4 +1310,4 @@ export default function App() {
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
     </div>
   );
-} 
+}
