@@ -196,6 +196,21 @@ function PriceBar({ low52w, high52w, current, ma200 }) {
   );
 }
 
+// ─── ASSET LOGO ──────────────────────────────────────────────────────────────
+function AssetLogo({ symbol, size = 40, color = "rgba(240,245,242,0.7)" }) {
+  const [err, setErr] = useState(false);
+  const ticker = symbol.replace("-USD", "").replace("-", "").toUpperCase();
+  const url = `https://img.logo.dev/ticker/${ticker}?token=pk_free&size=64&format=png`;
+  return (
+    <div style={{ width: size, height: size, borderRadius: size * 0.25, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+      {!err
+        ? <img src={url} alt={symbol} onError={() => setErr(true)} style={{ width: size * 0.65, height: size * 0.65, objectFit: "contain" }} />
+        : <span style={{ fontSize: size * 0.28, fontWeight: 500, color, fontFamily: MONO, letterSpacing: 1 }}>{symbol.slice(0, 2)}</span>
+      }
+    </div>
+  );
+}
+
 // ─── WATCH CARD ───────────────────────────────────────────────────────────────
 function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
   const [open, setOpen] = useState(false);
@@ -253,9 +268,7 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
     <div onClick={() => setOpen(!open)} style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `3px solid ${C.green}` : `1px solid ${C.borderHover}`, transition: "border-color 0.2s, background 0.2s" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: `linear-gradient(135deg, ${C.surfaceHigh}, ${C.surface})`, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 500, color: C.text1, fontFamily: MONO, letterSpacing: 1 }}>
-            {asset.symbol.slice(0, 2)}
-          </div>
+          <AssetLogo symbol={asset.symbol} size={40} />
           <div>
             <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 16, color: C.text1, letterSpacing: 0.2 }}>{asset.symbol}</div>
             <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 2 }}>{asset.name}</div>
@@ -571,9 +584,7 @@ function AssetSearchModal({ onAdd, onClose }) {
           {results.map(r => (
             <div key={r.symbol} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${C.border}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: C.surface, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 400, color: C.text2, fontFamily: MONO }}>
-                  {r.symbol.slice(0, 2)}
-                </div>
+                <AssetLogo symbol={r.symbol} size={36} />
                 <div>
                   <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 14, color: C.text1 }}>{r.symbol}</div>
                   <div style={{ fontSize: 11, color: C.text3, marginTop: 1, fontFamily: FONT, fontWeight: 300 }}>{r.name.length > 32 ? r.name.slice(0, 32) + "…" : r.name}</div>
@@ -778,9 +789,7 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
     <div onClick={() => setOpen(!open)} style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `3px solid ${isUp ? C.green : C.red}` : `1px solid ${C.borderHover}`, transition: "border-color 0.2s, background 0.2s" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: `linear-gradient(135deg, ${C.surfaceHigh}, ${C.surface})`, border: `1px solid ${isUp ? "rgba(74,222,128,0.2)" : "rgba(248,113,113,0.2)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 500, color: isUp ? C.green : C.red, fontFamily: MONO, letterSpacing: 1 }}>
-            {symbol.slice(0,2)}
-          </div>
+          <AssetLogo symbol={symbol} size={40} color={isUp ? C.green : C.red} />
           <div>
             <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 16, color: C.text1 }}>{symbol}</div>
             <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 2 }}>{pos.unitsHeld.toLocaleString(undefined,{maximumFractionDigits:6})} units</div>
@@ -1282,5 +1291,4 @@ export default function App() {
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
     </div>
   );
-}
- 
+} 
