@@ -893,6 +893,7 @@ export default function App() {
   const [showLegend, setShowLegend] = useState(false);
   const [liveStatus, setLiveStatus] = useState("idle"); // idle | fetching | ok | error
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [fearGreedData, setFearGreedData] = useState(null); // { value, label }
 
   // ── Live price refresh
   const refreshPrices = async (wl) => {
@@ -900,17 +901,33 @@ export default function App() {
     if (!list.length) return;
     setLiveStatus("fetching");
     const symbols = [...new Set(list.map(a => a.symbol))];
-    const prices = await fetchLivePrices(symbols);
+
+    // Fetch prices + Fear & Greed in parallel
+    const [prices, fgRes] = await Promise.all([
+      fetchLivePrices(symbols),
+      fetch("https://api.alternative.me/fng/?limit=1").then(r => r.json()).catch(() => null)
+    ]);
+
     if (Object.keys(prices).length > 0) {
-      setWatchlist(prev => prev.map(a =>
-        prices[a.symbol]
-          ? { ...a, currentPrice: prices[a.symbol].price, change24h: prices[a.symbol].change24h }
-          : a
-      ));
+      // Apply live prices
+      setWatchlist(prev => prev.map(a => {
+        const p = prices[a.symbol];
+        if (!p) return a;
+        // Auto-apply Fear & Greed to crypto assets
+        const fg = fgRes?.data?.[0]?.value ? parseInt(fgRes.data[0].value) : a.fearGreed;
+        return { ...a, currentPrice: p.price, change24h: p.change24h, ...(a.type === "crypto" ? { fearGreed: fg } : {}) };
+      }));
       setLastUpdated(new Date());
       setLiveStatus("ok");
     } else {
       setLiveStatus("error");
+    }
+
+    // Store Fear & Greed for display
+    if (fgRes?.data?.[0]) {
+      const val = parseInt(fgRes.data[0].value);
+      const label = fgRes.data[0].value_classification;
+      setFearGreedData({ value: val, label });
     }
   };
 
@@ -1045,6 +1062,28 @@ export default function App() {
               <button key={f} onClick={() => setFilterSig(f)} style={{ background: filterSig===f?C.surface:"transparent", border:`1px solid ${filterSig===f?C.borderHover:C.border}`, color:filterSig===f?C.text1:C.text3, borderRadius:4, padding:"4px 12px", fontSize:10, fontFamily:FONT, fontWeight:300, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.3 }}>{l}</button>
             ))}
           </div>
+
+          {/* Fear & Greed pill */}
+          {fearGreedData && (() => {
+            const v = fearGreedData.value;
+            const color = v <= 25 ? C.green : v <= 45 ? "rgba(74,222,128,0.6)" : v <= 55 ? C.text3 : v <= 75 ? C.amber : C.red;
+            const emoji = v <= 25 ? "😨" : v <= 45 ? "😟" : v <= 55 ? "😐" : v <= 75 ? "😏" : "🤑";
+            return (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>{emoji}</span>
+                  <div>
+                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 2 }}>FEAR & GREED INDEX</div>
+                    <div style={{ fontSize: 11, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{fearGreedData.label}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 28, fontWeight: 500, fontFamily: FONT, color, letterSpacing: -1 }}>{v}</div>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1 }}>/100</div>
+                </div>
+              </div>
+            );
+          })()}
 
           {filteredWatch.length === 0
             ? <div style={{ textAlign:"center", color:C.text3, fontFamily:FONT, fontWeight:300, fontSize:13, padding:"40px 0" }}>No assets match filter</div>
