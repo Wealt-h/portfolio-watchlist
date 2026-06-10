@@ -222,15 +222,15 @@ function AssetLogo({ symbol, size = 40, color = "rgba(240,245,242,0.7)" }) {
   const isCrypto = CRYPTO_TICKERS.includes(ticker) || symbol.includes("-USD");
   const domain = STOCK_DOMAINS[ticker] || `${ticker.toLowerCase()}.com`;
 
-  // Ticker Logos (AllInvestView) — free, no API key, covers stocks + crypto
-  const sources = [
-    `https://assets.allinvestview.com/logos/ticker/${ticker}.png`,
-    // Crypto fallback
-    ...(isCrypto ? [
-      `https://assets.coincap.io/assets/icons/${ticker.toLowerCase()}@2x.png`,
-      `https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/${ticker.toLowerCase()}.png`,
-    ] : []),
-  ];
+  // cdn.tickerlogos.com — free, no API key, CORS enabled, finance-focused
+  const sources = isCrypto
+    ? [
+        `https://assets.coincap.io/assets/icons/${ticker.toLowerCase()}@2x.png`,
+        `https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/${ticker.toLowerCase()}.png`,
+      ]
+    : [
+        `https://cdn.tickerlogos.com/${domain}`,
+      ];
 
   const failed = srcIndex >= sources.length;
 
