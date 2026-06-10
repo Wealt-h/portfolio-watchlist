@@ -197,34 +197,44 @@ function PriceBar({ low52w, high52w, current, ma200 }) {
 }
 
 // ─── ASSET LOGO ──────────────────────────────────────────────────────────────
+// Stock domain map for Clearbit
+const STOCK_DOMAINS = {
+  AMZN: "amazon.com", AAPL: "apple.com", MSFT: "microsoft.com",
+  GOOGL: "google.com", GOOG: "google.com", META: "meta.com",
+  TSLA: "tesla.com", NVDA: "nvidia.com", HOOD: "robinhood.com",
+  NFLX: "netflix.com", UBER: "uber.com", LYFT: "lyft.com",
+  SPOT: "spotify.com", SHOP: "shopify.com", SQ: "block.xyz",
+  PYPL: "paypal.com", V: "visa.com", MA: "mastercard.com",
+  JPM: "jpmorganchase.com", BAC: "bankofamerica.com",
+  DIS: "disney.com", BABA: "alibaba.com", NKE: "nike.com",
+  AMD: "amd.com", INTC: "intel.com", CRM: "salesforce.com",
+  ORCL: "oracle.com", IBM: "ibm.com", QCOM: "qualcomm.com",
+};
+
+const CRYPTO_TICKERS = ["BTC","ETH","SOL","DOGE","ADA","XRP","BNB","AVAX","MATIC","DOT","LINK","LTC","UNI","ATOM","NEAR","APT","SHIB","TRX","TON"];
+
 function AssetLogo({ symbol, size = 40, color = "rgba(240,245,242,0.7)" }) {
   const [srcIndex, setSrcIndex] = useState(0);
   const ticker = symbol.replace("-USD","").replace("-","").toUpperCase();
-  const isCrypto = ["BTC","ETH","SOL","DOGE","ADA","XRP","BNB","AVAX","MATIC","DOT","LINK","LTC","UNI","ATOM","NEAR","APT"].includes(ticker);
+  const isCrypto = CRYPTO_TICKERS.includes(ticker) || symbol.includes("-USD");
 
-  // Try multiple sources in order
-  const sources = isCrypto ? [
-    `https://assets.coincap.io/assets/icons/${ticker.toLowerCase()}@2x.png`,
-    `https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/${ticker.toLowerCase()}.png`,
-    `https://cryptoicons.org/api/icon/${ticker.toLowerCase()}/64`,
-  ] : [
-    `https://logo.clearbit.com/${ticker.toLowerCase()}.com`,
-    `https://assets.coingecko.com/coins/images/1/large/bitcoin.png`, // fallback never used for stocks
-  ];
+  const sources = isCrypto
+    ? [
+        `https://assets.coincap.io/assets/icons/${ticker.toLowerCase()}@2x.png`,
+        `https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/${ticker.toLowerCase()}.png`,
+      ]
+    : STOCK_DOMAINS[ticker]
+      ? [`https://logo.clearbit.com/${STOCK_DOMAINS[ticker]}`]
+      : [`https://logo.clearbit.com/${ticker.toLowerCase()}.com`];
 
-  const url = sources[srcIndex];
   const failed = srcIndex >= sources.length;
 
   return (
     <div style={{ width: size, height: size, borderRadius: size * 0.25, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
       {!failed
-        ? <img
-            src={url}
-            alt={symbol}
-            onError={() => setSrcIndex(i => i + 1)}
-            style={{ width: size * 0.65, height: size * 0.65, objectFit: "contain" }}
-          />
-        : <span style={{ fontSize: size * 0.28, fontWeight: 500, color, fontFamily: MONO, letterSpacing: 1 }}>{symbol.slice(0,2)}</span>
+        ? <img src={sources[srcIndex]} alt={symbol} onError={() => setSrcIndex(i => i + 1)}
+            style={{ width: size * 0.68, height: size * 0.68, objectFit: "contain" }} />
+        : <span style={{ fontSize: size * 0.28, fontWeight: 500, color, fontFamily: MONO, letterSpacing: 1 }}>{ticker.slice(0,2)}</span>
       }
     </div>
   );
