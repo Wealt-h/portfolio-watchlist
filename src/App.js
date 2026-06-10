@@ -115,31 +115,31 @@ const fmtPct = (v) => (v >= 0 ? "+" : "") + Number(v).toFixed(2) + "%";
 const FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 const MONO = "'Courier New', monospace";
 const C = {
-  bg:          "#08090a",
-  surface:     "#0f1114",
-  surfaceHigh: "#141619",
-  border:      "rgba(255,255,255,0.08)",
-  borderHover: "rgba(255,255,255,0.16)",
-  borderAccent:"rgba(74,222,128,0.35)",
-  text1:       "rgba(240,245,242,1)",
-  text2:       "rgba(240,245,242,0.55)",
-  text3:       "rgba(240,245,242,0.28)",
-  green:       "#4ade80",
-  greenDim:    "rgba(74,222,128,0.12)",
-  greenBorder: "rgba(74,222,128,0.25)",
-  red:         "#f87171",
-  redDim:      "rgba(248,113,113,0.1)",
+  bg:          "#07080a",
+  surface:     "#111318",
+  surfaceHigh: "#181c22",
+  border:      "rgba(255,255,255,0.14)",
+  borderHover: "rgba(255,255,255,0.26)",
+  borderAccent:"rgba(74,222,128,0.55)",
+  text1:       "#f0f5f2",
+  text2:       "rgba(240,245,242,0.65)",
+  text3:       "rgba(240,245,242,0.35)",
+  green:       "#3ddc84",
+  greenDim:    "rgba(61,220,132,0.14)",
+  greenBorder: "rgba(61,220,132,0.4)",
+  red:         "#ff6b6b",
+  redDim:      "rgba(255,107,107,0.12)",
   amber:       "#fbbf24",
   blue:        "#93c5fd",
-  blueDim:     "rgba(147,197,253,0.1)",
+  blueDim:     "rgba(147,197,253,0.12)",
 };
-const INP = { background: C.surfaceHigh, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", color: C.text1, fontSize: 13, fontFamily: FONT, fontWeight: 300, outline: "none", width: "100%", boxSizing: "border-box" };
+const INP = { background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "10px 12px", color: C.text1, fontSize: 13, fontFamily: FONT, fontWeight: 300, outline: "none", width: "100%", boxSizing: "border-box" };
 const LBL = { fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 4, textTransform: "uppercase" };
 
 // ─── SIGNAL BADGE ─────────────────────────────────────────────────────────────
 function SignalBadge({ sig, size = "md" }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${sig.color}14`, border: `1px solid ${sig.color}45`, borderRadius: 4, padding: size === "sm" ? "2px 8px" : "4px 11px", fontSize: size === "sm" ? 9 : 10, fontWeight: 500, color: sig.color, fontFamily: MONO, letterSpacing: 1.5, textTransform: "uppercase" }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${sig.color}18`, border: `1px solid ${sig.color}70`, borderRadius: 4, padding: size === "sm" ? "2px 8px" : "4px 11px", fontSize: size === "sm" ? 9 : 10, fontWeight: 500, color: sig.color, fontFamily: MONO, letterSpacing: 1.5, textTransform: "uppercase" }}>
       <span style={{ width: 5, height: 5, borderRadius: "50%", background: sig.color, display: "inline-block", flexShrink: 0, boxShadow: `0 0 4px ${sig.color}` }} />
       {sig.label}
     </span>
@@ -182,7 +182,7 @@ function PriceBar({ low52w, high52w, current, ma200 }) {
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.text3, marginBottom: 6, fontFamily: MONO, letterSpacing: 1 }}>
         <span>{fmtUSD(low52w, 0)}</span><span>52W RANGE</span><span>{fmtUSD(high52w, 0)}</span>
       </div>
-      <div style={{ position: "relative", height: 3, background: C.surfaceHigh, borderRadius: 3 }}>
+      <div style={{ position: "relative", height: 3, background: C.borderHover, borderRadius: 3 }}>
         <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${C.green}40, ${C.green})`, borderRadius: 3 }} />
         {maPct !== null && <div style={{ position: "absolute", top: -4, left: `${maPct}%`, transform: "translateX(-50%)", width: 1, height: 11, background: C.amber, opacity: 0.8 }} />}
         <div style={{ position: "absolute", top: -3, left: `${pct}%`, transform: "translateX(-50%)", width: 9, height: 9, borderRadius: "50%", background: C.green, boxShadow: `0 0 6px ${C.green}80` }} />
@@ -233,7 +233,7 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
   };
 
   return (
-    <div onClick={() => setOpen(!open)} style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${open ? C.borderAccent : C.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `2px solid ${C.green}` : `1px solid ${C.border}`, transition: "border-color 0.2s, background 0.2s" }}>
+    <div onClick={() => setOpen(!open)} style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${open ? C.borderAccent : C.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `2px solid ${C.green}` : `1px solid ${C.borderHover}`, transition: "border-color 0.2s, background 0.2s" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 40, height: 40, borderRadius: 10, background: `linear-gradient(135deg, ${C.surfaceHigh}, ${C.surface})`, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 500, color: C.text1, fontFamily: MONO, letterSpacing: 1 }}>
@@ -347,7 +347,7 @@ function WatchModal({ asset, onSave, onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
-      <div style={{ background: "#0e0f10", border: `1px solid ${C.border}`, borderRadius: 14, padding: 28, width: "100%", maxWidth: 500, maxHeight: "92vh", overflowY: "auto" }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 14, padding: 28, width: "100%", maxWidth: 500, maxHeight: "92vh", overflowY: "auto" }}>
         <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 15, color: C.text1, marginBottom: 20, letterSpacing: 0.3 }}>{asset ? "Edit asset" : "Add asset"}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 13 }}>
           <div><div style={LBL}>SYMBOL</div><input value={f.symbol} onChange={e => set("symbol", e.target.value.toUpperCase())} placeholder="HOOD" style={INP} /></div>
@@ -477,7 +477,7 @@ function AssetSearchModal({ onAdd, onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
-      <div style={{ background: "#0e0f10", border: `1px solid ${C.border}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 40px", width: "100%", maxWidth: 520, maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 40px", width: "100%", maxWidth: 520, maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 15, color: C.text1, letterSpacing: 0.3 }}>Add asset</div>
@@ -562,7 +562,7 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy" }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
-      <div style={{ background: "#0e0f10", border: `1px solid ${C.border}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", gap: 6 }}>
@@ -651,7 +651,7 @@ function EditTradeModal({ trade, onSave, onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }}>
-      <div style={{ background: "#0e0f10", border: `1px solid ${C.border}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520 }}>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -727,7 +727,7 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
   const hasSells = trades.some(t => t.type === "sell");
 
   return (
-    <div onClick={() => setOpen(!open)} style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${open ? C.borderAccent : C.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `2px solid ${isUp ? C.green : C.red}` : `1px solid ${C.border}`, transition: "border-color 0.2s, background 0.2s" }}>
+    <div onClick={() => setOpen(!open)} style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${open ? C.borderAccent : C.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `2px solid ${isUp ? C.green : C.red}` : `1px solid ${C.borderHover}`, transition: "border-color 0.2s, background 0.2s" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 40, height: 40, borderRadius: 10, background: `linear-gradient(135deg, ${C.surfaceHigh}, ${C.surface})`, border: `1px solid ${isUp ? "rgba(74,222,128,0.2)" : "rgba(248,113,113,0.2)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 500, color: isUp ? C.green : C.red, fontFamily: MONO, letterSpacing: 1 }}>
@@ -864,7 +864,7 @@ function SignalLegend() {
     { sig: { label: "AVOID",      color: "#ff6b6b", bg: "rgba(255,107,107,0.1)" }, rule: "Overbought / greed territory" },
   ];
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 18px", marginBottom: 20 }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 10, padding: "16px 18px", marginBottom: 20 }}>
       <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 14, textTransform: "uppercase" }}>Signal logic</div>
       {rules.map(({ sig, rule }) => (
         <div key={sig.label} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -1007,18 +1007,18 @@ export default function App() {
 
         {/* Divider with live status */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
-          <div style={{ flex: 1, height: 1, background: C.border }} />
+          <div style={{ flex: 1, height: 1, background: C.borderHover }} />
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <div style={{ width: 4, height: 4, borderRadius: "50%", background: liveStatus==="ok"?C.green:liveStatus==="error"?C.red:C.text3, opacity: 0.7 }} />
             <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, opacity: 0.6 }}>
               {liveStatus==="ok" ? "live" : liveStatus==="fetching" ? "updating" : liveStatus==="error" ? "offline" : "loading"}
             </span>
           </div>
-          <div style={{ flex: 1, height: 1, background: C.border }} />
+          <div style={{ flex: 1, height: 1, background: C.borderHover }} />
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 0, marginBottom: 28, background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.border}` }}>
+      <div style={{ display: "flex", gap: 0, marginBottom: 28, background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.borderHover}` }}>
         {[["watchlist","Watchlist"],["portfolio","Portfolio"]].map(([t,l]) => (
           <button key={t} onClick={() => setTab(t)} style={{ flex: 1, background: tab===t?C.surfaceHigh:"transparent", border: `1px solid ${tab===t?C.border:"transparent"}`, color: tab===t?C.text1:C.text3, borderRadius: 6, padding: "9px 0", fontSize: 12, fontFamily: FONT, fontWeight: tab===t?500:300, cursor: "pointer", letterSpacing: 0.3, transition: "all 0.15s" }}>{l}</button>
         ))}
@@ -1028,7 +1028,7 @@ export default function App() {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 24 }}>
             {[{l:"Assets",v:watchlist.length},{l:"Buy now",v:buyableCount},{l:"Watching",v:watchlist.filter(a=>calcSignal(a).signal==="watch").length}].map(s => (
-              <div key={s.l} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "12px 0", textAlign: "center" }}>
+              <div key={s.l} style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "12px 0", textAlign: "center" }}>
                 <div style={{ fontSize: 26, fontWeight: 400, fontFamily: FONT, color: C.text1 }}>{s.v}</div>
                 <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginTop: 4 }}>{s.l.toUpperCase()}</div>
               </div>
@@ -1057,7 +1057,7 @@ export default function App() {
       {tab === "portfolio" && (
         <>
           {portfolio.length > 0 && (
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "20px 20px", marginBottom: 20 }}>
+            <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "20px 20px", marginBottom: 20 }}>
               <div style={{ fontSize: 9, color: C.text2, fontFamily: MONO, letterSpacing: 3, marginBottom: 16, textTransform: "uppercase" }}>Portfolio Summary</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
                 {[["Cost basis", fmtUSD(totalCostBasis)], ["Current value", fmtUSD(totalCurrentValue)]].map(([l,v]) => (
