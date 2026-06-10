@@ -197,7 +197,6 @@ function PriceBar({ low52w, high52w, current, ma200 }) {
 }
 
 // ─── ASSET LOGO ──────────────────────────────────────────────────────────────
-// Stock domain map for Clearbit
 const STOCK_DOMAINS = {
   AMZN: "amazon.com", AAPL: "apple.com", MSFT: "microsoft.com",
   GOOGL: "google.com", GOOG: "google.com", META: "meta.com",
@@ -209,6 +208,10 @@ const STOCK_DOMAINS = {
   DIS: "disney.com", BABA: "alibaba.com", NKE: "nike.com",
   AMD: "amd.com", INTC: "intel.com", CRM: "salesforce.com",
   ORCL: "oracle.com", IBM: "ibm.com", QCOM: "qualcomm.com",
+  WMT: "walmart.com", COST: "costco.com", TGT: "target.com",
+  SBUX: "starbucks.com", MCD: "mcdonalds.com", KO: "coca-cola.com",
+  ABNB: "airbnb.com", COIN: "coinbase.com", PLTR: "palantir.com",
+  NET: "cloudflare.com", SNOW: "snowflake.com", DDOG: "datadoghq.com",
 };
 
 const CRYPTO_TICKERS = ["BTC","ETH","SOL","DOGE","ADA","XRP","BNB","AVAX","MATIC","DOT","LINK","LTC","UNI","ATOM","NEAR","APT","SHIB","TRX","TON"];
@@ -217,20 +220,24 @@ function AssetLogo({ symbol, size = 40, color = "rgba(240,245,242,0.7)" }) {
   const [srcIndex, setSrcIndex] = useState(0);
   const ticker = symbol.replace("-USD","").replace("-","").toUpperCase();
   const isCrypto = CRYPTO_TICKERS.includes(ticker) || symbol.includes("-USD");
+  const domain = STOCK_DOMAINS[ticker] || `${ticker.toLowerCase()}.com`;
 
+  // Google's high-res favicon service — works for any domain, no CORS issues
   const sources = isCrypto
     ? [
         `https://assets.coincap.io/assets/icons/${ticker.toLowerCase()}@2x.png`,
         `https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/${ticker.toLowerCase()}.png`,
       ]
-    : [`/api/logo?ticker=${ticker}`];
+    : [
+        `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+      ];
 
   const failed = srcIndex >= sources.length;
 
   return (
     <div style={{ width: size, height: size, borderRadius: size * 0.25, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
       {!failed
-        ? <img src={sources[srcIndex]} alt={symbol} onError={() => setSrcIndex(i => i + 1)} crossOrigin="anonymous"
+        ? <img src={sources[srcIndex]} alt={symbol} onError={() => setSrcIndex(i => i + 1)}
             style={{ width: size * 0.68, height: size * 0.68, objectFit: "contain", borderRadius: 4 }} />
         : <span style={{ fontSize: size * 0.28, fontWeight: 500, color, fontFamily: MONO, letterSpacing: 1 }}>{ticker.slice(0,2)}</span>
       }
