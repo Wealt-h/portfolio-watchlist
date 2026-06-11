@@ -316,11 +316,11 @@ function FundamentalsSection({ symbol, type }) {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const fetch_ = async () => {
+  const loadFundamentals = async () => {
     if (loaded || type === "crypto") return;
     setLoading(true);
     try {
-      const res = await fetch("/api/fundamentals", {
+      const res = await window.fetch("/api/fundamentals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol }),
@@ -328,7 +328,9 @@ function FundamentalsSection({ symbol, type }) {
       const d = await res.json();
       setData(d);
       setLoaded(true);
-    } catch {}
+    } catch (e) {
+      console.error("Fundamentals error:", e);
+    }
     setLoading(false);
   };
 
@@ -338,7 +340,7 @@ function FundamentalsSection({ symbol, type }) {
     <div style={{ marginTop: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={LBL}>FUNDAMENTALS</div>
-        {!loaded && <button onClick={fetch_} disabled={loading}
+        {!loaded && <button onClick={loadFundamentals} disabled={loading}
           style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 4, padding: "3px 10px", fontSize: 9, fontFamily: MONO, cursor: loading ? "default" : "pointer", letterSpacing: 1.5 }}>
           {loading ? "loading..." : "load"}
         </button>}
