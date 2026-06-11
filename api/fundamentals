@@ -1,0 +1,59 @@
+export default async function handler(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const { symbol } = req.body;
+  if (!symbol) return res.status(400).json({ error: "Missing symbol" });
+
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+  };
+
+  try {
+    const [quoteRes, calendarRes] = await Promise.all([
+      fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`, { headers }),
+      fetch(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=calendarEvents,summaryDetail,defaultKeyStatistics`, { headers }),
+    ]);
+
+    const quoteData = await quoteRes.json();
+    const calData = await calendarRes.json();
+
+    const meta = quoteData?.chart?.result?.[0]?.meta || {};
+    const summary = calData?.quoteSummary?.result?.[0] || {};
+    const calendar = summary?.calendarEvents || {};
+    const detail = summary?.summaryDetail || {};
+    const stats = summary?.defaultKeyStatistics || {};
+
+    // Earnings date
+    const earningsTimestamps = calendar?.earnings?.earningsDate || [];
+    const nextEarnings = earningsTimestamps.length > 0
+      ? new Date(earningsTimestamps[0].raw * 1000).toISOString().slice(0, 10)
+      : null;
+
+    // Dividend data
+    const dividendRate = detail?.dividendRate?.raw || 0;
+    const dividendYield = detail?.dividendYield?.raw || 0;
+    const exDividendDate = detail?.exDividendDate?.raw
+      ? new Date(detail.exDividendDate.raw * 1000).toISOString().slice(0, 10)
+      : null;
+    const lastDividend = stats?.lastDividendValue?.raw || 0;
+    const lastDividendDate = stats?.lastDividendDate?.raw
+      ? new Date(stats.lastDividendDate.raw * 1000).toISOString().slice(0, 10)
+      : null;
+    const payoutRatio = detail?.payoutRatio?.raw || 0;
+    const fiveYearAvgYield = detail?.fiveYearAvgDividendYield?.raw || 0;
+
+    return res.status(200).json({
+      nextEarnings,
+      dividendRate,
+      dividendYield: parseFloat((dividendYield * 100).toFixed(2)),
+      exDividendDate,
+      lastDividend,
+      lastDividendDate,
+      payoutRatio: parseFloat((payoutRatio * 100).toFixed(1)),
+      fiveYearAvgYield,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
