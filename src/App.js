@@ -245,8 +245,150 @@ function AssetLogo({ symbol, size = 40, color = "rgba(240,245,242,0.7)" }) {
   );
 }
 
+// ─── ALERT MODAL ─────────────────────────────────────────────────────────────
+function AlertModal({ symbol, currentPrice, alerts, onSave, onDelete, onClose }) {
+  const [price, setPrice] = useState("");
+  const [direction, setDirection] = useState("below");
+  const myAlerts = alerts.filter(a => a.symbol === symbol);
+
+  const handleAdd = () => {
+    if (!price) return;
+    onSave({ id: Date.now(), symbol, target: parseFloat(price), direction, triggered: false });
+    setPrice("");
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 15, color: C.text1 }}>{symbol} · Price Alerts</div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
+        </div>
+
+        <div style={{ fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 6 }}>CURRENT PRICE: {fmtUSD(currentPrice)}</div>
+
+        {/* Add alert */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <div style={{ display: "flex", background: C.surfaceHigh, borderRadius: 6, padding: 2, border: `1px solid ${C.border}` }}>
+            {["below","above"].map(d => (
+              <button key={d} onClick={() => setDirection(d)}
+                style={{ background: direction===d?C.borderHover:"transparent", border:"none", color: direction===d?C.text1:C.text3, borderRadius:4, padding:"6px 12px", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer" }}>
+                {d.charAt(0).toUpperCase()+d.slice(1)}
+              </button>
+            ))}
+          </div>
+          <input value={price} onChange={e => setPrice(e.target.value)} type="number" placeholder="Target price"
+            style={{ ...INP, flex: 1 }} />
+          <button onClick={handleAdd}
+            style={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "0 16px", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer", whiteSpace: "nowrap" }}>
+            + Add
+          </button>
+        </div>
+
+        {/* Existing alerts */}
+        {myAlerts.length === 0
+          ? <div style={{ fontSize: 12, color: C.text3, fontFamily: FONT, fontWeight: 300, fontStyle: "italic" }}>No alerts set for {symbol}</div>
+          : myAlerts.map(a => (
+            <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+              <div>
+                <span style={{ fontSize: 12, color: C.text1, fontFamily: FONT, fontWeight: 300 }}>
+                  {a.direction === "below" ? "↓ Below" : "↑ Above"} {fmtUSD(a.target)}
+                </span>
+                {a.triggered && <span style={{ fontSize: 9, color: C.amber, fontFamily: MONO, marginLeft: 8, letterSpacing: 1 }}>TRIGGERED</span>}
+              </div>
+              <button onClick={() => onDelete(a.id)}
+                style={{ background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.5)", borderRadius: 4, padding: "3px 8px", fontSize: 10, fontFamily: MONO, cursor: "pointer" }}>✕</button>
+            </div>
+          ))
+        }
+
+        <div style={{ marginTop: 14, fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 1, opacity: 0.6 }}>
+          Alerts check every 60 seconds. Enable notifications for instant alerts.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── FUNDAMENTALS SECTION ─────────────────────────────────────────────────────
+function FundamentalsSection({ symbol, type }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const fetch_ = async () => {
+    if (loaded || type === "crypto") return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/fundamentals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol }),
+      });
+      const d = await res.json();
+      setData(d);
+      setLoaded(true);
+    } catch {}
+    setLoading(false);
+  };
+
+  if (type === "crypto") return null;
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={LBL}>FUNDAMENTALS</div>
+        {!loaded && <button onClick={fetch_} disabled={loading}
+          style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 4, padding: "3px 10px", fontSize: 9, fontFamily: MONO, cursor: loading ? "default" : "pointer", letterSpacing: 1.5 }}>
+          {loading ? "loading..." : "load"}
+        </button>}
+      </div>
+
+      {loading && <div style={{ fontSize: 11, color: C.text3, fontFamily: MONO, fontStyle: "italic" }}>Fetching data...</div>}
+
+      {data && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {/* Earnings */}
+          {data.nextEarnings && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.surfaceHigh, borderRadius: 8, padding: "8px 12px", border: `1px solid ${C.border}` }}>
+              <div>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2 }}>NEXT EARNINGS</div>
+                <div style={{ fontSize: 13, color: C.text1, fontFamily: FONT, fontWeight: 400 }}>{data.nextEarnings}</div>
+              </div>
+              <div style={{ fontSize: 20 }}>📅</div>
+            </div>
+          )}
+
+          {/* Dividend data */}
+          {data.dividendYield > 0 && (
+            <div style={{ background: C.surfaceHigh, borderRadius: 8, padding: "10px 12px", border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 8 }}>DIVIDEND</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                {[
+                  ["Yield", `${data.dividendYield}%`],
+                  ["Annual", fmtUSD(data.dividendRate)],
+                  ["Ex-Date", data.exDividendDate || "—"],
+                ].map(([l, v]) => (
+                  <div key={l}>
+                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2 }}>{l.toUpperCase()}</div>
+                    <div style={{ fontSize: 12, color: C.green, fontFamily: FONT, fontWeight: 400 }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data.dividendYield === 0 && data.nextEarnings && (
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, fontStyle: "italic" }}>No dividend</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── WATCH CARD ───────────────────────────────────────────────────────────────
-function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
+function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onAlert, alertCount }) {
   const [open, setOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(null);
   const [aiError, setAiError] = useState(null);
@@ -422,7 +564,13 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate }) {
             {aiError && <div style={{ fontSize: 11, color: "#ff6b6b", marginTop: 6, fontFamily: "monospace" }}>{aiError}</div>}
           </div>
 
+          {/* Fundamentals — earnings + dividends */}
+          <FundamentalsSection symbol={asset.symbol} type={asset.type} />
+
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+            <button onClick={() => onAlert(asset)} style={{ position: "relative", background: "transparent", border: `1px solid ${C.border}`, color: alertCount > 0 ? C.amber : C.text3, borderRadius: 6, padding: "8px 14px", fontSize: 13, cursor: "pointer" }}>
+              🔔{alertCount > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: C.amber, color: "#08090a", borderRadius: "50%", width: 14, height: 14, fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontWeight: 700 }}>{alertCount}</span>}
+            </button>
             <button onClick={() => onEdit(asset)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>Edit</button>
             <button onClick={() => onDelete(asset.id)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>Remove</button>
           </div>
@@ -1314,6 +1462,10 @@ export default function App() {
   const [fearGreedData, setFearGreedData] = useState(null); // { value, label }
   const [insightsPeriod, setInsightsPeriod] = useState("weekly"); // daily | weekly | monthly
   const [spyPeriodData, setSpyPeriodData] = useState({}); // { daily, weekly, monthly } each { pct }
+  const [alerts, setAlerts] = useState([]);
+  const [alertsLoaded, setAlertsLoaded] = useState(false);
+  const [alertModal, setAlertModal] = useState(null); // null | { symbol, currentPrice }
+  const [triggeredAlerts, setTriggeredAlerts] = useState([]);
 
   // ── Live price refresh
   const refreshPrices = async (wl) => {
@@ -1343,6 +1495,32 @@ export default function App() {
       setLiveStatus("error");
     }
 
+    // Check price alerts
+    if (Object.keys(prices).length > 0) {
+      setAlerts(prev => {
+        const triggered = [];
+        const updated = prev.map(alert => {
+          const price = prices[alert.symbol]?.price;
+          if (!price || alert.triggered) return alert;
+          const hit = alert.direction === "below" ? price <= alert.target : price >= alert.target;
+          if (hit) {
+            triggered.push(alert);
+            // Browser notification
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification(`Accrue Alert: ${alert.symbol}`, {
+                body: `${alert.symbol} is ${alert.direction} $${alert.target} — now $${price.toFixed(2)}`,
+                icon: "/icon-192.png",
+              });
+            }
+            return { ...alert, triggered: true };
+          }
+          return alert;
+        });
+        if (triggered.length > 0) setTriggeredAlerts(t => [...t, ...triggered]);
+        return updated;
+      });
+    }
+
     // Store Fear & Greed for display
     if (fgRes?.data?.[0]) {
       const val = parseInt(fgRes.data[0].value);
@@ -1353,6 +1531,10 @@ export default function App() {
 
   useEffect(() => {
     if (!loaded) return;
+    // Request notification permission for alerts
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
     refreshPrices(watchlist);
     const interval = setInterval(() => refreshPrices(), 60000);
     return () => clearInterval(interval);
@@ -1401,6 +1583,15 @@ export default function App() {
     fetchSpyPeriods();
   }, [tab]);
   useEffect(() => { if (loaded) save("pf_portfolio_v4", portfolio); }, [portfolio, loaded]);
+
+  // Load alerts
+  useEffect(() => {
+    (async () => {
+      const a = await load("pf_alerts_v1", []);
+      setAlerts(a); setAlertsLoaded(true);
+    })();
+  }, []);
+  useEffect(() => { if (alertsLoaded) save("pf_alerts_v1", alerts); }, [alerts, alertsLoaded]);
 
   const saveWatch = (form) => {
     if (watchModal?.asset) setWatchlist(w => w.map(x => x.id === watchModal.asset.id ? { ...form, id: x.id } : x));
@@ -1541,7 +1732,7 @@ export default function App() {
 
           {filteredWatch.length === 0
             ? <div style={{ textAlign:"center", color:C.text3, fontFamily:FONT, fontWeight:300, fontSize:13, padding:"40px 0" }}>No assets match filter</div>
-            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onEdit={a => setWatchModal({asset:a})} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} onThesisUpdate={(id, thesis) => setWatchlist(w => w.map(x => x.id === id ? {...x, thesis} : x))} />)
+            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onEdit={a => setWatchModal({asset:a})} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} onThesisUpdate={(id, thesis) => setWatchlist(w => w.map(x => x.id === id ? {...x, thesis} : x))} onAlert={(asset) => setAlertModal({ symbol: asset.symbol, currentPrice: asset.currentPrice })} alertCount={alerts.filter(al => al.symbol === a.symbol && !al.triggered).length} />)
           }
           <button onClick={() => setSearchModal(true)} style={{ width:"100%", marginTop:10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"16px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Add asset</button>
         </>
@@ -1647,8 +1838,25 @@ export default function App() {
         {lastUpdated ? `Last sync ${lastUpdated.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}` : "Accrue"}
       </div>
 
+      {/* Triggered alerts toast */}
+      {triggeredAlerts.length > 0 && (
+        <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", zIndex: 400, display: "flex", flexDirection: "column", gap: 8, width: "90%", maxWidth: 400 }}>
+          {triggeredAlerts.slice(-3).map((a, i) => (
+            <div key={a.id} style={{ background: C.surfaceHigh, border: `1px solid ${C.amber}55`, borderRadius: 10, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 12, color: C.text1, fontFamily: FONT, fontWeight: 400 }}>🔔 {a.symbol} alert triggered</div>
+                <div style={{ fontSize: 11, color: C.text3, fontFamily: MONO, marginTop: 2 }}>{a.direction === "below" ? "↓" : "↑"} {fmtUSD(a.target)}</div>
+              </div>
+              <button onClick={() => setTriggeredAlerts(t => t.filter(x => x.id !== a.id))}
+                style={{ background: "transparent", border: "none", color: C.text3, fontSize: 16, cursor: "pointer" }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {watchModal !== null && <WatchModal asset={watchModal.asset} onSave={saveWatch} onClose={() => setWatchModal(null)} />}
       {searchModal && <AssetSearchModal onAdd={asset => { setWatchlist(w => [...w, asset]); }} onClose={() => setSearchModal(false)} />}
+      {alertModal && <AlertModal symbol={alertModal.symbol} currentPrice={alertModal.currentPrice} alerts={alerts} onSave={alert => setAlerts(a => [...a, alert])} onDelete={id => setAlerts(a => a.filter(x => x.id !== id))} onClose={() => setAlertModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
     </div>
