@@ -919,23 +919,15 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
           {(() => {
             const [rankView, setRankView] = React.useState("pct");
 
-            // Build ranked list — all assets + benchmarks
-            const ranked = positionSummaries.map(({sym, pos}) => {
-              const asset = watchlist.find(a => a.symbol === sym);
-              return {
-                sym,
-                type: asset?.type || "stock",
-                pct: pos.unrealisedPct,
-                pnl: pos.unrealisedPnl,
-                isBenchmark: false,
-              };
-            }).sort((a, b) => rankView === "pct"
-              ? b.pct - a.pct
-              : b.pnl - a.pnl
-            );
-
-            // Add S&P benchmark
-            if (spyData) ranked.push({ sym: "S&P 500", type: "benchmark", pct: spyData.change24h, pnl: null, isBenchmark: true });
+            // Build ranked list — all assets + S&P benchmark, all sorted together
+            const allItems = [
+              ...positionSummaries.map(({sym, pos}) => {
+                const asset = watchlist.find(a => a.symbol === sym);
+                return { sym, type: asset?.type || "stock", pct: pos.unrealisedPct, pnl: pos.unrealisedPnl, isBenchmark: false };
+              }),
+              ...(spyData ? [{ sym: "S&P 500", type: "index", pct: spyData.change24h, pnl: null, isBenchmark: true }] : []),
+            ];
+            const ranked = allItems.sort((a, b) => rankView === "pct" ? b.pct - a.pct : b.pnl - a.pnl);
 
             return (
               <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
@@ -960,7 +952,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                     <div key={item.sym} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < ranked.length - 1 ? `1px solid ${C.border}` : "none" }}>
                       {/* Rank number */}
                       <div style={{ width: 18, fontSize: 10, color: C.text3, fontFamily: MONO, textAlign: "center", flexShrink: 0 }}>
-                        {item.isBenchmark ? "—" : i + 1}
+                        {i + 1}
                       </div>
 
                       {/* Asset logo or benchmark icon */}
@@ -974,9 +966,8 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                         <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 14, color: item.isBenchmark ? C.text3 : C.text1 }}>{item.sym}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
                           <span style={{ fontSize: 9, color: typeColor[item.type] || C.text3, fontFamily: MONO, letterSpacing: 1 }}>
-                            {item.type.toUpperCase()}
+                            {item.isBenchmark ? "BENCHMARK" : item.type.toUpperCase()}
                           </span>
-                          {item.isBenchmark && <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO }}>BENCHMARK</span>}
                         </div>
                       </div>
 
