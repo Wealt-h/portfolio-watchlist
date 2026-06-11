@@ -788,6 +788,89 @@ function EditTradeModal({ trade, onSave, onClose }) {
   );
 }
 
+// ─── ANALYTICS CARD ──────────────────────────────────────────────────────────
+function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, isUp, total, chartData0 }) {
+  const [view, setView] = useState("chart"); // "chart" | "allocation"
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 20px", marginBottom: 14 }}>
+
+      {/* Header with toggle */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2 }}>
+          {view === "chart" ? "PORTFOLIO VALUE" : "ALLOCATION"}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {view === "chart" && hasChart && (
+            <div style={{ fontSize: 12, fontFamily: FONT, fontWeight: 400, color: lineColor }}>
+              {isUp ? "+" : ""}{fmtUSD(total - (chartData0?.cost || 0))}
+            </div>
+          )}
+          {showToggle && (
+            <div style={{ display: "flex", background: C.surfaceHigh, borderRadius: 6, padding: 2, border: `1px solid ${C.border}` }}>
+              {[["chart","↗"], ["allocation","◑"]].map(([v, icon]) => (
+                <button key={v} onClick={() => setView(v)}
+                  style={{ background: view===v ? C.borderHover : "transparent", border: "none", color: view===v ? C.text1 : C.text3, borderRadius: 4, padding: "3px 8px", fontSize: 11, cursor: "pointer", transition: "all 0.15s" }}>
+                  {icon}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Chart view */}
+      {view === "chart" && hasChart && (
+        <ResponsiveContainer width="100%" height={100}>
+          <AreaChart data={chartData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={lineColor} stopOpacity={0.2} />
+                <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+            <Area type="monotone" dataKey="cost" stroke={lineColor} strokeWidth={1.5} fill="url(#portfolioGrad)" dot={false} />
+            <Tooltip
+              contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
+              labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
+              itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
+              formatter={v => [fmtUSD(v), "Value"]}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
+
+      {/* Allocation view */}
+      {(view === "allocation" || !showToggle) && donutData && (
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <PieChart width={90} height={90}>
+            <Pie data={donutData} cx={41} cy={41} innerRadius={24} outerRadius={40} dataKey="value" strokeWidth={0}>
+              {donutData.map((d, i) => <Cell key={i} fill={d.color} opacity={0.9} />)}
+            </Pie>
+            <Tooltip
+              contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
+              itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
+              formatter={(v, n) => [`${v}%`, n]}
+            />
+          </PieChart>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+            {donutData.map((d, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: d.color }} />
+                  <span style={{ fontFamily: MONO, fontSize: 10, color: C.text2, letterSpacing: 1 }}>{d.name}</span>
+                </div>
+                <span style={{ fontFamily: FONT, fontWeight: 400, fontSize: 12, color: C.text1 }}>{d.value}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── POSITION HELPERS ────────────────────────────────────────────────────────
 function calcPosition(trades, currentPrice) {
   const buys = trades.filter(t => t.type === "buy");
@@ -1211,7 +1294,7 @@ export default function App() {
             ? <div style={{ textAlign:"center", color:C.text3, fontFamily:FONT, fontWeight:300, fontSize:13, padding:"40px 0", lineHeight:2 }}>No positions yet<br/><span style={{fontSize:11, opacity:0.6}}>Log your first trade below</span></div>
             : (
               <>
-                {/* Combined analytics card */}
+                {/* Combined analytics card with toggle */}
                 {(() => {
                   if (portfolio.length === 0) return null;
 
@@ -1235,72 +1318,23 @@ export default function App() {
                   }) : [];
                   if (hasChart) chartData.push({ date: "Now", cost: parseFloat(total.toFixed(2)) });
 
-                  const todayValue = total;
-                  const isUp = !hasChart || todayValue >= (chartData[0]?.cost || 0);
+                  const isUp = !hasChart || total >= (chartData[0]?.cost || 0);
                   const lineColor = isUp ? C.green : C.red;
 
+                  // Only show toggle if both views are available
+                  const showToggle = donutData && hasChart;
+
                   return (
-                    <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 20px", marginBottom: 14 }}>
-
-                      {/* Header row */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2 }}>ANALYTICS</div>
-                        {hasChart && (
-                          <div style={{ fontSize: 12, fontFamily: FONT, fontWeight: 400, color: lineColor }}>
-                            {isUp ? "+" : ""}{fmtUSD(todayValue - (chartData[0]?.cost || 0))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Donut + legend side by side (only if 2+ positions) */}
-                      {donutData && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: hasChart ? 16 : 0, paddingBottom: hasChart ? 16 : 0, borderBottom: hasChart ? `1px solid ${C.border}` : "none" }}>
-                          <PieChart width={80} height={80}>
-                            <Pie data={donutData} cx={36} cy={36} innerRadius={22} outerRadius={36} dataKey="value" strokeWidth={0}>
-                              {donutData.map((d, i) => <Cell key={i} fill={d.color} opacity={0.9} />)}
-                            </Pie>
-                            <Tooltip
-                              contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
-                              itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
-                              formatter={(v, n) => [`${v}%`, n]}
-                            />
-                          </PieChart>
-                          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
-                            {donutData.map((d, i) => (
-                              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: d.color }} />
-                                  <span style={{ fontFamily: MONO, fontSize: 10, color: C.text2, letterSpacing: 1 }}>{d.name}</span>
-                                </div>
-                                <span style={{ fontFamily: FONT, fontWeight: 400, fontSize: 12, color: C.text1 }}>{d.value}%</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Portfolio value chart */}
-                      {hasChart && (
-                        <ResponsiveContainer width="100%" height={80}>
-                          <AreaChart data={chartData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-                            <defs>
-                              <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={lineColor} stopOpacity={0.2} />
-                                <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                            <Area type="monotone" dataKey="cost" stroke={lineColor} strokeWidth={1.5} fill="url(#portfolioGrad)" dot={false} />
-                            <Tooltip
-                              contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
-                              labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
-                              itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
-                              formatter={v => [fmtUSD(v), "Value"]}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      )}
-                    </div>
+                    <AnalyticsCard
+                      donutData={donutData}
+                      chartData={chartData}
+                      hasChart={hasChart}
+                      showToggle={showToggle}
+                      lineColor={lineColor}
+                      isUp={isUp}
+                      total={total}
+                      chartData0={chartData[0]}
+                    />
                   );
                 })()}
 
