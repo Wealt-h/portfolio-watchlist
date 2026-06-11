@@ -789,7 +789,7 @@ function EditTradeModal({ trade, onSave, onClose }) {
 }
 
 // ─── INSIGHTS TAB ────────────────────────────────────────────────────────────
-function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyData, btcPeriodData, getLivePrice }) {
+function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyPeriodData, getLivePrice }) {
 
   // Period days mapping
   const periodDays = { daily: 1, weekly: 7, monthly: 30 };
@@ -833,9 +833,8 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   const classColors = { crypto: C.amber, stock: C.blue, etf: C.green };
   const classLabels = { crypto: "Crypto", stock: "Stocks", etf: "ETFs" };
 
-  // S&P and BTC benchmarks (24h change as proxy)
-  const spyChange = spyData?.change24h || null;
-  const btcChange = btcPeriodData?.change24h || null;
+  // S&P period return matching current toggle
+  const spyChange = spyPeriodData?.[period] ?? null;
 
   // Bar chart data for asset classes
   const barData = Object.entries(assetClasses).map(([type, data]) => ({
@@ -846,7 +845,6 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
 
   // Add benchmarks to bar chart
   if (spyChange !== null) barData.push({ name: "S&P 500", pct: spyChange, color: "rgba(240,245,242,0.4)", isBenchmark: true });
-  if (btcChange !== null && !assetClasses["crypto"]) barData.push({ name: "BTC", pct: btcChange, color: C.amber, isBenchmark: true });
 
   const StatCard = ({ label, value, sub, color }) => (
     <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 10, padding: "14px 16px" }}>
@@ -925,7 +923,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                 const asset = watchlist.find(a => a.symbol === sym);
                 return { sym, type: asset?.type || "stock", pct: pos.unrealisedPct, pnl: pos.unrealisedPnl, isBenchmark: false };
               }),
-              ...(spyData ? [{ sym: "S&P 500", type: "index", pct: spyData.change24h, pnl: null, isBenchmark: true }] : []),
+              ...(spyChange !== null ? [{ sym: "S&P 500", type: "index", pct: spyChange, pnl: null, isBenchmark: true }] : []),
             ];
             const ranked = allItems.sort((a, b) => rankView === "pct" ? b.pct - a.pct : b.pnl - a.pnl);
 
@@ -1000,7 +998,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
           {/* vs S&P 500 */}
           {spyChange !== null && (
             <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
-              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 12 }}>VS S&P 500</div>
+              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 12 }}>VS S&P 500 · {period.toUpperCase()}</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4 }}>YOUR PORTFOLIO</div>
@@ -1009,7 +1007,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4 }}>S&P 500 (24H)</div>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4 }}>S&P 500 ({period.toUpperCase()})</div>
                   <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 22, color: spyChange >= 0 ? C.green : C.red, letterSpacing: -0.5 }}>
                     {spyChange >= 0 ? "+" : ""}{spyChange.toFixed(2)}%
                   </div>
@@ -1315,8 +1313,7 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [fearGreedData, setFearGreedData] = useState(null); // { value, label }
   const [insightsPeriod, setInsightsPeriod] = useState("weekly"); // daily | weekly | monthly
-  const [spyData, setSpyData] = useState(null);
-  const [btcPeriodData, setBtcPeriodData] = useState(null);
+  const [spyPeriodData, setSpyPeriodData] = useState({}); // { daily, weekly, monthly } each { pct }
 
   // ── Live price refresh
   const refreshPrices = async (wl) => {
@@ -1370,22 +1367,38 @@ export default function App() {
   }, []);
   useEffect(() => { if (loaded) save("pf_watchlist_v3", watchlist); }, [watchlist, loaded]);
 
-  // Fetch SPY and BTC benchmark data for insights
+  // Fetch SPY period returns for insights
   useEffect(() => {
     if (tab !== "insights") return;
-    const fetchBenchmarks = async () => {
+    const fetchSpyPeriods = async () => {
       try {
-        const [spyRes, btcRes] = await Promise.all([
-          fetch("/api/prices", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: ["SPY", "BTC"] }) }),
-        ]);
-        const spyData = await spyRes.json();
-        if (spyData.prices) {
-          setSpyData(spyData.prices["SPY"] || null);
-          setBtcPeriodData(spyData.prices["BTC"] || null);
-        }
+        // Fetch 1 month of SPY history to cover all periods
+        const res = await fetch("/api/sparkline", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol: "SPY" }),
+        });
+        const data = await res.json();
+        const points = data.points || [];
+        if (points.length < 2) return;
+
+        const calcPeriodReturn = (daysBack) => {
+          const cutoff = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+          const periodPoints = points.filter(p => p.t >= cutoff);
+          if (periodPoints.length < 2) return null;
+          const start = periodPoints[0].v;
+          const end = periodPoints[periodPoints.length - 1].v;
+          return parseFloat((((end - start) / start) * 100).toFixed(2));
+        };
+
+        setSpyPeriodData({
+          daily: calcPeriodReturn(1),
+          weekly: calcPeriodReturn(7),
+          monthly: calcPeriodReturn(30),
+        });
       } catch {}
     };
-    fetchBenchmarks();
+    fetchSpyPeriods();
   }, [tab]);
   useEffect(() => { if (loaded) save("pf_portfolio_v4", portfolio); }, [portfolio, loaded]);
 
@@ -1625,8 +1638,7 @@ export default function App() {
           positionSummaries={positionSummaries}
           period={insightsPeriod}
           setPeriod={setInsightsPeriod}
-          spyData={spyData}
-          btcPeriodData={btcPeriodData}
+          spyPeriodData={spyPeriodData}
           getLivePrice={getLivePrice}
         />
       )}
