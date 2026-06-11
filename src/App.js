@@ -915,55 +915,96 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
             />
           </div>
 
-          {/* Asset class performance vs benchmarks */}
-          <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
-            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 14 }}>ASSET CLASS PERFORMANCE</div>
+          {/* Ranked performance list */}
+          {(() => {
+            const [rankView, setRankView] = React.useState("pct");
 
-            {/* Bar chart */}
-            <div style={{ marginBottom: 16 }}>
-              {barData.map((d, i) => {
-                const maxAbs = Math.max(...barData.map(b => Math.abs(b.pct)), 1);
-                const barWidth = Math.abs(d.pct) / maxAbs * 100;
-                return (
-                  <div key={i} style={{ marginBottom: 10 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        {d.isBenchmark && <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1 }}>BENCH</span>}
-                        <span style={{ fontSize: 12, color: d.isBenchmark ? C.text3 : C.text1, fontFamily: FONT, fontWeight: d.isBenchmark ? 300 : 400 }}>{d.name}</span>
-                      </div>
-                      <span style={{ fontSize: 12, fontFamily: MONO, fontWeight: 500, color: d.pct >= 0 ? C.green : C.red }}>
-                        {d.pct >= 0 ? "+" : ""}{d.pct.toFixed(2)}%
-                      </span>
-                    </div>
-                    <div style={{ height: 4, background: C.surfaceHigh, borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${barWidth}%`, background: d.pct >= 0 ? d.color : C.red, borderRadius: 2, opacity: d.isBenchmark ? 0.5 : 0.85 }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            // Build ranked list — all assets + benchmarks
+            const ranked = positionSummaries.map(({sym, pos}) => {
+              const asset = watchlist.find(a => a.symbol === sym);
+              return {
+                sym,
+                type: asset?.type || "stock",
+                pct: pos.unrealisedPct,
+                pnl: pos.unrealisedPnl,
+                isBenchmark: false,
+              };
+            }).sort((a, b) => rankView === "pct"
+              ? b.pct - a.pct
+              : b.pnl - a.pnl
+            );
 
-            {/* Asset breakdown per class */}
-            {Object.entries(assetClasses).map(([type, data]) => (
-              <div key={type} style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: classColors[type] || C.blue }} />
-                    <span style={{ fontSize: 10, color: C.text2, fontFamily: MONO, letterSpacing: 1.5 }}>{(classLabels[type] || type).toUpperCase()}</span>
+            // Add S&P benchmark
+            if (spyData) ranked.push({ sym: "S&P 500", type: "benchmark", pct: spyData.change24h, pnl: null, isBenchmark: true });
+
+            return (
+              <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
+                {/* Header + toggle */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2 }}>PERFORMANCE RANKING</div>
+                  <div style={{ display: "flex", background: C.surfaceHigh, borderRadius: 6, padding: 2, border: `1px solid ${C.border}` }}>
+                    {[["pct", "%"], ["pnl", "$"]].map(([v, label]) => (
+                      <button key={v} onClick={e => { e.stopPropagation(); setRankView(v); }}
+                        style={{ background: rankView===v?C.borderHover:"transparent", border: "none", color: rankView===v?C.text1:C.text3, borderRadius: 4, padding: "3px 10px", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1, transition: "all 0.15s" }}>
+                        {label}
+                      </button>
+                    ))}
                   </div>
-                  <span style={{ fontSize: 11, color: data.pnl >= 0 ? C.green : C.red, fontFamily: MONO }}>
-                    {data.pnl >= 0 ? "+" : ""}{fmtUSD(data.pnl)}
-                  </span>
                 </div>
-                {data.assets.map((a, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0 5px 12px", borderLeft: `1px solid ${C.border}` }}>
-                    <span style={{ fontSize: 12, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{a.sym}</span>
-                    <span style={{ fontSize: 12, color: a.pct >= 0 ? C.green : C.red, fontFamily: MONO }}>{a.pct >= 0 ? "+" : ""}{a.pct.toFixed(2)}%</span>
-                  </div>
-                ))}
+
+                {/* Ranked rows */}
+                {ranked.map((item, i) => {
+                  const isUp = item.pct >= 0;
+                  const typeColor = { crypto: C.amber, stock: C.blue, etf: C.green, benchmark: C.text3 };
+                  return (
+                    <div key={item.sym} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < ranked.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                      {/* Rank number */}
+                      <div style={{ width: 18, fontSize: 10, color: C.text3, fontFamily: MONO, textAlign: "center", flexShrink: 0 }}>
+                        {item.isBenchmark ? "—" : i + 1}
+                      </div>
+
+                      {/* Asset logo or benchmark icon */}
+                      {item.isBenchmark
+                        ? <div style={{ width: 32, height: 32, borderRadius: 8, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: C.text3, fontFamily: MONO, flexShrink: 0 }}>SPY</div>
+                        : <AssetLogo symbol={item.sym} size={32} />
+                      }
+
+                      {/* Name + type tag */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 14, color: item.isBenchmark ? C.text3 : C.text1 }}>{item.sym}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
+                          <span style={{ fontSize: 9, color: typeColor[item.type] || C.text3, fontFamily: MONO, letterSpacing: 1 }}>
+                            {item.type.toUpperCase()}
+                          </span>
+                          {item.isBenchmark && <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO }}>BENCHMARK</span>}
+                        </div>
+                      </div>
+
+                      {/* Performance value */}
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 16, color: isUp ? C.green : C.red, letterSpacing: -0.3 }}>
+                          {rankView === "pct"
+                            ? `${isUp ? "+" : ""}${item.pct.toFixed(2)}%`
+                            : item.pnl !== null ? `${item.pnl >= 0 ? "+" : ""}${fmtUSD(item.pnl)}` : "—"
+                          }
+                        </div>
+                        {rankView === "pct" && item.pnl !== null && (
+                          <div style={{ fontSize: 10, color: isUp ? "rgba(61,220,132,0.6)" : "rgba(255,107,107,0.6)", fontFamily: MONO, marginTop: 1 }}>
+                            {item.pnl >= 0 ? "+" : ""}{fmtUSD(item.pnl)}
+                          </div>
+                        )}
+                        {rankView === "pnl" && (
+                          <div style={{ fontSize: 10, color: C.text3, fontFamily: MONO, marginTop: 1 }}>
+                            {item.pct >= 0 ? "+" : ""}{item.pct.toFixed(2)}%
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            );
+          })()}
 
           {/* vs S&P 500 */}
           {spyChange !== null && (
