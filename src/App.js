@@ -788,6 +788,220 @@ function EditTradeModal({ trade, onSave, onClose }) {
   );
 }
 
+// ─── INSIGHTS TAB ────────────────────────────────────────────────────────────
+function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyData, btcPeriodData, getLivePrice }) {
+
+  // Period days mapping
+  const periodDays = { daily: 1, weekly: 7, monthly: 30 };
+  const days = periodDays[period];
+
+  // Filter trades within period
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const periodTrades = portfolio.filter(t => t.date >= cutoffStr);
+
+  // Overall P&L
+  const totalInvested = positionSummaries.reduce((s, {pos}) => s + pos.costBasis, 0);
+  const totalValue = positionSummaries.reduce((s, {pos}) => s + pos.currentValue, 0);
+  const totalPnl = totalValue - totalInvested;
+  const totalPnlPct = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
+
+  // Best / worst performer
+  const performers = positionSummaries
+    .map(({sym, pos}) => ({ sym, pct: pos.unrealisedPct, pnl: pos.unrealisedPnl }))
+    .sort((a, b) => b.pct - a.pct);
+  const best = performers[0] || null;
+  const worst = performers[performers.length - 1] || null;
+
+  // Win rate
+  const winners = positionSummaries.filter(({pos}) => pos.unrealisedPnl > 0).length;
+  const winRate = positionSummaries.length > 0 ? (winners / positionSummaries.length) * 100 : 0;
+
+  // Asset class breakdown
+  const assetClasses = {};
+  positionSummaries.forEach(({sym, pos}) => {
+    const asset = watchlist.find(a => a.symbol === sym);
+    const type = asset?.type || "stock";
+    if (!assetClasses[type]) assetClasses[type] = { pnl: 0, value: 0, cost: 0, assets: [] };
+    assetClasses[type].pnl += pos.unrealisedPnl;
+    assetClasses[type].value += pos.currentValue;
+    assetClasses[type].cost += pos.costBasis;
+    assetClasses[type].assets.push({ sym, pct: pos.unrealisedPct, pnl: pos.unrealisedPnl });
+  });
+
+  const classColors = { crypto: C.amber, stock: C.blue, etf: C.green };
+  const classLabels = { crypto: "Crypto", stock: "Stocks", etf: "ETFs" };
+
+  // S&P and BTC benchmarks (24h change as proxy)
+  const spyChange = spyData?.change24h || null;
+  const btcChange = btcPeriodData?.change24h || null;
+
+  // Bar chart data for asset classes
+  const barData = Object.entries(assetClasses).map(([type, data]) => ({
+    name: classLabels[type] || type,
+    pct: data.cost > 0 ? parseFloat(((data.pnl / data.cost) * 100).toFixed(2)) : 0,
+    color: classColors[type] || C.blue,
+  }));
+
+  // Add benchmarks to bar chart
+  if (spyChange !== null) barData.push({ name: "S&P 500", pct: spyChange, color: "rgba(240,245,242,0.4)", isBenchmark: true });
+  if (btcChange !== null && !assetClasses["crypto"]) barData.push({ name: "BTC", pct: btcChange, color: C.amber, isBenchmark: true });
+
+  const StatCard = ({ label, value, sub, color }) => (
+    <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 10, padding: "14px 16px" }}>
+      <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 6, textTransform: "uppercase" }}>{label}</div>
+      <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 20, color: color || C.text1, letterSpacing: -0.5 }}>{value}</div>
+      {sub && <div style={{ fontSize: 10, color: C.text3, fontFamily: MONO, marginTop: 3 }}>{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Period toggle */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+        {["daily","weekly","monthly"].map(p => (
+          <button key={p} onClick={() => setPeriod(p)}
+            style={{ flex: 1, background: period===p?C.surfaceHigh:"transparent", border: `1px solid ${period===p?C.borderHover:C.border}`, color: period===p?C.text1:C.text3, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: FONT, fontWeight: period===p?500:300, cursor: "pointer", letterSpacing: 0.3, textTransform: "capitalize" }}>
+            {p.charAt(0).toUpperCase() + p.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {positionSummaries.length === 0 ? (
+        <div style={{ textAlign: "center", color: C.text3, fontFamily: FONT, fontWeight: 300, fontSize: 13, padding: "60px 0" }}>
+          No portfolio data yet<br/><span style={{ fontSize: 11, opacity: 0.6 }}>Add trades to see insights</span>
+        </div>
+      ) : (
+        <>
+          {/* Overall P&L */}
+          <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>OVERALL P&L</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+              <div>
+                <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 28, color: totalPnl >= 0 ? C.green : C.red, letterSpacing: -1 }}>
+                  {totalPnl >= 0 ? "+" : ""}{fmtUSD(totalPnl)}
+                </div>
+                <div style={{ fontFamily: MONO, fontSize: 11, color: totalPnl >= 0 ? "rgba(61,220,132,0.7)" : "rgba(255,107,107,0.7)", marginTop: 3 }}>
+                  {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}% since purchase
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 3 }}>CURRENT VALUE</div>
+                <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 16, color: C.text1 }}>{fmtUSD(totalValue)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Best / Worst / Win rate */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+            <StatCard
+              label="Best"
+              value={best ? best.sym : "—"}
+              sub={best ? `+${best.pct.toFixed(1)}%` : null}
+              color={C.green}
+            />
+            <StatCard
+              label="Worst"
+              value={worst && worst.pct < 0 ? worst.sym : "—"}
+              sub={worst && worst.pct < 0 ? `${worst.pct.toFixed(1)}%` : "None in loss"}
+              color={worst && worst.pct < 0 ? C.red : C.text3}
+            />
+            <StatCard
+              label="Win Rate"
+              value={`${winRate.toFixed(0)}%`}
+              sub={`${winners}/${positionSummaries.length} positions`}
+              color={winRate >= 50 ? C.green : C.red}
+            />
+          </div>
+
+          {/* Asset class performance vs benchmarks */}
+          <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 14 }}>ASSET CLASS PERFORMANCE</div>
+
+            {/* Bar chart */}
+            <div style={{ marginBottom: 16 }}>
+              {barData.map((d, i) => {
+                const maxAbs = Math.max(...barData.map(b => Math.abs(b.pct)), 1);
+                const barWidth = Math.abs(d.pct) / maxAbs * 100;
+                return (
+                  <div key={i} style={{ marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {d.isBenchmark && <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1 }}>BENCH</span>}
+                        <span style={{ fontSize: 12, color: d.isBenchmark ? C.text3 : C.text1, fontFamily: FONT, fontWeight: d.isBenchmark ? 300 : 400 }}>{d.name}</span>
+                      </div>
+                      <span style={{ fontSize: 12, fontFamily: MONO, fontWeight: 500, color: d.pct >= 0 ? C.green : C.red }}>
+                        {d.pct >= 0 ? "+" : ""}{d.pct.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div style={{ height: 4, background: C.surfaceHigh, borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${barWidth}%`, background: d.pct >= 0 ? d.color : C.red, borderRadius: 2, opacity: d.isBenchmark ? 0.5 : 0.85 }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Asset breakdown per class */}
+            {Object.entries(assetClasses).map(([type, data]) => (
+              <div key={type} style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: classColors[type] || C.blue }} />
+                    <span style={{ fontSize: 10, color: C.text2, fontFamily: MONO, letterSpacing: 1.5 }}>{(classLabels[type] || type).toUpperCase()}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: data.pnl >= 0 ? C.green : C.red, fontFamily: MONO }}>
+                    {data.pnl >= 0 ? "+" : ""}{fmtUSD(data.pnl)}
+                  </span>
+                </div>
+                {data.assets.map((a, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0 5px 12px", borderLeft: `1px solid ${C.border}` }}>
+                    <span style={{ fontSize: 12, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{a.sym}</span>
+                    <span style={{ fontSize: 12, color: a.pct >= 0 ? C.green : C.red, fontFamily: MONO }}>{a.pct >= 0 ? "+" : ""}{a.pct.toFixed(2)}%</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* vs S&P 500 */}
+          {spyChange !== null && (
+            <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
+              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 12 }}>VS S&P 500</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4 }}>YOUR PORTFOLIO</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 22, color: totalPnlPct >= 0 ? C.green : C.red, letterSpacing: -0.5 }}>
+                    {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}%
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4 }}>S&P 500 (24H)</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 22, color: spyChange >= 0 ? C.green : C.red, letterSpacing: -0.5 }}>
+                    {spyChange >= 0 ? "+" : ""}{spyChange.toFixed(2)}%
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: 12, padding: "10px 14px", background: C.surfaceHigh, borderRadius: 8 }}>
+                {(() => {
+                  const diff = totalPnlPct - spyChange;
+                  const beating = diff >= 0;
+                  return (
+                    <div style={{ fontSize: 12, color: beating ? C.green : C.red, fontFamily: FONT, fontWeight: 300 }}>
+                      {beating ? "↑" : "↓"} {Math.abs(diff).toFixed(2)}% {beating ? "ahead of" : "behind"} the S&P 500
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── ANALYTICS CARD ──────────────────────────────────────────────────────────
 function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, isUp, total, chartData0 }) {
   const [view, setView] = useState("chart"); // "chart" | "allocation"
@@ -1068,6 +1282,9 @@ export default function App() {
   const [liveStatus, setLiveStatus] = useState("idle"); // idle | fetching | ok | error
   const [lastUpdated, setLastUpdated] = useState(null);
   const [fearGreedData, setFearGreedData] = useState(null); // { value, label }
+  const [insightsPeriod, setInsightsPeriod] = useState("weekly"); // daily | weekly | monthly
+  const [spyData, setSpyData] = useState(null);
+  const [btcPeriodData, setBtcPeriodData] = useState(null);
 
   // ── Live price refresh
   const refreshPrices = async (wl) => {
@@ -1120,6 +1337,24 @@ export default function App() {
     })();
   }, []);
   useEffect(() => { if (loaded) save("pf_watchlist_v3", watchlist); }, [watchlist, loaded]);
+
+  // Fetch SPY and BTC benchmark data for insights
+  useEffect(() => {
+    if (tab !== "insights") return;
+    const fetchBenchmarks = async () => {
+      try {
+        const [spyRes, btcRes] = await Promise.all([
+          fetch("/api/prices", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: ["SPY", "BTC"] }) }),
+        ]);
+        const spyData = await spyRes.json();
+        if (spyData.prices) {
+          setSpyData(spyData.prices["SPY"] || null);
+          setBtcPeriodData(spyData.prices["BTC"] || null);
+        }
+      } catch {}
+    };
+    fetchBenchmarks();
+  }, [tab]);
   useEffect(() => { if (loaded) save("pf_portfolio_v4", portfolio); }, [portfolio, loaded]);
 
   const saveWatch = (form) => {
@@ -1210,8 +1445,8 @@ export default function App() {
       </div>
 
       <div style={{ display: "flex", gap: 0, marginBottom: 28, background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.borderHover}` }}>
-        {[["watchlist","Watchlist"],["portfolio","Portfolio"]].map(([t,l]) => (
-          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, background: tab===t?C.surfaceHigh:"transparent", border: `1px solid ${tab===t?C.border:"transparent"}`, color: tab===t?C.text1:C.text3, borderRadius: 6, padding: "9px 0", fontSize: 12, fontFamily: FONT, fontWeight: tab===t?500:300, cursor: "pointer", letterSpacing: 0.3, transition: "all 0.15s" }}>{l}</button>
+        {[["watchlist","Watchlist"],["portfolio","Portfolio"],["insights","Insights"]].map(([t,l]) => (
+          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, background: tab===t?C.surfaceHigh:"transparent", border: `1px solid ${tab===t?C.border:"transparent"}`, color: tab===t?C.text1:C.text3, borderRadius: 6, padding: "9px 0", fontSize: 11, fontFamily: FONT, fontWeight: tab===t?500:300, cursor: "pointer", letterSpacing: 0.3, transition: "all 0.15s" }}>{l}</button>
         ))}
       </div>
 
@@ -1349,6 +1584,19 @@ export default function App() {
           }
           <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ width:"100%", marginTop:10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Log trade</button>
         </>
+      )}
+
+      {tab === "insights" && (
+        <InsightsTab
+          portfolio={portfolio}
+          watchlist={watchlist}
+          positionSummaries={positionSummaries}
+          period={insightsPeriod}
+          setPeriod={setInsightsPeriod}
+          spyData={spyData}
+          btcPeriodData={btcPeriodData}
+          getLivePrice={getLivePrice}
+        />
       )}
 
       <div style={{ textAlign:"center", marginTop:32, fontSize:9, color:C.text3, fontFamily:MONO, letterSpacing:2, opacity:0.4 }}>
