@@ -55,48 +55,66 @@ function OnboardingScreen({ onComplete }) {
         padding: "40px 32px",
         fontFamily: FONT,
       }}>
+        <style>{`
+          @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+          }
+          .splash-logo   { animation: fadeIn 1.2s ease forwards; opacity: 0; }
+          .splash-tag    { animation: fadeUp 0.8s ease 1.0s forwards; opacity: 0; }
+          .splash-line   { animation: fadeIn 0.6s ease 1.6s forwards; opacity: 0; }
+          .splash-pills  { animation: fadeUp 0.8s ease 1.8s forwards; opacity: 0; }
+          .splash-cta    { animation: fadeUp 0.7s ease 2.4s forwards; opacity: 0; }
+        `}</style>
+
         {/* Logo */}
-        <div style={{ marginBottom: 48 }}>
+        <div className="splash-logo" style={{ marginBottom: 28 }}>
           {[["A",1.0],["C",0.92],["C",0.84],["R",0.76],["U",0.68],["E",0.60]].map(([l,o],i) => (
-            <span key={i} style={{ fontSize: 42, fontWeight: 100, letterSpacing: 10, color: `rgba(240,245,242,${o})`, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{l}</span>
+            <span key={i} style={{ fontSize: 46, fontWeight: 100, letterSpacing: 11, color: `rgba(240,245,242,${o})`, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{l}</span>
           ))}
         </div>
 
         {/* Tagline */}
-        <div style={{ fontSize: 14, color: "rgba(240,245,242,0.4)", fontWeight: 300, letterSpacing: 1, textAlign: "center", marginBottom: 8 }}>
+        <div className="splash-tag" style={{ fontSize: 13, color: "rgba(240,245,242,0.38)", fontWeight: 300, letterSpacing: 1.5, textAlign: "center", marginBottom: 10 }}>
           Disciplined Investment Intelligence
         </div>
-        <div style={{ width: 40, height: 1, background: "rgba(61,220,132,0.4)", marginBottom: 60 }} />
+        <div className="splash-line" style={{ width: 36, height: 1, background: "rgba(61,220,132,0.45)", marginBottom: 52 }} />
 
         {/* Feature pills */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 300, marginBottom: 60 }}>
+        <div className="splash-pills" style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 300, marginBottom: 52 }}>
           {[
             ["📈", "Live prices & buy signals"],
             ["🧠", "AI-powered research"],
             ["💼", "Full portfolio tracking"],
             ["💡", "Performance insights"],
           ].map(([icon, text]) => (
-            <div key={text} style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "12px 16px" }}>
+            <div key={text} style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 16px" }}>
               <span style={{ fontSize: 16 }}>{icon}</span>
-              <span style={{ fontSize: 13, color: "rgba(240,245,242,0.65)", fontWeight: 300 }}>{text}</span>
+              <span style={{ fontSize: 13, color: "rgba(240,245,242,0.6)", fontWeight: 300 }}>{text}</span>
             </div>
           ))}
         </div>
 
         {/* CTA */}
-        <button onClick={() => setStep(0)} style={{
-          width: "100%", maxWidth: 300,
-          background: "linear-gradient(135deg, rgba(61,220,132,0.2), rgba(61,220,132,0.08))",
-          border: "1px solid rgba(61,220,132,0.4)",
-          color: "#3ddc84", borderRadius: 14, padding: "16px 0",
-          fontSize: 14, fontFamily: FONT, fontWeight: 400,
-          cursor: "pointer", letterSpacing: 1, marginBottom: 16,
-        }}>
-          Get started
-        </button>
-        <button onClick={handleSkip} style={{ background: "transparent", border: "none", color: "rgba(240,245,242,0.25)", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.5 }}>
-          Skip intro
-        </button>
+        <div className="splash-cta" style={{ width: "100%", maxWidth: 300 }}>
+          <button onClick={() => setStep(0)} style={{
+            width: "100%",
+            background: "linear-gradient(135deg, rgba(61,220,132,0.18), rgba(61,220,132,0.07))",
+            border: "1px solid rgba(61,220,132,0.4)",
+            color: "#3ddc84", borderRadius: 14, padding: "16px 0",
+            fontSize: 14, fontFamily: FONT, fontWeight: 400,
+            cursor: "pointer", letterSpacing: 1, marginBottom: 14,
+          }}>
+            Get started
+          </button>
+          <button onClick={handleSkip} style={{ display: "block", width: "100%", background: "transparent", border: "none", color: "rgba(240,245,242,0.22)", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.5, textAlign: "center" }}>
+            Skip intro
+          </button>
+        </div>
       </div>
     );
   }
