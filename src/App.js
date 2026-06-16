@@ -1796,6 +1796,11 @@ export default function App() {
   const getLivePrice = (sym) => { const a = watchlist.find(x => x.symbol===sym); return a?.currentPrice || 0; };
   const positionSummaries = Object.entries(positions).map(([sym, trades]) => ({ sym, trades, pos: calcPosition(trades, getLivePrice(sym)) }));
   const totalCostBasis = positionSummaries.reduce((s,{pos}) => s+pos.costBasis, 0);
+
+  // Cash totals
+  const totalCashPrincipal = cashAccounts.reduce((s, a) => s + (a.principal || 0), 0);
+  const totalCashValue = cashAccounts.reduce((s, a) => s + calcCashValue(a).currentValue, 0);
+  const totalCashInterest = totalCashValue - totalCashPrincipal;
   const totalCurrentValue = positionSummaries.reduce((s,{pos}) => s+pos.currentValue, 0);
   const totalUnrealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.unrealisedPnl, 0);
   const totalRealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.realisedPnl, 0);
