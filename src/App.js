@@ -867,7 +867,7 @@ function EditTradeModal({ trade, onSave, onClose }) {
 }
 
 // ─── INSIGHTS TAB ────────────────────────────────────────────────────────────
-function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyPeriodData, getLivePrice }) {
+function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyPeriodData, getLivePrice, cashAccounts }) {
 
   // Period days mapping
   const periodDays = { daily: 1, weekly: 7, monthly: 30 };
@@ -2054,6 +2054,7 @@ export default function App() {
           setPeriod={setInsightsPeriod}
           spyPeriodData={spyPeriodData}
           getLivePrice={getLivePrice}
+          cashAccounts={cashAccounts}
         />
       )}
 
