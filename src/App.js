@@ -176,8 +176,7 @@ function OnboardingScreen({ onComplete }) {
       <button onClick={handleSkip} style={{ background: "transparent", border: "none", color: "rgba(240,245,242,0.2)", fontSize: 11, fontFamily: FONT, fontWeight: 300, cursor: "pointer", marginTop: 16, letterSpacing: 0.5 }}>
         Skip
       </button>
-      </div>}
-    </>
+      </div>
   );
 }
 
