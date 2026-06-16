@@ -421,7 +421,7 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onA
                       contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
                       labelStyle={{ display: "none" }}
                       itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
-                      formatter={v => [fmtUSD(v), ""]}
+                      formatter={v => [fmtUSD(v)]}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -446,17 +446,18 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onA
             {asset.thesis && !aiLoading && (
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {asset.thesis.split("\n").filter(l => l.trim()).map((line, i) => {
-                  const isPos = line.startsWith("+");
-                  const isNeg = line.startsWith("-");
-                  const text = (isPos || isNeg) ? line.slice(1).trim() : line.trim();
+                  const isPos = line.trimStart().startsWith("+");
+                  const isNeg = line.trimStart().startsWith("-");
+                  const hasBullet = isPos || isNeg;
+                  const text = hasBullet ? line.replace(/^[\s+\-]+/, "").trim() : line.trim();
                   return (
                     <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                      {(isPos || isNeg) && (
-                        <span style={{ fontSize: 11, fontWeight: 300, color: isPos ? C.green : C.red, flexShrink: 0, marginTop: 1, opacity: 0.8 }}>
+                      {hasBullet && (
+                        <span style={{ fontSize: 11, fontWeight: 300, color: isPos ? C.green : C.red, flexShrink: 0, marginTop: 2, opacity: 0.8, minWidth: 10 }}>
                           {isPos ? "+" : "−"}
                         </span>
                       )}
-                      <span style={{ fontSize: 12, color: isPos ? "rgba(74,222,128,0.7)" : isNeg ? "rgba(248,113,113,0.7)" : C.text2, lineHeight: 1.6, fontFamily: FONT, fontWeight: 300 }}>{text}</span>
+                      <span style={{ fontSize: 12, color: hasBullet ? (isPos ? "rgba(74,222,128,0.75)" : "rgba(248,113,113,0.75)") : C.text2, lineHeight: 1.65, fontFamily: FONT, fontWeight: 300 }}>{text}</span>
                     </div>
                   );
                 })}
@@ -1410,6 +1411,12 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
         );
       })()}
 
+      {view === "chart" && !hasChart && (
+        <div style={{ textAlign: "center", color: C.text3, fontFamily: FONT, fontWeight: 300, fontSize: 12, padding: "20px 0", fontStyle: "italic" }}>
+          Log trades to see your P&L chart
+        </div>
+      )}
+
       {/* Allocation view */}
       {(view === "allocation" || !showToggle) && donutData && (
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -1800,7 +1807,7 @@ export default function App() {
   // Cash totals
   const totalCashPrincipal = cashAccounts.reduce((s, a) => s + (a.principal || 0), 0);
   const totalCashValue = cashAccounts.reduce((s, a) => s + calcCashValue(a).currentValue, 0);
-  const totalCashInterest = totalCashValue - totalCashPrincipal;
+  const totalCashInterest = Math.max(0, totalCashValue - totalCashPrincipal);
   const totalCurrentValue = positionSummaries.reduce((s,{pos}) => s+pos.currentValue, 0);
   const totalUnrealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.unrealisedPnl, 0);
   const totalRealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.realisedPnl, 0);
@@ -1826,7 +1833,7 @@ export default function App() {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "28px 20px 80px" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
       {/* ── ACCRUE HEADER ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -1842,9 +1849,9 @@ export default function App() {
                 ["E", 0.60],
               ].map(([letter, opacity], i) => (
                 <span key={i} style={{
-                  fontSize: 30,
+                  fontSize: 26,
                   fontWeight: 200,
-                  letterSpacing: 7,
+                  letterSpacing: 6,
                   fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
                   color: `rgba(240,245,242,${opacity})`,
                   display: "inline-block",
@@ -1896,7 +1903,7 @@ export default function App() {
           </button>
           {showLegend && <SignalLegend />}
 
-          <div style={{ display:"flex", gap:6, marginBottom:18, overflowX:"auto", paddingBottom:2 }}>
+          <div style={{ display:"flex", gap:6, marginBottom:18, overflowX:"auto", paddingBottom:4, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
             {[["all","All"],["strong-buy","Strong buy"],["dip","Buy dip"],["watch","Watching"],["near-high","Wait"],["crypto","Crypto"],["stock","Stock"]].map(([f,l]) => (
               <button key={f} onClick={() => setFilterSig(f)} style={{ background: filterSig===f?C.surface:"transparent", border:`1px solid ${filterSig===f?C.borderHover:C.border}`, color:filterSig===f?C.text1:C.text3, borderRadius:4, padding:"4px 12px", fontSize:10, fontFamily:FONT, fontWeight:300, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.3 }}>{l}</button>
             ))}
