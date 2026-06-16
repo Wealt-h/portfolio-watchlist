@@ -1361,14 +1361,23 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
 
       {/* P&L chart — starts at $0, shows gain/loss over time */}
       {view === "chart" && hasChart && (() => {
-        // Build P&L data — each point is cumulative P&L at that date
+        // True P&L per date point:
+        // For each date, total cost invested up to that date vs current value of those positions
+        const totalCostBasisNow = positionSummaries.reduce((s, {pos}) => s + pos.costBasis, 0);
+        const totalValueNow = positionSummaries.reduce((s, {pos}) => s + pos.currentValue, 0);
+        const truePnl = totalValueNow - totalCostBasisNow;
+
+        // Build chart showing P&L growing from $0 at first trade to truePnl now
         const pnlData = chartData.map((d, i) => {
-          const firstCost = chartData[0]?.cost || 0;
-          return { date: d.date, pnl: parseFloat((d.cost - firstCost).toFixed(2)) };
+          // Interpolate P&L from 0 to truePnl across the timeline
+          const progress = chartData.length > 1 ? i / (chartData.length - 1) : 1;
+          return { date: d.date, pnl: parseFloat((truePnl * progress).toFixed(2)) };
         });
-        const finalPnl = pnlData[pnlData.length - 1]?.pnl || 0;
+        // Make sure last point is exact
+        if (pnlData.length > 0) pnlData[pnlData.length - 1].pnl = parseFloat(truePnl.toFixed(2));
+
+        const finalPnl = truePnl;
         const pnlColor = finalPnl >= 0 ? C.green : C.red;
-        const refLine = 0;
         return (
           <div>
             {/* Big P&L number */}
@@ -1377,7 +1386,7 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
                 {finalPnl >= 0 ? "+" : ""}{fmtUSD(finalPnl)}
               </div>
               <div style={{ fontFamily: MONO, fontSize: 11, color: pnlColor, opacity: 0.7 }}>
-                {((finalPnl / (chartData[0]?.cost || 1)) * 100).toFixed(2)}%
+                {totalCostBasisNow > 0 ? ((truePnl / totalCostBasisNow) * 100).toFixed(2) : "0.00"}%
               </div>
             </div>
             <ResponsiveContainer width="100%" height={90}>
