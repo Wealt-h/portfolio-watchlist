@@ -2,6 +2,185 @@ import { useState, useEffect, useRef } from "react";
 import React from "react";
 import { AreaChart, Area, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
+// ─── ONBOARDING ──────────────────────────────────────────────────────────────
+const ONBOARDING_STEPS = [
+  {
+    icon: "👁",
+    title: "Watchlist",
+    subtitle: "Track quality assets",
+    body: "Add stocks, crypto, ETFs and commodities to your watchlist. Accrue calculates buy signals using RSI, 52-week high distance, 200-day MA and Fear & Greed — so you always know when to act.",
+    accent: "#3ddc84",
+  },
+  {
+    icon: "📊",
+    title: "Portfolio",
+    subtitle: "Log every trade",
+    body: "Record every buy and sell with price, units and fees. Track unrealised and realised P&L per position, monitor your cash accounts earning interest, and see your total portfolio value in one place.",
+    accent: "#93c5fd",
+  },
+  {
+    icon: "💡",
+    title: "Insights",
+    subtitle: "Understand your performance",
+    body: "See how each asset class performs — crypto vs stocks vs cash. Compare your returns against the S&P 500. Track your win rate and best performers with daily, weekly and monthly breakdowns.",
+    accent: "#fbbf24",
+  },
+  {
+    icon: "🤖",
+    title: "AI Intelligence",
+    subtitle: "Research powered by philosophy",
+    body: "Every thesis and daily market update is generated through the lens of Buffett, Druckenmiller, Dalio, Cohen and the Bitcoin Standard — giving you institutional-grade analysis personalised to your strategy.",
+    accent: "#c77dff",
+  },
+];
+
+function OnboardingScreen({ onComplete }) {
+  const [step, setStep] = useState(-1); // -1 = splash
+
+  const handleNext = () => {
+    if (step < ONBOARDING_STEPS.length - 1) setStep(s => s + 1);
+    else onComplete();
+  };
+
+  const handleSkip = () => onComplete();
+
+  // Splash screen
+  if (step === -1) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(180deg, #07090c 0%, #08090a 100%)",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        padding: "40px 32px",
+        fontFamily: FONT,
+      }}>
+        {/* Logo */}
+        <div style={{ marginBottom: 48 }}>
+          {[["A",1.0],["C",0.92],["C",0.84],["R",0.76],["U",0.68],["E",0.60]].map(([l,o],i) => (
+            <span key={i} style={{ fontSize: 42, fontWeight: 100, letterSpacing: 10, color: `rgba(240,245,242,${o})`, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{l}</span>
+          ))}
+        </div>
+
+        {/* Tagline */}
+        <div style={{ fontSize: 14, color: "rgba(240,245,242,0.4)", fontWeight: 300, letterSpacing: 1, textAlign: "center", marginBottom: 8 }}>
+          Disciplined Investment Intelligence
+        </div>
+        <div style={{ width: 40, height: 1, background: "rgba(61,220,132,0.4)", marginBottom: 60 }} />
+
+        {/* Feature pills */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 300, marginBottom: 60 }}>
+          {[
+            ["📈", "Live prices & buy signals"],
+            ["🧠", "AI-powered research"],
+            ["💼", "Full portfolio tracking"],
+            ["💡", "Performance insights"],
+          ].map(([icon, text]) => (
+            <div key={text} style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "12px 16px" }}>
+              <span style={{ fontSize: 16 }}>{icon}</span>
+              <span style={{ fontSize: 13, color: "rgba(240,245,242,0.65)", fontWeight: 300 }}>{text}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <button onClick={() => setStep(0)} style={{
+          width: "100%", maxWidth: 300,
+          background: "linear-gradient(135deg, rgba(61,220,132,0.2), rgba(61,220,132,0.08))",
+          border: "1px solid rgba(61,220,132,0.4)",
+          color: "#3ddc84", borderRadius: 14, padding: "16px 0",
+          fontSize: 14, fontFamily: FONT, fontWeight: 400,
+          cursor: "pointer", letterSpacing: 1, marginBottom: 16,
+        }}>
+          Get started
+        </button>
+        <button onClick={handleSkip} style={{ background: "transparent", border: "none", color: "rgba(240,245,242,0.25)", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.5 }}>
+          Skip intro
+        </button>
+      </div>
+    );
+  }
+
+  const current = ONBOARDING_STEPS[step];
+  const progress = (step + 1) / ONBOARDING_STEPS.length;
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(180deg, #07090c 0%, #08090a 100%)",
+      display: "flex", flexDirection: "column",
+      padding: "60px 28px 48px",
+      fontFamily: FONT,
+    }}>
+      {/* Progress bar */}
+      <div style={{ width: "100%", height: 2, background: "rgba(255,255,255,0.08)", borderRadius: 2, marginBottom: 48 }}>
+        <div style={{ height: "100%", width: `${progress * 100}%`, background: current.accent, borderRadius: 2, transition: "width 0.4s ease" }} />
+      </div>
+
+      {/* Step dots */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 48 }}>
+        {ONBOARDING_STEPS.map((_, i) => (
+          <div key={i} style={{ width: i === step ? 20 : 6, height: 6, borderRadius: 3, background: i === step ? current.accent : "rgba(255,255,255,0.15)", transition: "all 0.3s ease" }} />
+        ))}
+      </div>
+
+      {/* Icon */}
+      <div style={{
+        width: 80, height: 80, borderRadius: 24,
+        background: `${current.accent}15`,
+        border: `1px solid ${current.accent}30`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 36, marginBottom: 32,
+      }}>
+        {current.icon}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 10, color: current.accent, fontFamily: MONO, letterSpacing: 3, marginBottom: 8, textTransform: "uppercase", opacity: 0.8 }}>
+          {current.subtitle}
+        </div>
+        <div style={{ fontSize: 28, fontWeight: 300, color: "rgba(240,245,242,0.95)", letterSpacing: -0.5, marginBottom: 20, lineHeight: 1.2 }}>
+          {current.title}
+        </div>
+        <div style={{ fontSize: 14, color: "rgba(240,245,242,0.5)", fontWeight: 300, lineHeight: 1.7, maxWidth: 340 }}>
+          {current.body}
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div style={{ display: "flex", gap: 12, marginTop: 48 }}>
+        {step > 0 && (
+          <button onClick={() => setStep(s => s - 1)} style={{
+            flex: 1, background: "transparent",
+            border: "1px solid rgba(255,255,255,0.12)",
+            color: "rgba(240,245,242,0.4)", borderRadius: 12, padding: "14px 0",
+            fontSize: 13, fontFamily: FONT, fontWeight: 300, cursor: "pointer",
+          }}>
+            Back
+          </button>
+        )}
+        <button onClick={handleNext} style={{
+          flex: 2,
+          background: `linear-gradient(135deg, ${current.accent}25, ${current.accent}10)`,
+          border: `1px solid ${current.accent}50`,
+          color: current.accent, borderRadius: 12, padding: "14px 0",
+          fontSize: 13, fontFamily: FONT, fontWeight: 400,
+          cursor: "pointer", letterSpacing: 0.5,
+        }}>
+          {step === ONBOARDING_STEPS.length - 1 ? "Start using Accrue →" : "Next"}
+        </button>
+      </div>
+
+      {/* Skip */}
+      <button onClick={handleSkip} style={{ background: "transparent", border: "none", color: "rgba(240,245,242,0.2)", fontSize: 11, fontFamily: FONT, fontWeight: 300, cursor: "pointer", marginTop: 16, letterSpacing: 0.5 }}>
+        Skip
+      </button>
+    </div>}
+    </>
+  );
+}
+
 // ─── SIGNAL ENGINE ────────────────────────────────────────────────────────────
 function calcSignal({ currentPrice, high52w, rsi, ma200, fearGreed, type }) {
   const pctBelowHigh = high52w > 0 ? ((high52w - currentPrice) / high52w) * 100 : null;
@@ -1631,6 +1810,15 @@ function SignalLegend() {
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
+  const [onboarded, setOnboarded] = useState(() => {
+    try { return localStorage.getItem("accrue_onboarded") === "true"; } catch { return false; }
+  });
+
+  const completeOnboarding = () => {
+    try { localStorage.setItem("accrue_onboarded", "true"); } catch {}
+    setOnboarded(true);
+  };
+
   const [tab, setTab] = useState("watchlist");
   const [watchlist, setWatchlist] = useState(DEFAULT_WATCHLIST);
   const [portfolio, setPortfolio] = useState(DEFAULT_PORTFOLIO);
@@ -1833,7 +2021,9 @@ export default function App() {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
+    <>
+    {!onboarded && <OnboardingScreen onComplete={completeOnboarding} />}
+    {onboarded && <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
       {/* ── ACCRUE HEADER ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
