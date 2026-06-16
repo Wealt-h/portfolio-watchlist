@@ -1329,7 +1329,7 @@ function CashCard({ account, onEdit, onDelete }) {
 }
 
 // ─── ANALYTICS CARD ──────────────────────────────────────────────────────────
-function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, isUp, total, chartData0 }) {
+function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, isUp, total, chartData0, truePnl, totalCostBasisNow }) {
   const [view, setView] = useState("chart"); // "chart" | "allocation"
 
   return (
@@ -1361,12 +1361,6 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
 
       {/* P&L chart — starts at $0, shows gain/loss over time */}
       {view === "chart" && hasChart && (() => {
-        // True P&L per date point:
-        // For each date, total cost invested up to that date vs current value of those positions
-        const totalCostBasisNow = positionSummaries.reduce((s, {pos}) => s + pos.costBasis, 0);
-        const totalValueNow = positionSummaries.reduce((s, {pos}) => s + pos.currentValue, 0);
-        const truePnl = totalValueNow - totalCostBasisNow;
-
         // Build chart showing P&L growing from $0 at first trade to truePnl now
         const pnlData = chartData.map((d, i) => {
           // Interpolate P&L from 0 to truePnl across the timeline
@@ -2000,6 +1994,8 @@ export default function App() {
                       isUp={isUp}
                       total={total}
                       chartData0={chartData[0]}
+                      truePnl={totalUnrealisedPnl}
+                      totalCostBasisNow={totalCostBasis}
                     />
                   );
                 })()}
