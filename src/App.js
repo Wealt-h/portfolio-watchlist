@@ -31,7 +31,7 @@ function calcSignal({ currentPrice, high52w, rsi, ma200, fearGreed, type }) {
     else { score -= 1; reasons.push("Above 200MA"); }
   }
 
-  if (type === "crypto" && fearGreed > 0) {
+  if ((type === "crypto" || type === "commodity") && fearGreed > 0) {
     if (fearGreed <= 20) { score += 3; reasons.push(`Fear & Greed ${fearGreed} — extreme fear`); }
     else if (fearGreed <= 30) { score += 2; reasons.push(`Fear & Greed ${fearGreed} — fear zone`); }
     else if (fearGreed <= 45) { score += 1; reasons.push(`Fear & Greed ${fearGreed} — cautious`); }
@@ -220,6 +220,8 @@ function AssetLogo({ symbol, size = 40, color = "rgba(240,245,242,0.7)" }) {
   const [srcIndex, setSrcIndex] = useState(0);
   const ticker = symbol.replace("-USD","").replace("-","").toUpperCase();
   const isCrypto = CRYPTO_TICKERS.includes(ticker) || symbol.includes("-USD");
+  const COMMODITY_EMOJI = { "GC=F": "🥇", "SI=F": "🥈", GLD: "🥇", SLV: "🥈", IAU: "🥇", PSLV: "🥈", GDX: "⛏️", PDBC: "🛢️" };
+  const commodityEmoji = COMMODITY_EMOJI[ticker];
   const domain = STOCK_DOMAINS[ticker] || `${ticker.toLowerCase()}.com`;
 
   // cdn.tickerlogos.com — free, no API key, CORS enabled, finance-focused
@@ -233,6 +235,14 @@ function AssetLogo({ symbol, size = 40, color = "rgba(240,245,242,0.7)" }) {
       ];
 
   const failed = srcIndex >= sources.length;
+
+  if (commodityEmoji) {
+    return (
+      <div style={{ width: size, height: size, borderRadius: size * 0.25, background: "rgba(251,191,36,0.1)", border: `1px solid rgba(251,191,36,0.25)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: size * 0.5 }}>
+        {commodityEmoji}
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: size, height: size, borderRadius: size * 0.25, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
@@ -306,85 +316,6 @@ function AlertModal({ symbol, currentPrice, alerts, onSave, onDelete, onClose })
           Alerts check every 60 seconds. Enable notifications for instant alerts.
         </div>
       </div>
-    </div>
-  );
-}
-
-// ─── FUNDAMENTALS SECTION ─────────────────────────────────────────────────────
-function FundamentalsSection({ symbol, type }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  const loadFundamentals = async () => {
-    if (loaded || type === "crypto") return;
-    setLoading(true);
-    try {
-      const res = await window.fetch("/api/fundamentals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol }),
-      });
-      const d = await res.json();
-      setData(d);
-      setLoaded(true);
-    } catch (e) {
-      console.error("Fundamentals error:", e);
-    }
-    setLoading(false);
-  };
-
-  if (type === "crypto") return null;
-
-  return (
-    <div style={{ marginTop: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={LBL}>FUNDAMENTALS</div>
-        {!loaded && <button onClick={loadFundamentals} disabled={loading}
-          style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 4, padding: "3px 10px", fontSize: 9, fontFamily: MONO, cursor: loading ? "default" : "pointer", letterSpacing: 1.5 }}>
-          {loading ? "loading..." : "load"}
-        </button>}
-      </div>
-
-      {loading && <div style={{ fontSize: 11, color: C.text3, fontFamily: MONO, fontStyle: "italic" }}>Fetching data...</div>}
-
-      {data && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {/* Earnings */}
-          {data.nextEarnings && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.surfaceHigh, borderRadius: 8, padding: "8px 12px", border: `1px solid ${C.border}` }}>
-              <div>
-                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2 }}>NEXT EARNINGS</div>
-                <div style={{ fontSize: 13, color: C.text1, fontFamily: FONT, fontWeight: 400 }}>{data.nextEarnings}</div>
-              </div>
-              <div style={{ fontSize: 20 }}>📅</div>
-            </div>
-          )}
-
-          {/* Dividend data */}
-          {data.dividendYield > 0 && (
-            <div style={{ background: C.surfaceHigh, borderRadius: 8, padding: "10px 12px", border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 8 }}>DIVIDEND</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                {[
-                  ["Yield", `${data.dividendYield}%`],
-                  ["Annual", fmtUSD(data.dividendRate)],
-                  ["Ex-Date", data.exDividendDate || "—"],
-                ].map(([l, v]) => (
-                  <div key={l}>
-                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2 }}>{l.toUpperCase()}</div>
-                    <div style={{ fontSize: 12, color: C.green, fontFamily: FONT, fontWeight: 400 }}>{v}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {data.dividendYield === 0 && data.nextEarnings && (
-            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, fontStyle: "italic" }}>No dividend</div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -566,9 +497,6 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onA
             {aiError && <div style={{ fontSize: 11, color: "#ff6b6b", marginTop: 6, fontFamily: "monospace" }}>{aiError}</div>}
           </div>
 
-          {/* Fundamentals — earnings + dividends */}
-          <FundamentalsSection symbol={asset.symbol} type={asset.type} />
-
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
             <button onClick={() => onAlert(asset)} style={{ position: "relative", background: "transparent", border: `1px solid ${C.border}`, color: alertCount > 0 ? C.amber : C.text3, borderRadius: 6, padding: "8px 14px", fontSize: 13, cursor: "pointer" }}>
               🔔{alertCount > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: C.amber, color: "#08090a", borderRadius: "50%", width: 14, height: 14, fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontWeight: 700 }}>{alertCount}</span>}
@@ -600,9 +528,9 @@ function WatchModal({ asset, onSave, onClose }) {
         </div>
         <div style={{ marginBottom: 13 }}>
           <div style={LBL}>TYPE</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            {["stock","crypto","etf"].map(t => (
-              <button key={t} onClick={() => set("type", t)} style={{ flex: 1, background: f.type===t?"rgba(0,255,157,0.12)":"rgba(255,255,255,0.03)", border: `1px solid ${f.type===t?"rgba(0,255,157,0.35)":"rgba(255,255,255,0.08)"}`, color: f.type===t?"#00ff9d":"#4a6655", borderRadius: 8, padding: "8px 0", fontSize: 11, fontFamily: "monospace", cursor: "pointer", letterSpacing: 1 }}>{t.toUpperCase()}</button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {["stock","crypto","etf","commodity"].map(t => (
+              <button key={t} onClick={() => set("type", t)} style={{ flex: 1, background: f.type===t?C.surfaceHigh:"rgba(255,255,255,0.03)", border: `1px solid ${f.type===t?C.borderHover:C.border}`, color: f.type===t?C.text1:C.text3, borderRadius: 8, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1 }}>{t.toUpperCase()}</button>
             ))}
           </div>
         </div>
@@ -755,7 +683,7 @@ function AssetSearchModal({ onAdd, onClose }) {
             <div>
               <div style={{ marginBottom: 12, fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2 }}>POPULAR</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {["BTC", "AMZN", "NVDA", "AAPL", "MSFT", "ETH", "TSLA", "GOOGL"].map(s => (
+                {["BTC", "AMZN", "NVDA", "AAPL", "MSFT", "ETH", "TSLA", "GLD", "SLV"].map(s => (
                   <button key={s} onClick={() => { setQuery(s); search(s); }}
                     style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text2, borderRadius: 4, padding: "5px 12px", fontSize: 11, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>
                     {s}
@@ -968,8 +896,21 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   const winners = positionSummaries.filter(({pos}) => pos.unrealisedPnl > 0).length;
   const winRate = positionSummaries.length > 0 ? (winners / positionSummaries.length) * 100 : 0;
 
-  // Asset class breakdown
+  // Asset class breakdown — include cash
   const assetClasses = {};
+  if (cashAccounts && cashAccounts.length > 0) {
+    const cashVal = cashAccounts.reduce((s, a) => s + calcCashValue(a).currentValue, 0);
+    const cashCost = cashAccounts.reduce((s, a) => s + a.principal, 0);
+    assetClasses["cash"] = {
+      pnl: cashVal - cashCost,
+      value: cashVal,
+      cost: cashCost,
+      assets: cashAccounts.map(a => {
+        const c = calcCashValue(a);
+        return { sym: a.institution, pct: (c.accruedInterest / a.principal) * 100, pnl: c.accruedInterest };
+      }),
+    };
+  }
   positionSummaries.forEach(({sym, pos}) => {
     const asset = watchlist.find(a => a.symbol === sym);
     const type = asset?.type || "stock";
@@ -1182,6 +1123,211 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   );
 }
 
+// ─── CASH HELPERS ────────────────────────────────────────────────────────────
+function calcCashValue(account) {
+  const principal = account.principal || 0;
+  const rate = (account.rate || 0) / 100;
+  const startDate = new Date(account.startDate);
+  const today = new Date();
+  const days = Math.max(0, Math.floor((today - startDate) / (1000 * 60 * 60 * 24)));
+  const currentValue = principal * Math.pow(1 + rate / 365, days);
+  const accruedInterest = currentValue - principal;
+  const dailyEarn = principal * (rate / 365);
+  const annualEarn = principal * rate;
+  return { currentValue, accruedInterest, dailyEarn, annualEarn, days };
+}
+
+// ─── CASH MODAL ───────────────────────────────────────────────────────────────
+function CashModal({ account, onSave, onClose }) {
+  const blank = { institution: "", accountType: "Savings", principal: "", rate: "", startDate: new Date().toISOString().slice(0,10), notes: "" };
+  const [f, setF] = useState(account && account !== "new" ? { ...account, principal: account.principal.toString(), rate: account.rate.toString() } : blank);
+  const set = (k, v) => setF(p => ({ ...p, [k]: v }));
+  const SML = { ...INP, padding: "7px 10px", fontSize: 12 };
+  const LBL2 = { ...LBL, marginBottom: 3 };
+
+  const preview = f.principal && f.rate && f.startDate ? calcCashValue({
+    principal: parseFloat(f.principal),
+    rate: parseFloat(f.rate),
+    startDate: f.startDate,
+  }) : null;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "90vh", overflowY: "auto" }}>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 15, color: C.text1 }}>
+            {account && account !== "new" ? "Edit Cash Account" : "Add Cash Account"}
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={LBL2}>INSTITUTION</div>
+            <input value={f.institution} onChange={e => set("institution", e.target.value)} placeholder="ING, Macquarie, CBA..." style={SML} />
+          </div>
+          <div>
+            <div style={LBL2}>ACCOUNT TYPE</div>
+            <select value={f.accountType} onChange={e => set("accountType", e.target.value)}
+              style={{ ...SML, background: C.surfaceHigh }}>
+              {["Savings", "Term Deposit", "Cash Management", "High Interest", "Other"].map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div style={LBL2}>INTEREST RATE (% P.A.)</div>
+            <input value={f.rate} onChange={e => set("rate", e.target.value)} type="number" placeholder="5.50" style={SML} />
+          </div>
+          <div>
+            <div style={LBL2}>PRINCIPAL ($)</div>
+            <input value={f.principal} onChange={e => set("principal", e.target.value)} type="number" placeholder="10000" style={SML} />
+          </div>
+          <div>
+            <div style={LBL2}>START DATE</div>
+            <input value={f.startDate} onChange={e => set("startDate", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark" }} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <div style={LBL2}>NOTES (optional)</div>
+          <input value={f.notes} onChange={e => set("notes", e.target.value)} placeholder="e.g. Matures Dec 2025" style={SML} />
+        </div>
+
+        {/* Live preview */}
+        {preview && (
+          <div style={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>PREVIEW</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {[
+                ["Accrued so far", `+${fmtUSD(preview.accruedInterest)}`],
+                ["Daily earn", `+${fmtUSD(preview.dailyEarn)}`],
+                ["Annual earn", `+${fmtUSD(preview.annualEarn)}`],
+                ["Days running", `${preview.days} days`],
+              ].map(([l, v]) => (
+                <div key={l}>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2 }}>{l.toUpperCase()}</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 13, color: C.green }}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button onClick={() => onSave({ ...f, id: account?.id || Date.now(), principal: parseFloat(f.principal) || 0, rate: parseFloat(f.rate) || 0 })}
+          style={{ width: "100%", background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>
+          {account && account !== "new" ? "Save changes" : "Add account"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── CASH CARD ────────────────────────────────────────────────────────────────
+function CashCard({ account, onEdit, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const calc = calcCashValue(account);
+
+  // Build 30-day P&L sparkline data
+  const sparkData = Array.from({ length: 31 }, (_, i) => {
+    const d = new Date(account.startDate);
+    d.setDate(d.getDate() + i);
+    const days = i;
+    const val = account.principal * Math.pow(1 + (account.rate / 100) / 365, days);
+    return { day: i, interest: parseFloat((val - account.principal).toFixed(4)) };
+  });
+
+  return (
+    <div onClick={() => setOpen(!open)}
+      style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${open ? C.borderAccent : C.borderHover}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `2px solid ${C.green}` : `1px solid ${C.borderHover}`, transition: "all 0.2s" }}>
+
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: C.greenDim, border: `1px solid ${C.greenBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+            💰
+          </div>
+          <div>
+            <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 15, color: C.text1 }}>{account.institution}</div>
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 1 }}>{account.accountType} · {account.rate}% p.a.</div>
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.text1 }}>{fmtUSD(calc.currentValue)}</div>
+          <div style={{ fontSize: 11, color: C.green, fontFamily: MONO, marginTop: 2 }}>+{fmtUSD(calc.accruedInterest)}</div>
+        </div>
+      </div>
+
+      {/* Key stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginTop: 14 }}>
+        {[
+          ["Principal", fmtUSD(account.principal)],
+          ["Daily earn", `+${fmtUSD(calc.dailyEarn)}`],
+          ["Annual", `+${fmtUSD(calc.annualEarn)}`],
+        ].map(([l, v]) => (
+          <div key={l}>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 3, textTransform: "uppercase" }}>{l}</div>
+            <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 13, color: l === "Principal" ? C.text2 : C.green }}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Expanded */}
+      {open && (
+        <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }} onClick={e => e.stopPropagation()}>
+
+          {/* Interest sparkline */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 6 }}>30-DAY INTEREST ACCRUAL</div>
+            <ResponsiveContainer width="100%" height={70}>
+              <AreaChart data={sparkData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="cashGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={C.green} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={C.green} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="interest" stroke={C.green} strokeWidth={1.5} fill="url(#cashGrad)" dot={false} />
+                <Tooltip
+                  contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
+                  labelStyle={{ display: "none" }}
+                  itemStyle={{ color: C.green, fontSize: 11, fontFamily: MONO }}
+                  formatter={v => [`+${fmtUSD(v)}`, "Interest"]}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Extended stats */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+            {[
+              ["Start date", account.startDate],
+              ["Days running", `${calc.days} days`],
+              ["Total interest", `+${fmtUSD(calc.accruedInterest)}`],
+              ["Monthly earn", `+${fmtUSD(calc.dailyEarn * 30)}`],
+            ].map(([l, v]) => (
+              <div key={l}>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2, textTransform: "uppercase" }}>{l}</div>
+                <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 13, color: C.text2 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+
+          {account.notes && (
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, fontStyle: "italic", marginBottom: 12 }}>{account.notes}</div>
+          )}
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => onEdit(account)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Edit</button>
+            <button onClick={() => onDelete(account.id)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Remove</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ANALYTICS CARD ──────────────────────────────────────────────────────────
 function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, isUp, total, chartData0 }) {
   const [view, setView] = useState("chart"); // "chart" | "allocation"
@@ -1196,8 +1342,8 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {view === "chart" && hasChart && (
-            <div style={{ fontSize: 12, fontFamily: FONT, fontWeight: 400, color: lineColor }}>
-              {isUp ? "+" : ""}{fmtUSD(total - (chartData0?.cost || 0))}
+            <div style={{ fontSize: 12, fontFamily: FONT, fontWeight: 400, color: lineColor, opacity: 0.7 }}>
+              since first trade
             </div>
           )}
           {showToggle && (
@@ -1213,27 +1359,53 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
         </div>
       </div>
 
-      {/* Chart view */}
-      {view === "chart" && hasChart && (
-        <ResponsiveContainer width="100%" height={100}>
-          <AreaChart data={chartData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-            <defs>
-              <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={lineColor} stopOpacity={0.2} />
-                <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-            <Area type="monotone" dataKey="cost" stroke={lineColor} strokeWidth={1.5} fill="url(#portfolioGrad)" dot={false} />
-            <Tooltip
-              contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
-              labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
-              itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
-              formatter={v => [fmtUSD(v), "Value"]}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      )}
+      {/* P&L chart — starts at $0, shows gain/loss over time */}
+      {view === "chart" && hasChart && (() => {
+        // Build P&L data — each point is cumulative P&L at that date
+        const pnlData = chartData.map((d, i) => {
+          const firstCost = chartData[0]?.cost || 0;
+          return { date: d.date, pnl: parseFloat((d.cost - firstCost).toFixed(2)) };
+        });
+        const finalPnl = pnlData[pnlData.length - 1]?.pnl || 0;
+        const pnlColor = finalPnl >= 0 ? C.green : C.red;
+        const refLine = 0;
+        return (
+          <div>
+            {/* Big P&L number */}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
+              <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 32, color: pnlColor, letterSpacing: -1 }}>
+                {finalPnl >= 0 ? "+" : ""}{fmtUSD(finalPnl)}
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 11, color: pnlColor, opacity: 0.7 }}>
+                {((finalPnl / (chartData[0]?.cost || 1)) * 100).toFixed(2)}%
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={90}>
+              <AreaChart data={pnlData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="pnlGradPos" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={C.green} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={C.green} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="pnlGradNeg" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={C.red} stopOpacity={0} />
+                    <stop offset="95%" stopColor={C.red} stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <Area type="monotone" dataKey="pnl" stroke={pnlColor} strokeWidth={2}
+                  fill={finalPnl >= 0 ? "url(#pnlGradPos)" : "url(#pnlGradNeg)"} dot={false} />
+                <Tooltip
+                  contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
+                  labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
+                  itemStyle={{ color: pnlColor, fontSize: 11, fontFamily: MONO }}
+                  formatter={v => [`${v >= 0 ? "+" : ""}${fmtUSD(v)}`, "P&L"]}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      })()}
 
       {/* Allocation view */}
       {(view === "allocation" || !showToggle) && donutData && (
@@ -1464,6 +1636,9 @@ export default function App() {
   const [fearGreedData, setFearGreedData] = useState(null); // { value, label }
   const [insightsPeriod, setInsightsPeriod] = useState("weekly"); // daily | weekly | monthly
   const [spyPeriodData, setSpyPeriodData] = useState({}); // { daily, weekly, monthly } each { pct }
+  const [cashAccounts, setCashAccounts] = useState([]);
+  const [cashLoaded, setCashLoaded] = useState(false);
+  const [cashModal, setCashModal] = useState(null); // null | account object | "new"
   const [alerts, setAlerts] = useState([]);
   const [alertsLoaded, setAlertsLoaded] = useState(false);
   const [alertModal, setAlertModal] = useState(null); // null | { symbol, currentPrice }
@@ -1594,6 +1769,15 @@ export default function App() {
     })();
   }, []);
   useEffect(() => { if (alertsLoaded) save("pf_alerts_v1", alerts); }, [alerts, alertsLoaded]);
+
+  // Load cash accounts
+  useEffect(() => {
+    (async () => {
+      const c = await load("pf_cash_v1", []);
+      setCashAccounts(c); setCashLoaded(true);
+    })();
+  }, []);
+  useEffect(() => { if (cashLoaded) save("pf_cash_v1", cashAccounts); }, [cashAccounts, cashLoaded]);
 
   const saveWatch = (form) => {
     if (watchModal?.asset) setWatchlist(w => w.map(x => x.id === watchModal.asset.id ? { ...form, id: x.id } : x));
@@ -1820,7 +2004,34 @@ export default function App() {
               </>
             )
           }
-          <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ width:"100%", marginTop:10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Log trade</button>
+          {/* Cash accounts */}
+          {cashAccounts.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10, marginTop: 4 }}>CASH & INTEREST</div>
+              {cashAccounts.map(a => (
+                <CashCard key={a.id} account={a}
+                  onEdit={a => setCashModal(a)}
+                  onDelete={id => setCashAccounts(c => c.filter(x => x.id !== id))}
+                />
+              ))}
+              {/* Cash summary */}
+              <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 10, padding: "12px 16px", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 4 }}>TOTAL CASH</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.text1 }}>{fmtUSD(totalCashValue)}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 4 }}>INTEREST EARNED</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 16, color: C.green }}>+{fmtUSD(totalCashInterest)}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ flex: 1, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Log trade</button>
+            <button onClick={() => setCashModal("new")} style={{ flex: 1, background:"transparent", border:`1px dashed ${C.border}`, color:C.green, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Add cash</button>
+          </div>
         </>
       )}
 
@@ -1859,6 +2070,7 @@ export default function App() {
       {watchModal !== null && <WatchModal asset={watchModal.asset} onSave={saveWatch} onClose={() => setWatchModal(null)} />}
       {searchModal && <AssetSearchModal onAdd={asset => { setWatchlist(w => [...w, asset]); }} onClose={() => setSearchModal(false)} />}
       {alertModal && <AlertModal symbol={alertModal.symbol} currentPrice={alertModal.currentPrice} alerts={alerts} onSave={alert => setAlerts(a => [...a, alert])} onDelete={id => setAlerts(a => a.filter(x => x.id !== id))} onClose={() => setAlertModal(null)} />}
+      {cashModal !== null && <CashModal account={cashModal} onSave={acc => { if (cashModal === "new") { setCashAccounts(c => [...c, acc]); } else { setCashAccounts(c => c.map(x => x.id === acc.id ? acc : x)); } setCashModal(null); }} onClose={() => setCashModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
     </div>
