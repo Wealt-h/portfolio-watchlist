@@ -5,28 +5,58 @@ import { AreaChart, Area, LineChart, Line, PieChart, Pie, Cell, ResponsiveContai
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────
 const ONBOARDING_STEPS = [
   {
-    icon: "👁",
+    icon: (color) => (
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <polyline points="4,28 10,18 16,22 24,10 32,14" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="32" cy="14" r="2.5" fill={color}/>
+        <line x1="4" y1="32" x2="32" y2="32" stroke={color} strokeWidth="1.5" strokeLinecap="round" opacity="0.3"/>
+      </svg>
+    ),
     title: "Watchlist",
     subtitle: "Track quality assets",
     body: "Add stocks, crypto, ETFs and commodities to your watchlist. Accrue calculates buy signals using RSI, 52-week high distance, 200-day MA and Fear & Greed — so you always know when to act.",
     accent: "#3ddc84",
   },
   {
-    icon: "📊",
+    icon: (color) => (
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <rect x="4" y="20" width="7" height="12" rx="1.5" fill={color} opacity="0.8"/>
+        <rect x="14.5" y="13" width="7" height="19" rx="1.5" fill={color} opacity="0.6"/>
+        <rect x="25" y="6" width="7" height="26" rx="1.5" fill={color} opacity="0.4"/>
+        <line x1="4" y1="32" x2="32" y2="32" stroke={color} strokeWidth="1" opacity="0.2"/>
+      </svg>
+    ),
     title: "Portfolio",
     subtitle: "Log every trade",
     body: "Record every buy and sell with price, units and fees. Track unrealised and realised P&L per position, monitor your cash accounts earning interest, and see your total portfolio value in one place.",
     accent: "#93c5fd",
   },
   {
-    icon: "💡",
+    icon: (color) => (
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <circle cx="18" cy="18" r="13" stroke={color} strokeWidth="1.8" opacity="0.3"/>
+        <path d="M18 5 A13 13 0 0 1 31 18" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+        <circle cx="18" cy="18" r="2.5" fill={color}/>
+        <line x1="18" y1="18" x2="27" y2="10" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      </svg>
+    ),
     title: "Insights",
     subtitle: "Understand your performance",
     body: "See how each asset class performs — crypto vs stocks vs cash. Compare your returns against the S&P 500. Track your win rate and best performers with daily, weekly and monthly breakdowns.",
     accent: "#fbbf24",
   },
   {
-    icon: "🤖",
+    icon: (color) => (
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <rect x="6" y="8" width="24" height="20" rx="3" stroke={color} strokeWidth="1.8" opacity="0.4"/>
+        <line x1="10" y1="15" x2="26" y2="15" stroke={color} strokeWidth="1.5" strokeLinecap="round" opacity="0.6"/>
+        <line x1="10" y1="19" x2="22" y2="19" stroke={color} strokeWidth="1.5" strokeLinecap="round" opacity="0.6"/>
+        <line x1="10" y1="23" x2="18" y2="23" stroke={color} strokeWidth="1.5" strokeLinecap="round" opacity="0.6"/>
+        <circle cx="28" cy="26" r="5" fill="#07090c" stroke={color} strokeWidth="1.5"/>
+        <line x1="28" y1="23.5" x2="28" y2="26" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+        <circle cx="28" cy="27.5" r="0.8" fill={color}/>
+      </svg>
+    ),
     title: "AI Intelligence",
     subtitle: "Research powered by philosophy",
     body: "Every thesis and daily market update is generated through the lens of Buffett, Druckenmiller, Dalio, Cohen and the Bitcoin Standard — giving you institutional-grade analysis personalised to your strategy.",
@@ -87,14 +117,14 @@ function OnboardingScreen({ onComplete }) {
         {/* Feature pills */}
         <div className="splash-pills" style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 300, marginBottom: 52 }}>
           {[
-            ["📈", "Live prices & buy signals"],
-            ["🧠", "AI-powered research"],
-            ["💼", "Full portfolio tracking"],
-            ["💡", "Performance insights"],
-          ].map(([icon, text]) => (
-            <div key={text} style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 16px" }}>
-              <span style={{ fontSize: 16 }}>{icon}</span>
-              <span style={{ fontSize: 13, color: "rgba(240,245,242,0.6)", fontWeight: 300 }}>{text}</span>
+            { svg: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 12,4 15,6" stroke="#3ddc84" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="15" cy="6" r="1.2" fill="#3ddc84"/></svg>, text: "Live prices & buy signals" },
+            { svg: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="7" r="4.5" stroke="rgba(240,245,242,0.5)" strokeWidth="1.3"/><path d="M8 11v3M6 14h4" stroke="rgba(240,245,242,0.5)" strokeWidth="1.3" strokeLinecap="round"/><circle cx="6.5" cy="6.5" r="0.8" fill="rgba(240,245,242,0.5)"/><circle cx="9.5" cy="6.5" r="0.8" fill="rgba(240,245,242,0.5)"/></svg>, text: "AI-powered research" },
+            { svg: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5" stroke="rgba(240,245,242,0.5)" strokeWidth="1.3"/><path d="M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1" stroke="rgba(240,245,242,0.5)" strokeWidth="1.3"/><line x1="5" y1="8" x2="11" y2="8" stroke="rgba(240,245,242,0.5)" strokeWidth="1.3" strokeLinecap="round"/><line x1="5" y1="10.5" x2="9" y2="10.5" stroke="rgba(240,245,242,0.5)" strokeWidth="1.3" strokeLinecap="round"/></svg>, text: "Full portfolio tracking" },
+            { svg: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="rgba(240,245,242,0.5)" strokeWidth="1.3"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="rgba(240,245,242,0.5)" strokeWidth="1.3"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="rgba(240,245,242,0.5)" strokeWidth="1.3"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="#3ddc84" strokeWidth="1.3"/></svg>, text: "Performance insights" },
+          ].map(({ svg, text }) => (
+            <div key={text} style={{ display: "flex", alignItems: "center", gap: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "13px 16px" }}>
+              <div style={{ flexShrink: 0, opacity: 0.9 }}>{svg}</div>
+              <span style={{ fontSize: 13, color: "rgba(240,245,242,0.55)", fontWeight: 300, letterSpacing: 0.2 }}>{text}</span>
             </div>
           ))}
         </div>
@@ -144,13 +174,13 @@ function OnboardingScreen({ onComplete }) {
 
       {/* Icon */}
       <div style={{
-        width: 80, height: 80, borderRadius: 24,
-        background: `${current.accent}15`,
-        border: `1px solid ${current.accent}30`,
+        width: 80, height: 80, borderRadius: 22,
+        background: `${current.accent}0e`,
+        border: `1px solid ${current.accent}25`,
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 36, marginBottom: 32,
+        marginBottom: 32,
       }}>
-        {current.icon}
+        {current.icon(current.accent)}
       </div>
 
       {/* Content */}
