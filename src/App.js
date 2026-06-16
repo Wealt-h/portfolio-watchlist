@@ -176,10 +176,11 @@ function OnboardingScreen({ onComplete }) {
       <button onClick={handleSkip} style={{ background: "transparent", border: "none", color: "rgba(240,245,242,0.2)", fontSize: 11, fontFamily: FONT, fontWeight: 300, cursor: "pointer", marginTop: 16, letterSpacing: 0.5 }}>
         Skip
       </button>
-    </div>}
+      </div>}
     </>
   );
 }
+
 
 // ─── SIGNAL ENGINE ────────────────────────────────────────────────────────────
 function calcSignal({ currentPrice, high52w, rsi, ma200, fearGreed, type }) {
@@ -2022,8 +2023,8 @@ export default function App() {
 
   return (
     <>
-    {!onboarded && <OnboardingScreen onComplete={completeOnboarding} />}
-    {onboarded && <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
+      {!onboarded && <OnboardingScreen onComplete={completeOnboarding} />}
+      {onboarded && <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
       {/* ── ACCRUE HEADER ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -2281,6 +2282,7 @@ export default function App() {
       {cashModal !== null && <CashModal account={cashModal} onSave={acc => { if (cashModal === "new") { setCashAccounts(c => [...c, acc]); } else { setCashAccounts(c => c.map(x => x.id === acc.id ? acc : x)); } setCashModal(null); }} onClose={() => setCashModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
-    </div>
+    </div>}
+    </>
   );
 }
