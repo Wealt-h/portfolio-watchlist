@@ -999,7 +999,6 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy" }) {
             />
           )}
         </div>
-        </div>
 
         {/* Price / Units / Date */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
