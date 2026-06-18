@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import React from "react";
-import { AreaChart, Area, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────
 const ONBOARDING_STEPS = [
@@ -548,7 +548,7 @@ function AlertModal({ symbol, currentPrice, alerts, onSave, onDelete, onClose })
 }
 
 // ─── WATCH CARD ───────────────────────────────────────────────────────────────
-function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onAlert, alertCount }) {
+function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onAlert, alertCount, onLogTrade }) {
   const [open, setOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(null);
   const [aiError, setAiError] = useState(null);
@@ -729,6 +729,7 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onA
             <button onClick={() => onAlert(asset)} style={{ position: "relative", background: "transparent", border: `1px solid ${C.border}`, color: alertCount > 0 ? C.amber : C.text3, borderRadius: 6, padding: "8px 14px", fontSize: 13, cursor: "pointer" }}>
               🔔{alertCount > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: C.amber, color: "#08090a", borderRadius: "50%", width: 14, height: 14, fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontWeight: 700 }}>{alertCount}</span>}
             </button>
+            <button onClick={() => onLogTrade(asset.symbol)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.greenBorder}`, color: C.green, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>+ Trade</button>
             <button onClick={() => onEdit(asset)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>Edit</button>
             <button onClick={() => onDelete(asset.id)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>Remove</button>
           </div>
@@ -946,9 +947,12 @@ function AssetSearchModal({ onAdd, onClose }) {
 }
 
 // ─── TRADE MODAL (BUY + SELL) ─────────────────────────────────────────────────
-function TradeModal({ watchlist, onSave, onClose, defaultType = "buy" }) {
+function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSymbol = "" }) {
   const [tradeType, setTradeType] = useState(defaultType);
-  const [f, setF] = useState({ symbol: "", name: "", price: "", units: "", fees: "", date: new Date().toISOString().slice(0,10), notes: "" });
+  const [f, setF] = useState(() => {
+    const match = watchlist.find(x => x.symbol === defaultSymbol);
+    return { symbol: defaultSymbol || "", name: match?.name || "", price: "", units: "", fees: "", date: new Date().toISOString().slice(0,10), notes: "" };
+  });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const pick = (sym) => { const a = watchlist.find(x => x.symbol === sym); if (a) setF(p => ({ ...p, symbol: a.symbol, name: a.name })); else setF(p => ({ ...p, symbol: sym })); };
   const subtotal = (parseFloat(f.price)||0) * (parseFloat(f.units)||0);
@@ -1516,7 +1520,10 @@ function CashCard({ account, onEdit, onDelete }) {
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.text1 }}>{fmtUSD(calc.currentValue)}</div>
-          <div style={{ fontSize: 11, color: C.green, fontFamily: MONO, marginTop: 2 }}>+{fmtUSD(calc.accruedInterest)}</div>
+          <div style={{ fontSize: 12, color: C.green, fontFamily: MONO, marginTop: 2 }}>
+            +{account.principal > 0 ? ((calc.accruedInterest / account.principal) * 100).toFixed(2) : "0.00"}%
+          </div>
+          <div style={{ fontSize: 10, color: C.green, fontFamily: MONO, marginTop: 1, opacity: 0.8 }}>+{fmtUSD(calc.accruedInterest)}</div>
         </div>
       </div>
 
@@ -1620,7 +1627,7 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
         </div>
       </div>
 
-      {/* P&L chart — starts at $0, shows gain/loss over time */}
+      {/* P&L chart — starts at $0, shows gain/loss over time as bars */}
       {view === "chart" && hasChart && (() => {
         // Build chart showing P&L growing from $0 at first trade to truePnl now
         const pnlData = chartData.map((d, i) => {
@@ -1645,27 +1652,21 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
               </div>
             </div>
             <ResponsiveContainer width="100%" height={90}>
-              <AreaChart data={pnlData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-                <defs>
-                  <linearGradient id="pnlGradPos" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={C.green} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={C.green} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="pnlGradNeg" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={C.red} stopOpacity={0} />
-                    <stop offset="95%" stopColor={C.red} stopOpacity={0.3} />
-                  </linearGradient>
-                </defs>
+              <BarChart data={pnlData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                <Area type="monotone" dataKey="pnl" stroke={pnlColor} strokeWidth={2}
-                  fill={finalPnl >= 0 ? "url(#pnlGradPos)" : "url(#pnlGradNeg)"} dot={false} />
+                <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
+                  {pnlData.map((entry, i) => (
+                    <Cell key={i} fill={entry.pnl >= 0 ? C.green : C.red} fillOpacity={0.75} />
+                  ))}
+                </Bar>
                 <Tooltip
                   contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
                   labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
                   itemStyle={{ color: pnlColor, fontSize: 11, fontFamily: MONO }}
                   formatter={v => [`${v >= 0 ? "+" : ""}${fmtUSD(v)}`, "P&L"]}
+                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
                 />
-              </AreaChart>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         );
@@ -2021,6 +2022,13 @@ export default function App() {
         if (points.length < 2) return;
 
         const calcPeriodReturn = (daysBack) => {
+          if (daysBack === 1) {
+            // Daily: just compare the most recent two data points (today vs previous close)
+            if (points.length < 2) return null;
+            const start = points[points.length - 2].v;
+            const end = points[points.length - 1].v;
+            return parseFloat((((end - start) / start) * 100).toFixed(2));
+          }
           const cutoff = Date.now() - daysBack * 24 * 60 * 60 * 1000;
           const periodPoints = points.filter(p => p.t >= cutoff);
           if (periodPoints.length < 2) return null;
@@ -2079,7 +2087,8 @@ export default function App() {
   const totalCashInterest = Math.max(0, totalCashValue - totalCashPrincipal);
   const totalCurrentValue = positionSummaries.reduce((s,{pos}) => s+pos.currentValue, 0);
   const totalUnrealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.unrealisedPnl, 0);
-  const totalRealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.realisedPnl, 0);
+  // Cash interest is treated as realised gain — it's locked in daily compounding, not subject to market risk like an open position
+  const totalRealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.realisedPnl, 0) + totalCashInterest;
   const totalPnl = totalUnrealisedPnl + totalRealisedPnl;
   const totalPnlPct = totalCostBasis > 0 ? (totalUnrealisedPnl/totalCostBasis)*100 : 0;
 
@@ -2204,7 +2213,7 @@ export default function App() {
 
           {filteredWatch.length === 0
             ? <div style={{ textAlign:"center", color:C.text3, fontFamily:FONT, fontWeight:300, fontSize:13, padding:"40px 0" }}>No assets match filter</div>
-            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onEdit={a => setWatchModal({asset:a})} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} onThesisUpdate={(id, thesis) => setWatchlist(w => w.map(x => x.id === id ? {...x, thesis} : x))} onAlert={(asset) => setAlertModal({ symbol: asset.symbol, currentPrice: asset.currentPrice })} alertCount={alerts.filter(al => al.symbol === a.symbol && !al.triggered).length} />)
+            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onEdit={a => setWatchModal({asset:a})} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} onThesisUpdate={(id, thesis) => setWatchlist(w => w.map(x => x.id === id ? {...x, thesis} : x))} onAlert={(asset) => setAlertModal({ symbol: asset.symbol, currentPrice: asset.currentPrice })} alertCount={alerts.filter(al => al.symbol === a.symbol && !al.triggered).length} onLogTrade={(sym) => setTradeModal({ defaultType: "buy", symbol: sym })} />)
           }
           <button onClick={() => setSearchModal(true)} style={{ width:"100%", marginTop:10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"16px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Add asset</button>
         </>
@@ -2391,7 +2400,7 @@ export default function App() {
         setCashModal(null);
       }} onClose={() => setCashModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
-      {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
+      {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
     </div>}
     </>
   );
