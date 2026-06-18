@@ -117,7 +117,7 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
 
         {/* Secondary nav */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <NavItem icon="🔔" label="Alerts" dim badge={alertCount} onClick={() => { setTab("watchlist"); onClose(); }} />
+          <NavItem icon="◌" label="Alerts" dim badge={alertCount} onClick={() => { setTab("watchlist"); onClose(); }} />
           <NavItem icon="↻" label="Replay intro" dim onClick={() => { onRestartOnboarding(); onClose(); }} />
           <NavItem icon="ⓘ" label="About Accrue" dim onClick={() => {}} />
           <NavItem icon="✉" label="Help & feedback" dim onClick={() => {}} />
