@@ -258,7 +258,7 @@ function calcSignal({ currentPrice, high52w, rsi, ma200, fearGreed, type }) {
     else { score -= 1; reasons.push("Above 200MA"); }
   }
 
-  if ((type === "crypto" || type === "commodity") && fearGreed > 0) {
+  if ((type === "crypto" || type === "commodity" || type === "stock" || type === "etf") && fearGreed > 0) {
     if (fearGreed <= 20) { score += 3; reasons.push(`Fear & Greed ${fearGreed} — extreme fear`); }
     else if (fearGreed <= 30) { score += 2; reasons.push(`Fear & Greed ${fearGreed} — fear zone`); }
     else if (fearGreed <= 45) { score += 1; reasons.push(`Fear & Greed ${fearGreed} — cautious`); }
@@ -381,7 +381,7 @@ function SignalBreakdown({ asset }) {
     asset.rsi > 0 && { label: "RSI", value: asset.rsi, note: asset.rsi < 30 ? "Oversold ✓" : asset.rsi < 40 ? "Weak ✓" : asset.rsi >= 70 ? "Overbought ✗" : "Neutral", good: asset.rsi < 40 },
     asset.high52w > 0 && { label: "vs 52W HIGH", value: sig.pctBelowHigh != null ? `-${sig.pctBelowHigh.toFixed(1)}%` : "—", note: sig.pctBelowHigh >= 20 ? "Strong dip ✓✓" : sig.pctBelowHigh >= 10 ? "Dip ✓" : "Near high ✗", good: sig.pctBelowHigh >= 10 },
     asset.ma200 > 0 && { label: "200MA", value: fmtUSD(asset.ma200, 0), note: sig.belowMA200 ? `${sig.pctBelowMA200?.toFixed(1)}% below ✓` : "Above 200MA ✗", good: sig.belowMA200 },
-    asset.type === "crypto" && asset.fearGreed > 0 && { label: "FEAR & GREED", value: asset.fearGreed, note: asset.fearGreed <= 30 ? "Fear zone ✓" : asset.fearGreed >= 75 ? "Greed ✗" : "Neutral", good: asset.fearGreed <= 45 },
+    (asset.type === "crypto" || asset.type === "stock" || asset.type === "etf") && asset.fearGreed > 0 && { label: asset.type === "crypto" ? "FEAR & GREED" : "MARKET SENTIMENT", value: asset.fearGreed, note: asset.fearGreed <= 30 ? "Fear zone ✓" : asset.fearGreed >= 75 ? "Greed ✗" : "Neutral", good: asset.fearGreed <= 45 },
   ].filter(Boolean);
 
   return (
@@ -1938,6 +1938,7 @@ export default function App() {
   const [alertsLoaded, setAlertsLoaded] = useState(false);
   const [alertModal, setAlertModal] = useState(null); // null | { symbol, currentPrice }
   const [triggeredAlerts, setTriggeredAlerts] = useState([]);
+  const [stockFearGreed, setStockFearGreed] = useState(null); // { score, rating, previousClose, previousWeek, previousMonth }
 
   // ── Live price refresh
   const refreshPrices = async (wl) => {
@@ -1946,11 +1947,14 @@ export default function App() {
     setLiveStatus("fetching");
     const symbols = [...new Set(list.map(a => a.symbol))];
 
-    // Fetch prices + Fear & Greed in parallel
-    const [prices, fgRes] = await Promise.all([
+    // Fetch prices + Crypto Fear & Greed + Stock Fear & Greed in parallel
+    const [prices, fgRes, stockFgRes] = await Promise.all([
       fetchLivePrices(symbols),
-      fetch("https://api.alternative.me/fng/?limit=1").then(r => r.json()).catch(() => null)
+      fetch("https://api.alternative.me/fng/?limit=1").then(r => r.json()).catch(() => null),
+      fetch("/api/stock-sentiment").then(r => r.json()).catch(() => null),
     ]);
+
+    if (stockFgRes && !stockFgRes.error) setStockFearGreed(stockFgRes);
 
     if (Object.keys(prices).length > 0) {
       // Apply live prices
@@ -1959,7 +1963,10 @@ export default function App() {
         if (!p) return a;
         // Auto-apply Fear & Greed to crypto assets
         const fg = fgRes?.data?.[0]?.value ? parseInt(fgRes.data[0].value) : a.fearGreed;
-        return { ...a, currentPrice: p.price, change24h: p.change24h, ...(a.type === "crypto" ? { fearGreed: fg } : {}) };
+        // Auto-apply CNN stock Fear & Greed to stock/etf assets
+        const stockFg = (stockFgRes && !stockFgRes.error) ? stockFgRes.score : a.fearGreed;
+        const isEquity = a.type === "stock" || a.type === "etf";
+        return { ...a, currentPrice: p.price, change24h: p.change24h, ...(a.type === "crypto" ? { fearGreed: fg } : {}), ...(isEquity ? { fearGreed: stockFg } : {}) };
       }));
       setLastUpdated(new Date());
       setLiveStatus("ok");
@@ -2207,18 +2214,41 @@ export default function App() {
             ))}
           </div>
 
-          {/* Fear & Greed pill */}
+          {/* Fear & Greed pill (crypto) */}
           {fearGreedData && (() => {
             const v = fearGreedData.value;
             const color = v <= 25 ? C.green : v <= 45 ? "rgba(74,222,128,0.6)" : v <= 55 ? C.text3 : v <= 75 ? C.amber : C.red;
             const emoji = v <= 25 ? "😨" : v <= 45 ? "😟" : v <= 55 ? "😐" : v <= 75 ? "😏" : "🤑";
             return (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>{emoji}</span>
+                  <div>
+                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 2 }}>CRYPTO FEAR & GREED</div>
+                    <div style={{ fontSize: 11, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{fearGreedData.label}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 28, fontWeight: 500, fontFamily: FONT, color, letterSpacing: -1 }}>{v}</div>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1 }}>/100</div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Stock market sentiment pill (CNN Fear & Greed) */}
+          {stockFearGreed && (() => {
+            const v = stockFearGreed.score;
+            const color = v <= 25 ? C.green : v <= 45 ? "rgba(74,222,128,0.6)" : v <= 55 ? C.text3 : v <= 75 ? C.amber : C.red;
+            const emoji = v <= 25 ? "😨" : v <= 45 ? "😟" : v <= 55 ? "😐" : v <= 75 ? "😏" : "🤑";
+            const ratingLabel = (stockFearGreed.rating || "").replace(/\b\w/g, c => c.toUpperCase());
+            return (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 16 }}>{emoji}</span>
                   <div>
-                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 2 }}>FEAR & GREED INDEX</div>
-                    <div style={{ fontSize: 11, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{fearGreedData.label}</div>
+                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 2 }}>STOCK MARKET SENTIMENT</div>
+                    <div style={{ fontSize: 11, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{ratingLabel || "—"}</div>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
