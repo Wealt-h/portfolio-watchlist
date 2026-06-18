@@ -361,7 +361,7 @@ const C = {
   blue:        "#93c5fd",
   blueDim:     "rgba(147,197,253,0.12)",
 };
-const INP = { background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "10px 12px", color: C.text1, fontSize: 13, fontFamily: FONT, fontWeight: 300, outline: "none", width: "100%", boxSizing: "border-box" };
+const INP = { background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "10px 12px", color: C.text1, fontSize: 16, fontFamily: FONT, fontWeight: 300, outline: "none", width: "100%", boxSizing: "border-box" };
 const LBL = { fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 4, textTransform: "uppercase" };
 
 // ─── SIGNAL BADGE ─────────────────────────────────────────────────────────────
@@ -954,7 +954,7 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy" }) {
   const subtotal = (parseFloat(f.price)||0) * (parseFloat(f.units)||0);
   const fees = parseFloat(f.fees)||0;
   const total = tradeType === "buy" ? subtotal + fees : subtotal - fees;
-  const SML = { ...INP, padding: "7px 10px", fontSize: 12 };
+  const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
   const LBL2 = { ...LBL, marginBottom: 3 };
   const isBuy = tradeType === "buy";
   const accent = isBuy ? "#00ff9d" : "#f5a623";
@@ -974,15 +974,31 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy" }) {
           <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
         </div>
 
-        {/* Symbol pills */}
-        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 12 }}>
-          {watchlist.map(a => (
-            <button key={a.symbol} onClick={() => pick(a.symbol)}
-              style={{ background: f.symbol===a.symbol?"rgba(255,255,255,0.1)":"rgba(255,255,255,0.04)", border: `1px solid ${f.symbol===a.symbol?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.1)"}`, color: f.symbol===a.symbol?"#e8f5ec":"#6a8a7a", borderRadius: 20, padding: "5px 14px", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}>
-              {a.symbol}
-            </button>
-          ))}
-          <input value={f.symbol.length && !watchlist.find(x=>x.symbol===f.symbol) ? f.symbol : ""} onChange={e => pick(e.target.value.toUpperCase())} placeholder="OTHER" style={{ ...SML, width: 80, borderRadius: 20, padding: "5px 12px", textAlign: "center" }} />
+        {/* Asset dropdown */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={LBL2}>ASSET</div>
+          <select
+            value={watchlist.find(x => x.symbol === f.symbol) ? f.symbol : ""}
+            onChange={e => { if (e.target.value === "__other__") { setF(p => ({ ...p, symbol: "", name: "" })); } else { pick(e.target.value); } }}
+            style={{ ...SML, background: C.surfaceHigh, cursor: "pointer" }}
+          >
+            <option value="" disabled>Select an asset...</option>
+            {watchlist.map(a => (
+              <option key={a.symbol} value={a.symbol}>{a.symbol} — {a.name}</option>
+            ))}
+            <option value="__other__">Other (enter manually)</option>
+          </select>
+
+          {/* Manual entry shown only when "Other" selected or symbol not in watchlist */}
+          {(!watchlist.find(x => x.symbol === f.symbol)) && (
+            <input
+              value={f.symbol}
+              onChange={e => pick(e.target.value.toUpperCase())}
+              placeholder="Enter ticker symbol"
+              style={{ ...SML, marginTop: 8 }}
+            />
+          )}
+        </div>
         </div>
 
         {/* Price / Units / Date */}
@@ -1044,7 +1060,7 @@ function EditTradeModal({ trade, onSave, onClose }) {
   const subtotal = (parseFloat(f.price)||0) * (parseFloat(f.units)||0);
   const fees = parseFloat(f.fees)||0;
   const total = trade.type === "buy" ? subtotal + fees : subtotal - fees;
-  const SML = { ...INP, padding: "7px 10px", fontSize: 12 };
+  const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
   const LBL2 = { ...LBL, marginBottom: 3 };
   const accent = trade.type === "buy" ? "#00ff9d" : "#f5a623";
 
@@ -1107,22 +1123,29 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   const cutoffStr = cutoff.toISOString().slice(0, 10);
   const periodTrades = portfolio.filter(t => t.date >= cutoffStr);
 
-  // Overall P&L
-  const totalInvested = positionSummaries.reduce((s, {pos}) => s + pos.costBasis, 0);
-  const totalValue = positionSummaries.reduce((s, {pos}) => s + pos.currentValue, 0);
+  // Overall P&L — includes cash interest as "growth"
+  const cashTotalValue = (cashAccounts || []).reduce((s, a) => s + calcCashValue(a).currentValue, 0);
+  const cashTotalPrincipal = (cashAccounts || []).reduce((s, a) => s + a.principal, 0);
+  const totalInvested = positionSummaries.reduce((s, {pos}) => s + pos.costBasis, 0) + cashTotalPrincipal;
+  const totalValue = positionSummaries.reduce((s, {pos}) => s + pos.currentValue, 0) + cashTotalValue;
   const totalPnl = totalValue - totalInvested;
   const totalPnlPct = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
 
-  // Best / worst performer
-  const performers = positionSummaries
-    .map(({sym, pos}) => ({ sym, pct: pos.unrealisedPct, pnl: pos.unrealisedPnl }))
-    .sort((a, b) => b.pct - a.pct);
+  // Best / worst performer — includes cash accounts
+  const performers = [
+    ...positionSummaries.map(({sym, pos}) => ({ sym, pct: pos.unrealisedPct, pnl: pos.unrealisedPnl })),
+    ...(cashAccounts || []).map(a => {
+      const c = calcCashValue(a);
+      return { sym: a.institution, pct: a.principal > 0 ? (c.accruedInterest / a.principal) * 100 : 0, pnl: c.accruedInterest };
+    }),
+  ].sort((a, b) => b.pct - a.pct);
   const best = performers[0] || null;
   const worst = performers[performers.length - 1] || null;
 
-  // Win rate
-  const winners = positionSummaries.filter(({pos}) => pos.unrealisedPnl > 0).length;
-  const winRate = positionSummaries.length > 0 ? (winners / positionSummaries.length) * 100 : 0;
+  // Win rate — includes cash (cash always counts as a "win" since it only accrues, never loses)
+  const totalHoldings = positionSummaries.length + (cashAccounts?.length || 0);
+  const winners = positionSummaries.filter(({pos}) => pos.unrealisedPnl > 0).length + (cashAccounts?.length || 0);
+  const winRate = totalHoldings > 0 ? (winners / totalHoldings) * 100 : 0;
 
   // Asset class breakdown — include cash
   const assetClasses = {};
@@ -1149,8 +1172,8 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
     assetClasses[type].assets.push({ sym, pct: pos.unrealisedPct, pnl: pos.unrealisedPnl });
   });
 
-  const classColors = { crypto: C.amber, stock: C.blue, etf: C.green };
-  const classLabels = { crypto: "Crypto", stock: "Stocks", etf: "ETFs" };
+  const classColors = { crypto: C.amber, stock: C.blue, etf: C.green, cash: "#a8e6cf", commodity: "#fbbf24" };
+  const classLabels = { crypto: "Crypto", stock: "Stocks", etf: "ETFs", cash: "Cash", commodity: "Commodities" };
 
   // S&P period return matching current toggle
   const spyChange = spyPeriodData?.[period] ?? null;
@@ -1185,7 +1208,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
         ))}
       </div>
 
-      {positionSummaries.length === 0 ? (
+      {positionSummaries.length === 0 && cashAccounts.length === 0 ? (
         <div style={{ textAlign: "center", color: C.text3, fontFamily: FONT, fontWeight: 300, fontSize: 13, padding: "60px 0" }}>
           No portfolio data yet<br/><span style={{ fontSize: 11, opacity: 0.6 }}>Add trades to see insights</span>
         </div>
@@ -1236,11 +1259,15 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
           {(() => {
             const [rankView, setRankView] = React.useState("pct");
 
-            // Build ranked list — all assets + S&P benchmark, all sorted together
+            // Build ranked list — all assets + cash + S&P benchmark, all sorted together
             const allItems = [
               ...positionSummaries.map(({sym, pos}) => {
                 const asset = watchlist.find(a => a.symbol === sym);
                 return { sym, type: asset?.type || "stock", pct: pos.unrealisedPct, pnl: pos.unrealisedPnl, isBenchmark: false };
+              }),
+              ...(cashAccounts || []).map(a => {
+                const c = calcCashValue(a);
+                return { sym: a.institution, type: "cash", pct: a.principal > 0 ? (c.accruedInterest / a.principal) * 100 : 0, pnl: c.accruedInterest, isBenchmark: false };
               }),
               ...(spyChange !== null ? [{ sym: "S&P 500", type: "index", pct: spyChange, pnl: null, isBenchmark: true }] : []),
             ];
@@ -1264,7 +1291,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                 {/* Ranked rows */}
                 {ranked.map((item, i) => {
                   const isUp = item.pct >= 0;
-                  const typeColor = { crypto: C.amber, stock: C.blue, etf: C.green, benchmark: C.text3 };
+                  const typeColor = { crypto: C.amber, stock: C.blue, etf: C.green, benchmark: C.text3, cash: "#a8e6cf", commodity: "#fbbf24" };
                   return (
                     <div key={item.sym} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < ranked.length - 1 ? `1px solid ${C.border}` : "none" }}>
                       {/* Rank number */}
@@ -1275,7 +1302,9 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                       {/* Asset logo or benchmark icon */}
                       {item.isBenchmark
                         ? <div style={{ width: 32, height: 32, borderRadius: 8, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: C.text3, fontFamily: MONO, flexShrink: 0 }}>SPY</div>
-                        : <AssetLogo symbol={item.sym} size={32} />
+                        : item.type === "cash"
+                          ? <div style={{ width: 32, height: 32, borderRadius: 8, background: C.greenDim, border: `1px solid ${C.greenBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>💰</div>
+                          : <AssetLogo symbol={item.sym} size={32} />
                       }
 
                       {/* Name + type tag */}
@@ -1370,7 +1399,7 @@ function CashModal({ account, onSave, onClose }) {
   const blank = { institution: "", accountType: "Savings", principal: "", rate: "", startDate: new Date().toISOString().slice(0,10), notes: "" };
   const [f, setF] = useState(account && account !== "new" ? { ...account, principal: account.principal.toString(), rate: account.rate.toString() } : blank);
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
-  const SML = { ...INP, padding: "7px 10px", fontSize: 12 };
+  const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
   const LBL2 = { ...LBL, marginBottom: 3 };
 
   const preview = f.principal && f.rate && f.startDate ? calcCashValue({
@@ -1394,6 +1423,11 @@ function CashModal({ account, onSave, onClose }) {
           <div style={{ gridColumn: "1 / -1" }}>
             <div style={LBL2}>INSTITUTION</div>
             <input value={f.institution} onChange={e => set("institution", e.target.value)} placeholder="ING, Macquarie, CBA..." style={SML} />
+            {!account || account === "new" ? (
+              <div style={{ fontSize: 10, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 5, fontStyle: "italic" }}>
+                Adding to an existing institution name will combine the balance into that account.
+              </div>
+            ) : null}
           </div>
           <div>
             <div style={LBL2}>ACCOUNT TYPE</div>
@@ -2206,14 +2240,22 @@ export default function App() {
               <>
                 {/* Combined analytics card with toggle */}
                 {(() => {
-                  if (portfolio.length === 0) return null;
+                  if (portfolio.length === 0 && cashAccounts.length === 0) return null;
 
-                  const COLORS = [C.green, C.blue, C.amber, "#c77dff", "#f87171", "#67e8f9"];
-                  const total = positionSummaries.reduce((s,{pos}) => s + pos.currentValue, 0);
-                  const donutData = positionSummaries.length > 1
-                    ? positionSummaries.map(({sym, pos}, i) => ({
-                        name: sym,
-                        value: parseFloat(((pos.currentValue / total) * 100).toFixed(1)),
+                  const COLORS = [C.green, C.blue, C.amber, "#c77dff", "#f87171", "#67e8f9", "#a8e6cf"];
+
+                  // Build combined list of holdings: positions + cash accounts
+                  const holdings = [
+                    ...positionSummaries.map(({sym, pos}) => ({ name: sym, value: pos.currentValue })),
+                    ...cashAccounts.map(a => ({ name: a.institution, value: calcCashValue(a).currentValue })),
+                  ];
+
+                  const total = holdings.reduce((s, h) => s + h.value, 0) || 1;
+
+                  const donutData = holdings.length > 1
+                    ? holdings.map((h, i) => ({
+                        name: h.name,
+                        value: parseFloat(((h.value / total) * 100).toFixed(1)),
                         color: COLORS[i % COLORS.length],
                       }))
                     : null;
@@ -2326,7 +2368,29 @@ export default function App() {
       {watchModal !== null && <WatchModal asset={watchModal.asset} onSave={saveWatch} onClose={() => setWatchModal(null)} />}
       {searchModal && <AssetSearchModal onAdd={asset => { setWatchlist(w => [...w, asset]); }} onClose={() => setSearchModal(false)} />}
       {alertModal && <AlertModal symbol={alertModal.symbol} currentPrice={alertModal.currentPrice} alerts={alerts} onSave={alert => setAlerts(a => [...a, alert])} onDelete={id => setAlerts(a => a.filter(x => x.id !== id))} onClose={() => setAlertModal(null)} />}
-      {cashModal !== null && <CashModal account={cashModal} onSave={acc => { if (cashModal === "new") { setCashAccounts(c => [...c, acc]); } else { setCashAccounts(c => c.map(x => x.id === acc.id ? acc : x)); } setCashModal(null); }} onClose={() => setCashModal(null)} />}
+      {cashModal !== null && <CashModal account={cashModal} onSave={acc => {
+        if (cashModal === "new") {
+          // Check for existing account with same institution name (case-insensitive)
+          setCashAccounts(c => {
+            const existingIdx = c.findIndex(x => x.institution.trim().toLowerCase() === acc.institution.trim().toLowerCase());
+            if (existingIdx !== -1) {
+              // Merge: add new principal to existing, keep existing start date (don't reset compounding clock)
+              const existing = c[existingIdx];
+              const merged = {
+                ...existing,
+                principal: existing.principal + acc.principal,
+                rate: acc.rate, // use latest rate in case it changed
+                notes: acc.notes || existing.notes,
+              };
+              return c.map((x, i) => i === existingIdx ? merged : x);
+            }
+            return [...c, acc];
+          });
+        } else {
+          setCashAccounts(c => c.map(x => x.id === acc.id ? acc : x));
+        }
+        setCashModal(null);
+      }} onClose={() => setCashModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
     </div>}
