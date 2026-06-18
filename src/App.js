@@ -64,6 +64,76 @@ const ONBOARDING_STEPS = [
   },
 ];
 
+// ─── NAV DRAWER ──────────────────────────────────────────────────────────────
+function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding }) {
+  if (!open) return null;
+
+  const NavItem = ({ icon, label, active, badge, onClick, dim }) => (
+    <button onClick={onClick} style={{
+      display: "flex", alignItems: "center", gap: 12, width: "100%",
+      background: active ? "rgba(255,255,255,0.05)" : "transparent",
+      border: "none", borderRadius: 8, padding: "11px 12px",
+      cursor: "pointer", textAlign: "left",
+    }}>
+      <span style={{ fontSize: 16, opacity: active ? 0.95 : (dim ? 0.4 : 0.6), width: 18, textAlign: "center" }}>{icon}</span>
+      <span style={{ fontSize: 13, fontFamily: FONT, fontWeight: 300, color: active ? "rgba(240,245,242,0.95)" : (dim ? "rgba(240,245,242,0.4)" : "rgba(240,245,242,0.6)") }}>{label}</span>
+      {badge > 0 && <span style={{ marginLeft: "auto", fontSize: 10, color: C.green, fontFamily: MONO }}>{badge}</span>}
+    </button>
+  );
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex" }}>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} />
+
+      {/* Drawer panel */}
+      <div style={{
+        position: "relative", width: "78%", maxWidth: 280, height: "100%",
+        background: "#0a0c0e", borderRight: "1px solid rgba(255,255,255,0.08)",
+        padding: "env(safe-area-inset-top, 28px) 20px 28px",
+        display: "flex", flexDirection: "column",
+        animation: "slideIn 0.22s ease",
+      }}>
+        <style>{`@keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }`}</style>
+
+        {/* Wordmark + close */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+            {[["A",1.0],["C",0.92],["C",0.84],["R",0.76],["U",0.68],["E",0.60]].map(([l,o],i) => (
+              <span key={i} style={{ fontSize: 20, fontWeight: 200, letterSpacing: 4, color: `rgba(240,245,242,${o})`, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{l}</span>
+            ))}
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "rgba(240,245,242,0.4)", fontSize: 18, cursor: "pointer" }}>✕</button>
+        </div>
+
+        {/* Primary nav */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <NavItem icon="☰" label="Watchlist" active={tab === "watchlist"} onClick={() => { setTab("watchlist"); onClose(); }} />
+          <NavItem icon="◧" label="Portfolio" active={tab === "portfolio"} onClick={() => { setTab("portfolio"); onClose(); }} />
+          <NavItem icon="◔" label="Insights" active={tab === "insights"} onClick={() => { setTab("insights"); onClose(); }} />
+        </div>
+
+        <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "16px 0" }} />
+
+        {/* Secondary nav */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <NavItem icon="🔔" label="Alerts" dim badge={alertCount} onClick={() => { setTab("watchlist"); onClose(); }} />
+          <NavItem icon="↻" label="Replay intro" dim onClick={() => { onRestartOnboarding(); onClose(); }} />
+          <NavItem icon="ⓘ" label="About Accrue" dim onClick={() => {}} />
+          <NavItem icon="✉" label="Help & feedback" dim onClick={() => {}} />
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 14, fontSize: 10, color: "rgba(240,245,242,0.25)", fontFamily: MONO, letterSpacing: 1 }}>
+          v1.0.0
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function OnboardingScreen({ onComplete }) {
   const [step, setStep] = useState(-1); // -1 = splash
 
@@ -1916,6 +1986,12 @@ export default function App() {
     setOnboarded(true);
   };
 
+  const [navOpen, setNavOpen] = useState(false);
+  const restartOnboarding = () => {
+    try { localStorage.removeItem("accrue_onboarded"); } catch {}
+    setOnboarded(false);
+  };
+
   const [tab, setTab] = useState("watchlist");
   const [watchlist, setWatchlist] = useState(DEFAULT_WATCHLIST);
   const [portfolio, setPortfolio] = useState(DEFAULT_PORTFOLIO);
@@ -2142,7 +2218,16 @@ export default function App() {
       {/* ── ACCRUE HEADER ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Hamburger menu */}
+            <button onClick={() => setNavOpen(true)} style={{ background: "transparent", border: "none", color: C.text2, cursor: "pointer", padding: 4, display: "flex", alignItems: "center" }} aria-label="Open menu">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <line x1="2" y1="5" x2="18" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <line x1="2" y1="10" x2="18" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <line x1="2" y1="15" x2="18" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+
             {/* ACCRUE wordmark — letter fade */}
             <div style={{ display: "flex", alignItems: "center", gap: 0, lineHeight: 1 }}>
               {[
@@ -2439,6 +2524,7 @@ export default function App() {
       }} onClose={() => setCashModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
+      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} />
     </div>}
     </>
   );
