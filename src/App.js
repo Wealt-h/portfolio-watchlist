@@ -2436,12 +2436,12 @@ export default function App() {
             const cols = [
               fearGreedData && { key: "crypto", label: "CRYPTO", value: fearGreedData.value, sub: fearGreedData.label, color: getColor(fearGreedData.value), emoji: getEmoji(fearGreedData.value) },
               stockFearGreed && { key: "stocks", label: "STOCKS", value: stockFearGreed.score, sub: (stockFearGreed.rating || "").replace(/\b\w/g, c => c.toUpperCase()) || "—", color: getColor(stockFearGreed.score), emoji: getEmoji(stockFearGreed.score) },
-              vixData && { key: "vix", label: "VIX", value: vixData.value, sub: vixData.label, color: vixColor(vixData.level), emoji: vixEmoji(vixData.level) },
+              vixData && { key: "vix", label: "VOLATILITY", value: vixData.value, sub: vixData.label, color: vixColor(vixData.level), emoji: vixEmoji(vixData.level) },
             ].filter(Boolean);
 
             return (
               <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
-                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>MARKET SENTIMENT</div>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10, textAlign: "center" }}>MARKET SENTIMENT</div>
                 <div style={{ display: "flex", gap: 0 }}>
                   {cols.map((col, i) => (
                     <React.Fragment key={col.key}>
