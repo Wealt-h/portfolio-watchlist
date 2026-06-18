@@ -1399,8 +1399,13 @@ function calcCashValue(account) {
 
 // ─── CASH MODAL ───────────────────────────────────────────────────────────────
 function CashModal({ account, onSave, onClose }) {
+  const isTopUp = account && typeof account === "object" && account.topUpFor;
   const blank = { institution: "", accountType: "Savings", principal: "", rate: "", startDate: new Date().toISOString().slice(0,10), notes: "" };
-  const [f, setF] = useState(account && account !== "new" ? { ...account, principal: account.principal.toString(), rate: account.rate.toString() } : blank);
+  const [f, setF] = useState(() => {
+    if (isTopUp) return { ...blank, institution: account.topUpFor };
+    if (account && account !== "new") return { ...account, principal: account.principal.toString(), rate: account.rate.toString() };
+    return blank;
+  });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
   const LBL2 = { ...LBL, marginBottom: 3 };
@@ -1417,7 +1422,7 @@ function CashModal({ account, onSave, onClose }) {
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 15, color: C.text1 }}>
-            {account && account !== "new" ? "Edit Cash Account" : "Add Cash Account"}
+            {isTopUp ? `Add to ${account.topUpFor}` : (account && account !== "new" ? "Edit Cash Account" : "Add Cash Account")}
           </div>
           <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
         </div>
@@ -1425,8 +1430,12 @@ function CashModal({ account, onSave, onClose }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
           <div style={{ gridColumn: "1 / -1" }}>
             <div style={LBL2}>INSTITUTION</div>
-            <input value={f.institution} onChange={e => set("institution", e.target.value)} placeholder="ING, Macquarie, CBA..." style={SML} />
-            {!account || account === "new" ? (
+            <input value={f.institution} onChange={e => set("institution", e.target.value)} placeholder="ING, Macquarie, CBA..." style={SML} disabled={isTopUp} readOnly={isTopUp} />
+            {isTopUp ? (
+              <div style={{ fontSize: 10, color: C.green, fontFamily: FONT, fontWeight: 300, marginTop: 5, fontStyle: "italic" }}>
+                This amount will be added to your existing {account.topUpFor} balance.
+              </div>
+            ) : (!account || account === "new") ? (
               <div style={{ fontSize: 10, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 5, fontStyle: "italic" }}>
                 Adding to an existing institution name will combine the balance into that account.
               </div>
@@ -1482,7 +1491,7 @@ function CashModal({ account, onSave, onClose }) {
 
         <button onClick={() => onSave({ ...f, id: account?.id || Date.now(), principal: parseFloat(f.principal) || 0, rate: parseFloat(f.rate) || 0 })}
           style={{ width: "100%", background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>
-          {account && account !== "new" ? "Save changes" : "Add account"}
+          {isTopUp ? "Add to balance" : (account && account !== "new" ? "Save changes" : "Add account")}
         </button>
       </div>
     </div>
@@ -1490,7 +1499,7 @@ function CashModal({ account, onSave, onClose }) {
 }
 
 // ─── CASH CARD ────────────────────────────────────────────────────────────────
-function CashCard({ account, onEdit, onDelete }) {
+function CashCard({ account, onEdit, onDelete, onAddCash }) {
   const [open, setOpen] = useState(false);
   const calc = calcCashValue(account);
 
@@ -1587,6 +1596,7 @@ function CashCard({ account, onEdit, onDelete }) {
           )}
 
           <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => onAddCash(account)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.greenBorder}`, color: C.green, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>+ Add cash</button>
             <button onClick={() => onEdit(account)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Edit</button>
             <button onClick={() => onDelete(account.id)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Remove</button>
           </div>
@@ -2317,6 +2327,7 @@ export default function App() {
                 <CashCard key={a.id} account={a}
                   onEdit={a => setCashModal(a)}
                   onDelete={id => setCashAccounts(c => c.filter(x => x.id !== id))}
+                  onAddCash={a => setCashModal({ topUpFor: a.institution })}
                 />
               ))}
               {/* Cash summary */}
@@ -2377,7 +2388,8 @@ export default function App() {
       {searchModal && <AssetSearchModal onAdd={asset => { setWatchlist(w => [...w, asset]); }} onClose={() => setSearchModal(false)} />}
       {alertModal && <AlertModal symbol={alertModal.symbol} currentPrice={alertModal.currentPrice} alerts={alerts} onSave={alert => setAlerts(a => [...a, alert])} onDelete={id => setAlerts(a => a.filter(x => x.id !== id))} onClose={() => setAlertModal(null)} />}
       {cashModal !== null && <CashModal account={cashModal} onSave={acc => {
-        if (cashModal === "new") {
+        const isMergeCase = cashModal === "new" || (typeof cashModal === "object" && cashModal.topUpFor);
+        if (isMergeCase) {
           // Check for existing account with same institution name (case-insensitive)
           setCashAccounts(c => {
             const existingIdx = c.findIndex(x => x.institution.trim().toLowerCase() === acc.institution.trim().toLowerCase());
