@@ -135,6 +135,44 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
 }
 
 
+// ─── RETURNING-VISIT SPLASH (logo only, auto-dismisses) ─────────────────────
+function ReturningSplash({ onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2200);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  return (
+    <div onClick={onDone} style={{
+      minHeight: "100vh",
+      background: "linear-gradient(180deg, #07090c 0%, #08090a 100%)",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      padding: "40px 32px",
+      fontFamily: FONT,
+      cursor: "pointer",
+    }}>
+      <style>{`
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .rsplash-logo { animation: fadeIn 1.2s ease forwards; opacity: 0; }
+        .rsplash-tag  { animation: fadeUp 0.8s ease 1.0s forwards; opacity: 0; }
+        .rsplash-line { animation: fadeIn 0.6s ease 1.6s forwards; opacity: 0; }
+      `}</style>
+      <div className="rsplash-logo" style={{ marginBottom: 28 }}>
+        {[["A",1.0],["C",0.92],["C",0.84],["R",0.76],["U",0.68],["E",0.60]].map(([l,o],i) => (
+          <span key={i} style={{ fontSize: 46, fontWeight: 100, letterSpacing: 11, color: `rgba(240,245,242,${o})`, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{l}</span>
+        ))}
+      </div>
+      <div className="rsplash-tag" style={{ fontSize: 13, color: "rgba(240,245,242,0.38)", fontWeight: 300, letterSpacing: 1.5, textAlign: "center", marginBottom: 10 }}>
+        Disciplined Investment Intelligence
+      </div>
+      <div className="rsplash-line" style={{ width: 36, height: 1, background: "rgba(61,220,132,0.45)" }} />
+    </div>
+  );
+}
+
+
 function OnboardingScreen({ onComplete }) {
   const [step, setStep] = useState(-1); // -1 = splash
 
@@ -2010,6 +2048,12 @@ export default function App() {
     setOnboarded(true);
   };
 
+  // Lightweight splash shown on every cold start for returning users (already onboarded)
+  // Initialised once per page load — doesn't re-trigger on internal state changes
+  const [showReturningSplash, setShowReturningSplash] = useState(() => {
+    try { return localStorage.getItem("accrue_onboarded") === "true"; } catch { return false; }
+  });
+
   const [navOpen, setNavOpen] = useState(false);
 
   // ── Display currency (USD is always source of truth; this only affects display)
@@ -2269,7 +2313,8 @@ export default function App() {
   return (
     <>
       {!onboarded && <OnboardingScreen onComplete={completeOnboarding} />}
-      {onboarded && <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
+      {onboarded && showReturningSplash && <ReturningSplash onDone={() => setShowReturningSplash(false)} />}
+      {onboarded && !showReturningSplash && <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
       {/* ── ACCRUE HEADER ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -2377,46 +2422,51 @@ export default function App() {
             ))}
           </div>
 
-          {/* Fear & Greed pill (crypto) */}
-          {fearGreedData && (() => {
-            const v = fearGreedData.value;
-            const color = v <= 25 ? C.green : v <= 45 ? "rgba(74,222,128,0.6)" : v <= 55 ? C.text3 : v <= 75 ? C.amber : C.red;
-            const emoji = v <= 25 ? "😨" : v <= 45 ? "😟" : v <= 55 ? "😐" : v <= 75 ? "😏" : "🤑";
+          {/* Combined Fear & Greed card — crypto + stocks side by side */}
+          {(fearGreedData || stockFearGreed) && (() => {
+            const getColor = v => v <= 25 ? C.green : v <= 45 ? "rgba(74,222,128,0.6)" : v <= 55 ? C.text3 : v <= 75 ? C.amber : C.red;
+            const getEmoji = v => v <= 25 ? "😨" : v <= 45 ? "😟" : v <= 55 ? "😐" : v <= 75 ? "😏" : "🤑";
             return (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>{emoji}</span>
-                  <div>
-                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 2 }}>CRYPTO FEAR & GREED</div>
-                    <div style={{ fontSize: 11, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{fearGreedData.label}</div>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 28, fontWeight: 500, fontFamily: FONT, color, letterSpacing: -1 }}>{v}</div>
-                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1 }}>/100</div>
-                </div>
-              </div>
-            );
-          })()}
+              <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>FEAR & GREED</div>
+                <div style={{ display: "flex", gap: 0 }}>
+                  {/* Crypto half */}
+                  {fearGreedData && (() => {
+                    const v = fearGreedData.value;
+                    return (
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 15 }}>{getEmoji(v)}</span>
+                        <div>
+                          <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1, marginBottom: 2 }}>CRYPTO</div>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+                            <span style={{ fontSize: 20, fontWeight: 500, fontFamily: FONT, color: getColor(v), letterSpacing: -0.5 }}>{v}</span>
+                            <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO }}>{fearGreedData.label}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
-          {/* Stock market sentiment pill (CNN Fear & Greed) */}
-          {stockFearGreed && (() => {
-            const v = stockFearGreed.score;
-            const color = v <= 25 ? C.green : v <= 45 ? "rgba(74,222,128,0.6)" : v <= 55 ? C.text3 : v <= 75 ? C.amber : C.red;
-            const emoji = v <= 25 ? "😨" : v <= 45 ? "😟" : v <= 55 ? "😐" : v <= 75 ? "😏" : "🤑";
-            const ratingLabel = (stockFearGreed.rating || "").replace(/\b\w/g, c => c.toUpperCase());
-            return (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>{emoji}</span>
-                  <div>
-                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 2 }}>STOCK MARKET SENTIMENT</div>
-                    <div style={{ fontSize: 11, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{ratingLabel || "—"}</div>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 28, fontWeight: 500, fontFamily: FONT, color, letterSpacing: -1 }}>{v}</div>
-                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1 }}>/100</div>
+                  {/* Divider */}
+                  {fearGreedData && stockFearGreed && <div style={{ width: 1, background: C.border, margin: "2px 14px" }} />}
+
+                  {/* Stocks half */}
+                  {stockFearGreed && (() => {
+                    const v = stockFearGreed.score;
+                    const ratingLabel = (stockFearGreed.rating || "").replace(/\b\w/g, c => c.toUpperCase());
+                    return (
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 15 }}>{getEmoji(v)}</span>
+                        <div>
+                          <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1, marginBottom: 2 }}>STOCKS</div>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+                            <span style={{ fontSize: 20, fontWeight: 500, fontFamily: FONT, color: getColor(v), letterSpacing: -0.5 }}>{v}</span>
+                            <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO }}>{ratingLabel || "—"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             );
