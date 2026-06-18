@@ -740,7 +740,7 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onA
     fetch("/api/sparkline", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol: asset.symbol }),
+      body: JSON.stringify({ symbol: asset.symbol, range: "1y" }),
     })
       .then(r => r.json())
       .then(d => { if (d.points) setSparkData(d.points); })
@@ -803,9 +803,9 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onA
         <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }} onClick={e => e.stopPropagation()}>
           <PriceBar low52w={asset.low52w} high52w={asset.high52w} current={asset.currentPrice} ma200={asset.ma200} />
 
-          {/* Sparkline — 30 day price chart */}
+          {/* Sparkline — 1 year price chart */}
           <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>30 DAY PRICE</div>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>1 YEAR PRICE</div>
             {sparkLoading && <div style={{ height: 60, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 10, color: C.text3, fontFamily: MONO }}>loading chart...</span></div>}
             {sparkData && !sparkLoading && (() => {
               const first = sparkData[0]?.v || 1;
@@ -1225,20 +1225,22 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
           )}
         </div>
 
-        {/* Price / Units / Date */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-          <div>
-            <div style={LBL2}>{isBuy?"BUY":"SELL"} PRICE</div>
-            <div style={{ display: "flex", gap: 4 }}>
-              <input value={f.price} onChange={e => set("price", e.target.value)} type="number" placeholder="0.00" style={{ ...SML, flex: 1 }} />
-              <select value={tradeCurrency} onChange={e => setTradeCurrency(e.target.value)}
-                style={{ ...SML, width: 64, padding: "9px 4px", fontSize: 12, background: C.surfaceHigh, cursor: "pointer", flexShrink: 0 }}>
-                {Object.keys(CURRENCY_SYMBOLS).map(cur => (
-                  <option key={cur} value={cur}>{cur}</option>
-                ))}
-              </select>
-            </div>
+        {/* Price + currency — full width row */}
+        <div style={{ marginBottom: 8 }}>
+          <div style={LBL2}>{isBuy?"BUY":"SELL"} PRICE</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <input value={f.price} onChange={e => set("price", e.target.value)} type="number" placeholder="0.00" style={{ ...SML, flex: 1, minWidth: 0 }} />
+            <select value={tradeCurrency} onChange={e => setTradeCurrency(e.target.value)}
+              style={{ ...SML, width: 88, padding: "9px 8px", fontSize: 13, background: C.surfaceHigh, cursor: "pointer", flexShrink: 0 }}>
+              {Object.keys(CURRENCY_SYMBOLS).map(cur => (
+                <option key={cur} value={cur}>{cur}</option>
+              ))}
+            </select>
           </div>
+        </div>
+
+        {/* Units / Date */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
           <div><div style={LBL2}>UNITS</div><input value={f.units} onChange={e => set("units", e.target.value)} type="number" placeholder="0" style={SML} /></div>
           <div><div style={LBL2}>DATE</div><input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark" }} /></div>
         </div>
