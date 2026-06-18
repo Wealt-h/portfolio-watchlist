@@ -65,7 +65,53 @@ const ONBOARDING_STEPS = [
 ];
 
 // ─── NAV DRAWER ──────────────────────────────────────────────────────────────
-function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker }) {
+// ─── ABOUT SCREEN ────────────────────────────────────────────────────────────
+function AboutScreen({ onClose }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 400 }}>
+      <div style={{
+        background: "#0e1014", border: "1px solid rgba(255,255,255,0.14)", borderRadius: "16px 16px 0 0",
+        padding: "28px 24px 40px", width: "100%", maxWidth: 540, maxHeight: "86vh", overflowY: "auto",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+            {[["A",1.0],["C",0.92],["C",0.84],["R",0.76],["U",0.68],["E",0.60]].map(([l,o],i) => (
+              <span key={i} style={{ fontSize: 24, fontWeight: 200, letterSpacing: 5, color: `rgba(240,245,242,${o})`, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{l}</span>
+            ))}
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "rgba(240,245,242,0.4)", fontSize: 18, cursor: "pointer", padding: 4 }}>✕</button>
+        </div>
+
+        <div style={{ fontSize: 11, color: "rgba(61,220,132,0.7)", fontFamily: MONO, letterSpacing: 2, marginBottom: 22 }}>
+          DISCIPLINED INVESTMENT INTELLIGENCE
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 18, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 300, fontSize: 14.5, lineHeight: 1.65, color: "rgba(240,245,242,0.75)" }}>
+          <p style={{ margin: 0 }}>
+            Accrue was built on a simple premise: the best time to buy a great asset is when everyone else is scared to.
+          </p>
+          <p style={{ margin: 0 }}>
+            It draws on ideas from some of the more disciplined voices in investing — patience and quality over hype, conviction sized to opportunity, risk managed deliberately rather than left to chance. You don't have to share every belief behind it to find it useful; the goal is simply to help you act with a clear head instead of a crowded one.
+          </p>
+          <p style={{ margin: 0 }}>
+            Accrue exists to remove emotion from the process — tracking what you own, what it's worth, and whether today is a day to act or a day to wait.
+          </p>
+          <p style={{ margin: 0, color: "rgba(240,245,242,0.5)", fontSize: 13 }}>
+            This is a personal project, built and refined one feature at a time. If something feels off, I'd genuinely like to know — there's a feedback link in the menu.
+          </p>
+        </div>
+
+        <div style={{ marginTop: 28, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 10, color: "rgba(240,245,242,0.25)", fontFamily: MONO, letterSpacing: 1 }}>v1.0.0</span>
+          <span style={{ fontSize: 10, color: "rgba(240,245,242,0.25)", fontFamily: MONO, letterSpacing: 1 }}>Built with care</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker, onOpenAbout }) {
   if (!open) return null;
 
   const NavItem = ({ icon, label, active, badge, onClick, dim }) => (
@@ -120,8 +166,8 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
           <NavItem icon="◌" label="Alerts" dim badge={alertCount} onClick={() => { setTab("watchlist"); onClose(); }} />
           <NavItem icon="◎" label={`Currency · ${displayCurrency}`} dim onClick={() => { onOpenCurrencyPicker(); onClose(); }} />
           <NavItem icon="↻" label="Replay intro" dim onClick={() => { onRestartOnboarding(); onClose(); }} />
-          <NavItem icon="ⓘ" label="About Accrue" dim onClick={() => {}} />
-          <NavItem icon="✉" label="Help & feedback" dim onClick={() => {}} />
+          <NavItem icon="ⓘ" label="About Accrue" dim onClick={() => { onOpenAbout(); onClose(); }} />
+          <NavItem icon="✉" label="Help & feedback" dim onClick={() => { window.location.href = "mailto:?subject=Accrue%20feedback"; onClose(); }} />
         </div>
 
         <div style={{ flex: 1 }} />
@@ -2112,6 +2158,7 @@ export default function App() {
   });
 
   const [navOpen, setNavOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   // ── Display currency (USD is always source of truth; this only affects display)
   const [displayCurrency, setDisplayCurrency] = useState(() => {
@@ -2700,7 +2747,8 @@ export default function App() {
       }} onClose={() => setCashModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
-      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} />
+      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} />
+      {aboutOpen && <AboutScreen onClose={() => setAboutOpen(false)} />}
     </div>}
     </>
   );
