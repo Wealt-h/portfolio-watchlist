@@ -947,7 +947,7 @@ function AssetSearchModal({ onAdd, onClose }) {
 }
 
 // ─── TRADE MODAL (BUY + SELL) ─────────────────────────────────────────────────
-function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSymbol = "" }) {
+function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSymbol = "", onAddCash }) {
   const [tradeType, setTradeType] = useState(defaultType);
   const [f, setF] = useState(() => {
     const match = watchlist.find(x => x.symbol === defaultSymbol);
@@ -983,7 +983,11 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
           <div style={LBL2}>ASSET</div>
           <select
             value={watchlist.find(x => x.symbol === f.symbol) ? f.symbol : ""}
-            onChange={e => { if (e.target.value === "__other__") { setF(p => ({ ...p, symbol: "", name: "" })); } else { pick(e.target.value); } }}
+            onChange={e => {
+              if (e.target.value === "__other__") { setF(p => ({ ...p, symbol: "", name: "" })); }
+              else if (e.target.value === "__cash__") { onAddCash(); onClose(); }
+              else { pick(e.target.value); }
+            }}
             style={{ ...SML, background: C.surfaceHigh, cursor: "pointer" }}
           >
             <option value="" disabled>Select an asset...</option>
@@ -991,6 +995,7 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
               <option key={a.symbol} value={a.symbol}>{a.symbol} — {a.name}</option>
             ))}
             <option value="__other__">Other (enter manually)</option>
+            <option value="__cash__">💰 Cash deposit</option>
           </select>
 
           {/* Manual entry shown only when "Other" selected or symbol not in watchlist */}
@@ -2089,18 +2094,21 @@ export default function App() {
   // Portfolio summary using live prices from watchlist
   const getLivePrice = (sym) => { const a = watchlist.find(x => x.symbol===sym); return a?.currentPrice || 0; };
   const positionSummaries = Object.entries(positions).map(([sym, trades]) => ({ sym, trades, pos: calcPosition(trades, getLivePrice(sym)) }));
-  const totalCostBasis = positionSummaries.reduce((s,{pos}) => s+pos.costBasis, 0);
 
   // Cash totals
   const totalCashPrincipal = cashAccounts.reduce((s, a) => s + (a.principal || 0), 0);
   const totalCashValue = cashAccounts.reduce((s, a) => s + calcCashValue(a).currentValue, 0);
   const totalCashInterest = Math.max(0, totalCashValue - totalCashPrincipal);
-  const totalCurrentValue = positionSummaries.reduce((s,{pos}) => s+pos.currentValue, 0);
+
+  // Cost basis & current value — includes cash (principal counts as "basis", current value includes accrued interest)
+  const totalCostBasis = positionSummaries.reduce((s,{pos}) => s+pos.costBasis, 0) + totalCashPrincipal;
+  const totalCurrentValue = positionSummaries.reduce((s,{pos}) => s+pos.currentValue, 0) + totalCashValue;
+
   const totalUnrealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.unrealisedPnl, 0);
   // Cash interest is treated as realised gain — it's locked in daily compounding, not subject to market risk like an open position
   const totalRealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.realisedPnl, 0) + totalCashInterest;
   const totalPnl = totalUnrealisedPnl + totalRealisedPnl;
-  const totalPnlPct = totalCostBasis > 0 ? (totalUnrealisedPnl/totalCostBasis)*100 : 0;
+  const totalPnlPct = totalCostBasis > 0 ? (totalPnl/totalCostBasis)*100 : 0;
 
   const filterMap = {
     all: watchlist,
@@ -2294,6 +2302,8 @@ export default function App() {
                   // Only show toggle if both views are available
                   const showToggle = donutData && hasChart;
 
+                  const positionsCostBasis = positionSummaries.reduce((s,{pos}) => s+pos.costBasis, 0);
+
                   return (
                     <AnalyticsCard
                       donutData={donutData}
@@ -2305,7 +2315,7 @@ export default function App() {
                       total={total}
                       chartData0={chartData[0]}
                       truePnl={totalUnrealisedPnl}
-                      totalCostBasisNow={totalCostBasis}
+                      totalCostBasisNow={positionsCostBasis}
                     />
                   );
                 })()}
@@ -2330,24 +2340,10 @@ export default function App() {
                   onAddCash={a => setCashModal({ topUpFor: a.institution })}
                 />
               ))}
-              {/* Cash summary */}
-              <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 10, padding: "12px 16px", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 4 }}>TOTAL CASH</div>
-                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.text1 }}>{fmtUSD(totalCashValue)}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 4 }}>INTEREST EARNED</div>
-                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 16, color: C.green }}>+{fmtUSD(totalCashInterest)}</div>
-                </div>
-              </div>
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ flex: 1, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Log trade</button>
-            <button onClick={() => setCashModal("new")} style={{ flex: 1, background:"transparent", border:`1px dashed ${C.border}`, color:C.green, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Add cash</button>
-          </div>
+          <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ width: "100%", marginTop: 10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Log trade</button>
         </>
       )}
 
@@ -2412,7 +2408,7 @@ export default function App() {
         setCashModal(null);
       }} onClose={() => setCashModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
-      {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} />}
+      {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
     </div>}
     </>
   );
