@@ -1085,6 +1085,9 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
     const match = watchlist.find(x => x.symbol === defaultSymbol);
     return { symbol: defaultSymbol || "", name: match?.name || "", price: "", units: "", fees: "", date: new Date().toISOString().slice(0,10), notes: "" };
   });
+  const [tradeCurrency, setTradeCurrency] = useState("USD");
+  const [converting, setConverting] = useState(false);
+  const [convertError, setConvertError] = useState(null);
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const pick = (sym) => { const a = watchlist.find(x => x.symbol === sym); if (a) setF(p => ({ ...p, symbol: a.symbol, name: a.name })); else setF(p => ({ ...p, symbol: sym })); };
   const subtotal = (parseFloat(f.price)||0) * (parseFloat(f.units)||0);
@@ -1094,6 +1097,41 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
   const LBL2 = { ...LBL, marginBottom: 3 };
   const isBuy = tradeType === "buy";
   const accent = isBuy ? "#00ff9d" : "#f5a623";
+
+  const handleSave = async () => {
+    let priceUSD = parseFloat(f.price) || 0;
+    let feesUSD = parseFloat(f.fees) || 0;
+
+    if (tradeCurrency !== "USD") {
+      setConverting(true);
+      setConvertError(null);
+      try {
+        const res = await fetch(`/api/fx-historical?date=${f.date}&currency=${tradeCurrency}`);
+        const data = await res.json();
+        if (data?.rate) {
+          // data.rate is USD -> tradeCurrency, so divide to go the other way
+          priceUSD = priceUSD / data.rate;
+          feesUSD = feesUSD / data.rate;
+        } else {
+          setConvertError("Could not fetch exchange rate — trade not saved");
+          setConverting(false);
+          return;
+        }
+      } catch (e) {
+        setConvertError("Could not fetch exchange rate — trade not saved");
+        setConverting(false);
+        return;
+      }
+      setConverting(false);
+    }
+
+    onSave({
+      id: Date.now(), type: tradeType, symbol: f.symbol.toUpperCase().trim(), name: f.name,
+      price: priceUSD, units: parseFloat(f.units) || 0, fees: feesUSD,
+      date: f.date, notes: f.notes, total: tradeType === "buy" ? (priceUSD * (parseFloat(f.units)||0) + feesUSD) : (priceUSD * (parseFloat(f.units)||0) - feesUSD),
+      ...(tradeCurrency !== "USD" ? { originalCurrency: tradeCurrency, originalPrice: parseFloat(f.price) || 0 } : {}),
+    });
+  };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
@@ -1143,14 +1181,31 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
 
         {/* Price / Units / Date */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-          <div><div style={LBL2}>{isBuy?"BUY":"SELL"} PRICE</div><input value={f.price} onChange={e => set("price", e.target.value)} type="number" placeholder="0.00" style={SML} /></div>
+          <div>
+            <div style={LBL2}>{isBuy?"BUY":"SELL"} PRICE</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              <input value={f.price} onChange={e => set("price", e.target.value)} type="number" placeholder="0.00" style={{ ...SML, flex: 1 }} />
+              <select value={tradeCurrency} onChange={e => setTradeCurrency(e.target.value)}
+                style={{ ...SML, width: 64, padding: "9px 4px", fontSize: 12, background: C.surfaceHigh, cursor: "pointer", flexShrink: 0 }}>
+                {Object.keys(CURRENCY_SYMBOLS).map(cur => (
+                  <option key={cur} value={cur}>{cur}</option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div><div style={LBL2}>UNITS</div><input value={f.units} onChange={e => set("units", e.target.value)} type="number" placeholder="0" style={SML} /></div>
           <div><div style={LBL2}>DATE</div><input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark" }} /></div>
         </div>
 
+        {tradeCurrency !== "USD" && (
+          <div style={{ fontSize: 10, color: C.text3, fontFamily: FONT, fontWeight: 300, marginBottom: 10, fontStyle: "italic" }}>
+            Entered in {CURRENCY_NAMES[tradeCurrency] || tradeCurrency} — will be converted to USD using the exchange rate on {f.date}.
+          </div>
+        )}
+
         {/* Fees */}
         <div style={{ marginBottom: 10 }}>
-          <div style={LBL2}>BROKERAGE FEE <span style={{ color: "#2d4a3a" }}>(optional)</span></div>
+          <div style={LBL2}>BROKERAGE FEE <span style={{ color: "#2d4a3a" }}>(optional, same currency as above)</span></div>
           <input value={f.fees} onChange={e => set("fees", e.target.value)} type="number" placeholder="0.00" style={{ ...SML, width: "50%" }} />
         </div>
 
@@ -1159,15 +1214,15 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
           <div style={{ background: isBuy?"rgba(0,255,157,0.06)":"rgba(245,166,35,0.06)", border: `1px solid ${isBuy?"rgba(0,255,157,0.15)":"rgba(245,166,35,0.15)"}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 12, marginBottom: fees>0?4:0 }}>
               <span style={{ color: "#4a6655" }}>SUBTOTAL</span>
-              <span style={{ color: "#c8dfd1" }}>{fmtUSD(subtotal)}</span>
+              <span style={{ color: "#c8dfd1" }}>{CURRENCY_SYMBOLS[tradeCurrency] || ""}{subtotal.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
             </div>
             {fees > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 12, marginBottom: 4 }}>
               <span style={{ color: "#4a6655" }}>FEES</span>
-              <span style={{ color: "#ff6b6b" }}>+{fmtUSD(fees)}</span>
+              <span style={{ color: "#ff6b6b" }}>+{CURRENCY_SYMBOLS[tradeCurrency] || ""}{fees.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
             </div>}
             <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 13, borderTop: fees>0?"1px solid rgba(255,255,255,0.06)":"none", paddingTop: fees>0?4:0 }}>
               <span style={{ color: "#4a6655" }}>{isBuy?"TOTAL COST":"NET PROCEEDS"}</span>
-              <span style={{ color: accent, fontWeight: 800 }}>{fmtUSD(total)}</span>
+              <span style={{ color: accent, fontWeight: 800 }}>{CURRENCY_SYMBOLS[tradeCurrency] || ""}{total.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
             </div>
           </div>
         )}
@@ -1178,9 +1233,11 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
           <textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={2} placeholder={isBuy?"Why I bought this dip...":"Why I'm taking profit / cutting loss..."} style={{ ...SML, resize: "none", width: "100%" }} />
         </div>
 
-        <button onClick={() => onSave({ id: Date.now(), type: tradeType, symbol: f.symbol.toUpperCase().trim(), name: f.name, price: parseFloat(f.price)||0, units: parseFloat(f.units)||0, fees: parseFloat(f.fees)||0, date: f.date, notes: f.notes, total })}
-          style={{ width: "100%", background: C.surface, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.5 }}>
-          Log {tradeType}
+        {convertError && <div style={{ fontSize: 11, color: C.red, fontFamily: FONT, fontWeight: 300, marginBottom: 10 }}>{convertError}</div>}
+
+        <button onClick={handleSave} disabled={converting}
+          style={{ width: "100%", background: C.surface, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: converting ? "default" : "pointer", letterSpacing: 0.5, opacity: converting ? 0.6 : 1 }}>
+          {converting ? "Converting..." : `Log ${tradeType}`}
         </button>
       </div>
     </div>
