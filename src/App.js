@@ -65,7 +65,7 @@ const ONBOARDING_STEPS = [
 ];
 
 // ─── NAV DRAWER ──────────────────────────────────────────────────────────────
-function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding }) {
+function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker }) {
   if (!open) return null;
 
   const NavItem = ({ icon, label, active, badge, onClick, dim }) => (
@@ -118,6 +118,7 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
         {/* Secondary nav */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <NavItem icon="◌" label="Alerts" dim badge={alertCount} onClick={() => { setTab("watchlist"); onClose(); }} />
+          <NavItem icon="◎" label={`Currency · ${displayCurrency}`} dim onClick={() => { onOpenCurrencyPicker(); onClose(); }} />
           <NavItem icon="↻" label="Replay intro" dim onClick={() => { onRestartOnboarding(); onClose(); }} />
           <NavItem icon="ⓘ" label="About Accrue" dim onClick={() => {}} />
           <NavItem icon="✉" label="Help & feedback" dim onClick={() => {}} />
@@ -407,7 +408,30 @@ async function fetchLivePrices(symbols) {
 }
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
-const fmtUSD = (v, d = 2) => v == null || isNaN(v) ? "—" : "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+// ─── CURRENCY DISPLAY ENGINE ────────────────────────────────────────────────
+// USD is always the source of truth for all stored/calculated values.
+// This engine only affects DISPLAY — converts on the fly using live FX rates.
+const CURRENCY_SYMBOLS = { USD: "$", AUD: "A$", GBP: "£", EUR: "€", CAD: "C$", NZD: "NZ$", JPY: "¥", SGD: "S$", HKD: "HK$", CHF: "CHF ", INR: "₹", CNY: "¥" };
+const CURRENCY_NAMES = { USD: "US Dollar", AUD: "Australian Dollar", GBP: "British Pound", EUR: "Euro", CAD: "Canadian Dollar", NZD: "New Zealand Dollar", JPY: "Japanese Yen", SGD: "Singapore Dollar", HKD: "Hong Kong Dollar", CHF: "Swiss Franc", INR: "Indian Rupee", CNY: "Chinese Yuan" };
+
+// Module-level display state — set via setDisplayCurrency(), read via fmtUSD()
+let _displayCurrency = "USD";
+let _fxRates = {}; // { AUD: 1.52, EUR: 0.92, ... } — all relative to USD base
+function setDisplayCurrencyGlobals(currency, rates) {
+  _displayCurrency = currency || "USD";
+  _fxRates = rates || {};
+}
+
+const fmtUSD = (v, d = 2) => {
+  if (v == null || isNaN(v)) return "—";
+  let val = Number(v);
+  let symbol = CURRENCY_SYMBOLS.USD;
+  if (_displayCurrency !== "USD" && _fxRates[_displayCurrency]) {
+    val = val * _fxRates[_displayCurrency];
+    symbol = CURRENCY_SYMBOLS[_displayCurrency] || _displayCurrency + " ";
+  }
+  return symbol + Number(val).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+};
 const fmtPct = (v) => (v >= 0 ? "+" : "") + Number(v).toFixed(2) + "%";
 // ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
 const FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
@@ -1987,6 +2011,37 @@ export default function App() {
   };
 
   const [navOpen, setNavOpen] = useState(false);
+
+  // ── Display currency (USD is always source of truth; this only affects display)
+  const [displayCurrency, setDisplayCurrency] = useState(() => {
+    try { return localStorage.getItem("accrue_currency") || "USD"; } catch { return "USD"; }
+  });
+  const [fxRates, setFxRates] = useState({});
+  const [fxLoaded, setFxLoaded] = useState(false);
+
+  // Keep the module-level fmtUSD engine in sync with state on every render
+  setDisplayCurrencyGlobals(displayCurrency, fxRates);
+
+  const changeDisplayCurrency = (currency) => {
+    setDisplayCurrency(currency);
+    try { localStorage.setItem("accrue_currency", currency); } catch {}
+  };
+  const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
+
+  // Fetch FX rates once on load, and refresh every 12 hours while app is open
+  useEffect(() => {
+    const fetchFx = async () => {
+      try {
+        const res = await fetch("/api/fx-rates");
+        const data = await res.json();
+        if (data?.rates) setFxRates(data.rates);
+      } catch {}
+      setFxLoaded(true);
+    };
+    fetchFx();
+    const interval = setInterval(fetchFx, 12 * 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
   const restartOnboarding = () => {
     try { localStorage.removeItem("accrue_onboarded"); } catch {}
     setOnboarded(false);
@@ -2250,12 +2305,35 @@ export default function App() {
             </div>
           </div>
 
-          {/* Refresh + live status */}
-          <button onClick={() => refreshPrices()} disabled={liveStatus==="fetching"}
-            style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 6, padding: "7px 10px", fontSize: 13, fontFamily: FONT, cursor: liveStatus==="fetching"?"default":"pointer", display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
-            <span style={{ display: "inline-block", animation: liveStatus==="fetching"?"spin 1s linear infinite":"none" }}>↻</span>
-            <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* Currency toggle */}
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setCurrencyPickerOpen(o => !o)}
+                style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "7px 10px", fontSize: 11, fontFamily: MONO, fontWeight: 500, cursor: "pointer", marginTop: 2, letterSpacing: 1 }}>
+                {displayCurrency}
+              </button>
+              {currencyPickerOpen && (
+                <>
+                  <div onClick={() => setCurrencyPickerOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 350 }} />
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: 4, zIndex: 351, minWidth: 160, maxHeight: 280, overflowY: "auto" }}>
+                    {Object.keys(CURRENCY_SYMBOLS).map(cur => (
+                      <button key={cur} onClick={() => { changeDisplayCurrency(cur); setCurrencyPickerOpen(false); }}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: cur === displayCurrency ? "rgba(255,255,255,0.06)" : "transparent", border: "none", borderRadius: 6, padding: "8px 10px", cursor: "pointer", textAlign: "left" }}>
+                        <span style={{ fontSize: 12, fontFamily: FONT, fontWeight: 300, color: cur === displayCurrency ? C.text1 : C.text2 }}>{cur} <span style={{ color: C.text3, fontSize: 10 }}>{CURRENCY_NAMES[cur]}</span></span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Refresh + live status */}
+            <button onClick={() => refreshPrices()} disabled={liveStatus==="fetching"}
+              style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 6, padding: "7px 10px", fontSize: 13, fontFamily: FONT, cursor: liveStatus==="fetching"?"default":"pointer", display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
+              <span style={{ display: "inline-block", animation: liveStatus==="fetching"?"spin 1s linear infinite":"none" }}>↻</span>
+              <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+            </button>
+          </div>
         </div>
 
         {/* Divider with live status */}
@@ -2524,7 +2602,7 @@ export default function App() {
       }} onClose={() => setCashModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
-      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} />
+      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} />
     </div>}
     </>
   );
