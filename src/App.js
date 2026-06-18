@@ -2114,6 +2114,7 @@ export default function App() {
   const [alertModal, setAlertModal] = useState(null); // null | { symbol, currentPrice }
   const [triggeredAlerts, setTriggeredAlerts] = useState([]);
   const [stockFearGreed, setStockFearGreed] = useState(null); // { score, rating, previousClose, previousWeek, previousMonth }
+  const [vixData, setVixData] = useState(null); // { value, changePct, level, label }
 
   // ── Live price refresh
   const refreshPrices = async (wl) => {
@@ -2122,14 +2123,16 @@ export default function App() {
     setLiveStatus("fetching");
     const symbols = [...new Set(list.map(a => a.symbol))];
 
-    // Fetch prices + Crypto Fear & Greed + Stock Fear & Greed in parallel
-    const [prices, fgRes, stockFgRes] = await Promise.all([
+    // Fetch prices + Crypto Fear & Greed + Stock Fear & Greed + VIX in parallel
+    const [prices, fgRes, stockFgRes, vixRes] = await Promise.all([
       fetchLivePrices(symbols),
       fetch("https://api.alternative.me/fng/?limit=1").then(r => r.json()).catch(() => null),
       fetch("/api/stock-sentiment").then(r => r.json()).catch(() => null),
+      fetch("/api/vix").then(r => r.json()).catch(() => null),
     ]);
 
     if (stockFgRes && !stockFgRes.error) setStockFearGreed(stockFgRes);
+    if (vixRes && !vixRes.error) setVixData(vixRes);
 
     if (Object.keys(prices).length > 0) {
       // Apply live prices
@@ -2422,51 +2425,39 @@ export default function App() {
             ))}
           </div>
 
-          {/* Combined Fear & Greed card — crypto + stocks side by side */}
-          {(fearGreedData || stockFearGreed) && (() => {
+          {/* Combined Fear & Greed card — crypto + stocks + VIX side by side */}
+          {(fearGreedData || stockFearGreed || vixData) && (() => {
             const getColor = v => v <= 25 ? C.green : v <= 45 ? "rgba(74,222,128,0.6)" : v <= 55 ? C.text3 : v <= 75 ? C.amber : C.red;
             const getEmoji = v => v <= 25 ? "😨" : v <= 45 ? "😟" : v <= 55 ? "😐" : v <= 75 ? "😏" : "🤑";
+            // VIX uses an inverted scale — high VIX = fear (bad), low VIX = calm (good) — opposite framing from F&G's 0-100 scale
+            const vixColor = l => l === "panic" ? C.red : l === "elevated" ? C.amber : l === "calm" ? "rgba(74,222,128,0.6)" : C.green;
+            const vixEmoji = l => l === "panic" ? "😱" : l === "elevated" ? "😟" : l === "calm" ? "😐" : "😎";
+
+            const cols = [
+              fearGreedData && { key: "crypto", label: "CRYPTO", value: fearGreedData.value, sub: fearGreedData.label, color: getColor(fearGreedData.value), emoji: getEmoji(fearGreedData.value) },
+              stockFearGreed && { key: "stocks", label: "STOCKS", value: stockFearGreed.score, sub: (stockFearGreed.rating || "").replace(/\b\w/g, c => c.toUpperCase()) || "—", color: getColor(stockFearGreed.score), emoji: getEmoji(stockFearGreed.score) },
+              vixData && { key: "vix", label: "VIX", value: vixData.value, sub: vixData.label, color: vixColor(vixData.level), emoji: vixEmoji(vixData.level) },
+            ].filter(Boolean);
+
             return (
               <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
-                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>FEAR & GREED</div>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>MARKET SENTIMENT</div>
                 <div style={{ display: "flex", gap: 0 }}>
-                  {/* Crypto half */}
-                  {fearGreedData && (() => {
-                    const v = fearGreedData.value;
-                    return (
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 15 }}>{getEmoji(v)}</span>
-                        <div>
-                          <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1, marginBottom: 2 }}>CRYPTO</div>
+                  {cols.map((col, i) => (
+                    <React.Fragment key={col.key}>
+                      {i > 0 && <div style={{ width: 1, background: C.border, margin: "2px 12px" }} />}
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                        <span style={{ fontSize: 14 }}>{col.emoji}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1, marginBottom: 2 }}>{col.label}</div>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-                            <span style={{ fontSize: 20, fontWeight: 500, fontFamily: FONT, color: getColor(v), letterSpacing: -0.5 }}>{v}</span>
-                            <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO }}>{fearGreedData.label}</span>
+                            <span style={{ fontSize: 18, fontWeight: 500, fontFamily: FONT, color: col.color, letterSpacing: -0.5 }}>{col.value}</span>
+                            <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, whiteSpace: "nowrap" }}>{col.sub}</span>
                           </div>
                         </div>
                       </div>
-                    );
-                  })()}
-
-                  {/* Divider */}
-                  {fearGreedData && stockFearGreed && <div style={{ width: 1, background: C.border, margin: "2px 14px" }} />}
-
-                  {/* Stocks half */}
-                  {stockFearGreed && (() => {
-                    const v = stockFearGreed.score;
-                    const ratingLabel = (stockFearGreed.rating || "").replace(/\b\w/g, c => c.toUpperCase());
-                    return (
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 15 }}>{getEmoji(v)}</span>
-                        <div>
-                          <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1, marginBottom: 2 }}>STOCKS</div>
-                          <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-                            <span style={{ fontSize: 20, fontWeight: 500, fontFamily: FONT, color: getColor(v), letterSpacing: -0.5 }}>{v}</span>
-                            <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO }}>{ratingLabel || "—"}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                    </React.Fragment>
+                  ))}
                 </div>
               </div>
             );
