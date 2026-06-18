@@ -740,7 +740,7 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onA
     fetch("/api/sparkline", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol: asset.symbol, range: "1y" }),
+      body: JSON.stringify({ symbol: asset.symbol, range: "5y" }),
     })
       .then(r => r.json())
       .then(d => { if (d.points) setSparkData(d.points); })
@@ -803,9 +803,9 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onA
         <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }} onClick={e => e.stopPropagation()}>
           <PriceBar low52w={asset.low52w} high52w={asset.high52w} current={asset.currentPrice} ma200={asset.ma200} />
 
-          {/* Sparkline — 1 year price chart */}
+          {/* Sparkline — 5 year price chart */}
           <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>1 YEAR PRICE</div>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>5 YEAR PRICE</div>
             {sparkLoading && <div style={{ height: 60, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 10, color: C.text3, fontFamily: MONO }}>loading chart...</span></div>}
             {sparkData && !sparkLoading && (() => {
               const first = sparkData[0]?.v || 1;
@@ -821,12 +821,17 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onA
                         <stop offset="95%" stopColor={color} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={`url(#sg-${asset.symbol})`} dot={false} />
+                    <XAxis dataKey="t" hide />
+                    <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={`url(#sg-${asset.symbol})`} dot={false} isAnimationActive={false} />
                     <Tooltip
-                      contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
-                      labelStyle={{ display: "none" }}
+                      contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "6px 10px" }}
+                      labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO, marginBottom: 2 }}
                       itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
-                      formatter={v => [fmtUSD(v)]}
+                      labelFormatter={(t) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      formatter={(value) => {
+                        const n = Array.isArray(value) ? value[0] : value;
+                        return [fmtUSD(typeof n === "number" ? n : Number(n)), "Price"];
+                      }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
