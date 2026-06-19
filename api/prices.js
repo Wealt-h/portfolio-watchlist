@@ -15,16 +15,18 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: "No symbols provided" }), { status: 400 });
   }
 
-  const TICKER_MAP = {
-    BTC: "BTC-USD", ETH: "ETH-USD", SOL: "SOL-USD", DOGE: "DOGE-USD",
-    AMZN: "AMZN", HOOD: "HOOD", AAPL: "AAPL", MSFT: "MSFT",
-    NVDA: "NVDA", TSLA: "TSLA", GOOGL: "GOOGL", META: "META",
-  };
+  // Crypto tickers must be suffixed with -USD on Yahoo Finance, or they silently
+  // resolve to an unrelated listed equity that happens to share the same short ticker
+  // (e.g. plain "BTC" is a real stock, not Bitcoin). This list matches the full set
+  // of crypto tickers supported elsewhere in the app — keep in sync with sparkline.js
+  // and the CRYPTO_TICKERS constant in App.js.
+  const CRYPTO_TICKERS = ["BTC","ETH","SOL","DOGE","ADA","XRP","BNB","AVAX","MATIC","DOT","LINK","LTC","UNI","ATOM","NEAR","APT","SHIB","TRX","TON"];
 
   const results = {};
 
   await Promise.all(symbols.map(async (sym) => {
-    const ticker = TICKER_MAP[sym] || sym;
+    const symUpper = sym.toUpperCase();
+    const ticker = CRYPTO_TICKERS.includes(symUpper) ? `${symUpper}-USD` : sym;
     try {
       const res = await fetch(
         `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1m&range=1d`,
@@ -43,7 +45,7 @@ export default async function handler(req) {
         const prev = meta.chartPreviousClose || meta.previousClose;
         const change24h = prev ? (((price - prev) / prev) * 100) : 0;
         results[sym] = {
-          price: parseFloat(price.toFixed(sym === "BTC" || price > 1000 ? 2 : 2)),
+          price: parseFloat(price.toFixed(2)),
           change24h: parseFloat(change24h.toFixed(2))
         };
       }
