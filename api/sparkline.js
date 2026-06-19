@@ -7,6 +7,12 @@ export default async function handler(req, res) {
   const { symbol, range } = body;
   if (!symbol) return res.status(400).json({ error: "Missing symbol" });
 
+  // Crypto tickers must be suffixed with -USD on Yahoo Finance, or they silently
+  // resolve to an unrelated listed equity that happens to share the same short ticker
+  // (e.g. plain "BTC" is a real stock, not Bitcoin) — this caused wildly wrong prices.
+  const CRYPTO_TICKERS = ["BTC","ETH","SOL","DOGE","ADA","XRP","BNB","AVAX","MATIC","DOT","LINK","LTC","UNI","ATOM","NEAR","APT","SHIB","TRX","TON"];
+  const yahooSymbol = CRYPTO_TICKERS.includes(symbol.toUpperCase()) ? `${symbol.toUpperCase()}-USD` : symbol;
+
   // Validate against Yahoo's accepted range values to avoid passing through anything unexpected
   const validRanges = ["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"];
   const safeRange = validRanges.includes(range) ? range : "1mo";
@@ -22,7 +28,7 @@ export default async function handler(req, res) {
 
   try {
     const res2 = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=${safeRange}`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=${safeRange}`,
       { headers }
     );
     const data = await res2.json();
