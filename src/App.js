@@ -2033,10 +2033,6 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
         </div>
       )}
 
-      <div style={{ marginTop: 14 }} onClick={e => e.stopPropagation()}>
-        <button onClick={() => onAddTrade(symbol)} style={{ width: "100%", background: "transparent", border: `1px solid ${C.greenBorder}`, color: C.green, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>+ Trade</button>
-      </div>
-
       {/* Expanded detail */}
       {open && (
         <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }} onClick={e => e.stopPropagation()}>
@@ -2051,13 +2047,18 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
             ))}
           </div>
 
-          {/* Trade log tabs */}
-          <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-            {["summary","trades"].map(v => (
-              <button key={v} onClick={() => setView(v)} style={{ background: view===v?C.surface:"transparent", border:`1px solid ${view===v?C.borderHover:C.border}`, color:view===v?C.text1:C.text3, borderRadius:4, padding:"4px 14px", fontSize:10, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:0.3 }}>
-                {v.charAt(0).toUpperCase()+v.slice(1)}
-              </button>
-            ))}
+          {/* Trade log tabs + log trade */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 6 }}>
+              {["summary","trades"].map(v => (
+                <button key={v} onClick={() => setView(v)} style={{ background: view===v?C.surface:"transparent", border:`1px solid ${view===v?C.borderHover:C.border}`, color:view===v?C.text1:C.text3, borderRadius:4, padding:"4px 14px", fontSize:10, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:0.3 }}>
+                  {v.charAt(0).toUpperCase()+v.slice(1)}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => onAddTrade(symbol)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text3, borderRadius: 4, padding: "4px 14px", fontSize: 10, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.3 }}>
+              + Trade
+            </button>
           </div>
 
           {view === "trades" && (
