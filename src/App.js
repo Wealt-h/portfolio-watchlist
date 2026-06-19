@@ -726,7 +726,7 @@ function AlertModal({ symbol, currentPrice, alerts, onSave, onDelete, onClose })
 }
 
 // ─── WATCH CARD ───────────────────────────────────────────────────────────────
-function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onAlert, alertCount, onLogTrade }) {
+function WatchCard({ asset, onDelete, onNotesUpdate, onThesisUpdate, onAlert, alertCount, onLogTrade }) {
   const [open, setOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(null);
   const [aiError, setAiError] = useState(null);
@@ -913,7 +913,6 @@ function WatchCard({ asset, onEdit, onDelete, onNotesUpdate, onThesisUpdate, onA
               🔔{alertCount > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: C.amber, color: "#08090a", borderRadius: "50%", width: 14, height: 14, fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontWeight: 700 }}>{alertCount}</span>}
             </button>
             <button onClick={() => onLogTrade(asset.symbol)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.greenBorder}`, color: C.green, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>+ Trade</button>
-            <button onClick={() => onEdit(asset)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>Edit</button>
             <button onClick={() => onDelete(asset.id)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>Remove</button>
           </div>
         </div>
@@ -1186,6 +1185,9 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
+      <style>{`
+        input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+      `}</style>
       <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -1247,7 +1249,7 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
         {/* Units / Date */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
           <div><div style={LBL2}>UNITS</div><input value={f.units} onChange={e => set("units", e.target.value)} type="number" placeholder="0" style={SML} /></div>
-          <div><div style={LBL2}>DATE</div><input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark" }} /></div>
+          <div><div style={LBL2}>DATE</div><input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark", textAlign: "left" }} /></div>
         </div>
 
         {tradeCurrency !== "USD" && (
@@ -1316,6 +1318,9 @@ function EditTradeModal({ trade, onSave, onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }}>
+      <style>{`
+        input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+      `}</style>
       <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520 }}>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -1330,7 +1335,7 @@ function EditTradeModal({ trade, onSave, onClose }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
           <div><div style={LBL2}>PRICE ($)</div><input value={f.price} onChange={e => set("price", e.target.value)} type="number" style={SML} /></div>
           <div><div style={LBL2}>UNITS</div><input value={f.units} onChange={e => set("units", e.target.value)} type="number" style={SML} /></div>
-          <div><div style={LBL2}>DATE</div><input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark" }} /></div>
+          <div><div style={LBL2}>DATE</div><input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark", textAlign: "left" }} /></div>
         </div>
 
         <div style={{ marginBottom: 10 }}>
@@ -2028,6 +2033,10 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
         </div>
       )}
 
+      <div style={{ marginTop: 14 }} onClick={e => e.stopPropagation()}>
+        <button onClick={() => onAddTrade(symbol)} style={{ width: "100%", background: "transparent", border: `1px solid ${C.greenBorder}`, color: C.green, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5, textTransform: "uppercase" }}>+ Trade</button>
+      </div>
+
       {/* Expanded detail */}
       {open && (
         <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }} onClick={e => e.stopPropagation()}>
@@ -2576,7 +2585,7 @@ export default function App() {
 
           {filteredWatch.length === 0
             ? <div style={{ textAlign:"center", color:C.text3, fontFamily:FONT, fontWeight:300, fontSize:13, padding:"40px 0" }}>No assets match filter</div>
-            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onEdit={a => setWatchModal({asset:a})} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} onThesisUpdate={(id, thesis) => setWatchlist(w => w.map(x => x.id === id ? {...x, thesis} : x))} onAlert={(asset) => setAlertModal({ symbol: asset.symbol, currentPrice: asset.currentPrice })} alertCount={alerts.filter(al => al.symbol === a.symbol && !al.triggered).length} onLogTrade={(sym) => setTradeModal({ defaultType: "buy", symbol: sym })} />)
+            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} onThesisUpdate={(id, thesis) => setWatchlist(w => w.map(x => x.id === id ? {...x, thesis} : x))} onAlert={(asset) => setAlertModal({ symbol: asset.symbol, currentPrice: asset.currentPrice })} alertCount={alerts.filter(al => al.symbol === a.symbol && !al.triggered).length} onLogTrade={(sym) => setTradeModal({ defaultType: "buy", symbol: sym })} />)
           }
           <button onClick={() => setSearchModal(true)} style={{ width:"100%", marginTop:10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"16px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Add asset</button>
         </>
