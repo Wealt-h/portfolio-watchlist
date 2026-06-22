@@ -2221,7 +2221,7 @@ function PropertyCard({ property, onEdit, onDelete }) {
 }
 
 // ─── ANALYTICS CARD ──────────────────────────────────────────────────────────
-function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, isUp, total, chartData0, truePnl, totalCostBasisNow }) {
+function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, isUp, total, chartData0, truePnl, totalCostBasisNow, pnlHistory, pnlHistoryLoading }) {
   const [view, setView] = useState("chart"); // "chart" | "allocation"
 
   return (
@@ -2251,19 +2251,23 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
         </div>
       </div>
 
-      {/* P&L chart — starts at $0, shows gain/loss over time as bars */}
+      {/* P&L chart — real daily unrealised P&L over the last 90 days, from actual historical prices */}
       {view === "chart" && hasChart && (() => {
-        // Build chart showing P&L growing from $0 at first trade to truePnl now
-        const pnlData = chartData.map((d, i) => {
-          // Interpolate P&L from 0 to truePnl across the timeline
-          const progress = chartData.length > 1 ? i / (chartData.length - 1) : 1;
-          return { date: d.date, pnl: parseFloat((truePnl * progress).toFixed(2)) };
-        });
-        // Make sure last point is exact
-        if (pnlData.length > 0) pnlData[pnlData.length - 1].pnl = parseFloat(truePnl.toFixed(2));
-
+        const pnlData = pnlHistory || [];
+        // Keep the final bar exactly in sync with the live truePnl figure shown above the chart —
+        // pnlHistory's last point uses end-of-day historical close, truePnl uses live current price
+        if (pnlData.length > 0) pnlData[pnlData.length - 1] = { ...pnlData[pnlData.length - 1], pnl: parseFloat(truePnl.toFixed(2)) };
         const finalPnl = truePnl;
         const pnlColor = finalPnl >= 0 ? C.green : C.red;
+
+        if (pnlHistoryLoading && pnlData.length === 0) {
+          return (
+            <div style={{ height: 90, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 10, color: C.text3, fontFamily: MONO }}>loading price history...</span>
+            </div>
+          );
+        }
+
         return (
           <div>
             {/* Big P&L number */}
@@ -2275,23 +2279,32 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
                 {totalCostBasisNow > 0 ? ((truePnl / totalCostBasisNow) * 100).toFixed(2) : "0.00"}%
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={90}>
-              <BarChart data={pnlData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-                <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
-                  {pnlData.map((entry, i) => (
-                    <Cell key={i} fill={entry.pnl >= 0 ? C.green : C.red} fillOpacity={0.75} />
-                  ))}
-                </Bar>
-                <Tooltip
-                  contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
-                  labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
-                  itemStyle={{ color: pnlColor, fontSize: 11, fontFamily: MONO }}
-                  formatter={v => [`${v >= 0 ? "+" : ""}${fmtUSD(v)}`, "P&L"]}
-                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            {pnlData.length > 0 ? (
+              <>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 6 }}>LAST 90 DAYS</div>
+                <ResponsiveContainer width="100%" height={90}>
+                  <BarChart data={pnlData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
+                      {pnlData.map((entry, i) => (
+                        <Cell key={i} fill={entry.pnl >= 0 ? C.green : C.red} fillOpacity={0.75} />
+                      ))}
+                    </Bar>
+                    <Tooltip
+                      contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
+                      labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
+                      itemStyle={{ color: pnlColor, fontSize: 11, fontFamily: MONO }}
+                      formatter={v => [`${v >= 0 ? "+" : ""}${fmtUSD(v)}`, "P&L"]}
+                      cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </>
+            ) : (
+              <div style={{ textAlign: "center", color: C.text3, fontFamily: FONT, fontWeight: 300, fontSize: 12, padding: "20px 0", fontStyle: "italic" }}>
+                Price history unavailable right now
+              </div>
+            )}
           </div>
         );
       })()}
@@ -2333,6 +2346,26 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
 }
 
 // ─── POSITION HELPERS ────────────────────────────────────────────────────────
+// Same cost-basis/units-held math as calcPosition, but "as of" an arbitrary past date —
+// used to build the real daily P&L history chart instead of the old linear-interpolation fake.
+function calcPositionAsOf(trades, priceOnDate) {
+  const tradesUpTo = trades; // caller pre-filters to trades on or before the target date
+  const buys = tradesUpTo.filter(t => t.type === "buy");
+  const sells = tradesUpTo.filter(t => t.type === "sell");
+  const totalBuyUnits = buys.reduce((s,t) => s+t.units, 0);
+  const totalSellUnits = sells.reduce((s,t) => s+t.units, 0);
+  const unitsHeld = totalBuyUnits - totalSellUnits;
+  if (unitsHeld <= 0) return { unitsHeld: 0, costBasis: 0, currentValue: 0, unrealisedPnl: 0 };
+  const totalCostWithFees = buys.reduce((s,t) => s+(t.price*t.units)+(t.fees||0), 0);
+  const totalBuyUnitsForAvg = totalBuyUnits || 1;
+  const avgBuyPrice = buys.reduce((s,t) => s+t.price*t.units, 0) / totalBuyUnitsForAvg;
+  const totalFeesOnBuys = buys.reduce((s,t) => s+(t.fees||0), 0);
+  const costBasis = avgBuyPrice * unitsHeld + (unitsHeld/totalBuyUnitsForAvg)*totalFeesOnBuys;
+  const currentValue = (priceOnDate != null ? priceOnDate : avgBuyPrice) * unitsHeld;
+  const unrealisedPnl = currentValue - costBasis;
+  return { unitsHeld, costBasis, currentValue, unrealisedPnl };
+}
+
 function calcPosition(trades, currentPrice) {
   const buys = trades.filter(t => t.type === "buy");
   const sells = trades.filter(t => t.type === "sell");
@@ -2589,6 +2622,8 @@ export default function App() {
   const [fearGreedData, setFearGreedData] = useState(null); // { value, label }
   const [insightsPeriod, setInsightsPeriod] = useState("weekly"); // daily | weekly | monthly
   const [spyPeriodData, setSpyPeriodData] = useState({}); // { daily, weekly, monthly } each { pct }
+  const [pnlHistory, setPnlHistory] = useState([]); // [{ date, pnl }] — real daily unrealised P&L, last 90 days
+  const [pnlHistoryLoading, setPnlHistoryLoading] = useState(false);
   const [cashAccounts, setCashAccounts] = useState([]);
   const [cashLoaded, setCashLoaded] = useState(false);
   const [cashModal, setCashModal] = useState(null); // null | account object | "new"
@@ -2733,6 +2768,73 @@ export default function App() {
     fetchSpyPeriods();
   }, [tab]);
   useEffect(() => { if (loaded) save("pf_portfolio_v4", portfolio); }, [portfolio, loaded]);
+
+  // Build real day-by-day P&L history (last 90 days) for the Portfolio chart —
+  // replaces the old fake linear-interpolation chart with actual historical prices.
+  useEffect(() => {
+    if (tab !== "portfolio" || portfolio.length === 0) return;
+    const fetchPnlHistory = async () => {
+      setPnlHistoryLoading(true);
+      try {
+        const symbols = [...new Set(portfolio.map(t => t.symbol))];
+        // Fetch 3 months of daily price history per symbol (covers the 90-day window with margin)
+        const histories = await Promise.all(symbols.map(async (sym) => {
+          try {
+            const res = await fetch("/api/sparkline", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ symbol: sym, range: "3mo" }),
+            });
+            const data = await res.json();
+            return { symbol: sym, points: data.points || [] };
+          } catch {
+            return { symbol: sym, points: [] };
+          }
+        }));
+
+        // Build a lookup: symbol -> { "YYYY-MM-DD": closePrice }
+        const priceBySymbolDate = {};
+        histories.forEach(({ symbol, points }) => {
+          priceBySymbolDate[symbol] = {};
+          points.forEach(p => {
+            const dateStr = new Date(p.t).toISOString().slice(0, 10);
+            priceBySymbolDate[symbol][dateStr] = p.v;
+          });
+        });
+
+        // Walk the last 90 calendar days, computing real unrealised P&L across all positions
+        const today = new Date();
+        const days = 90;
+        const series = [];
+        let lastKnownPrice = {}; // carries forward over weekends/holidays when a symbol has no price that day
+
+        for (let i = days - 1; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          const dateStr = d.toISOString().slice(0, 10);
+
+          let totalPnl = 0;
+          symbols.forEach(sym => {
+            const tradesUpToDate = portfolio.filter(t => t.symbol === sym && t.date <= dateStr);
+            if (tradesUpToDate.length === 0) return;
+            const priceToday = priceBySymbolDate[sym]?.[dateStr];
+            if (priceToday != null) lastKnownPrice[sym] = priceToday;
+            const usePrice = lastKnownPrice[sym];
+            const pos = calcPositionAsOf(tradesUpToDate, usePrice);
+            totalPnl += pos.unrealisedPnl;
+          });
+
+          series.push({ date: dateStr.slice(5), pnl: parseFloat(totalPnl.toFixed(2)) });
+        }
+
+        setPnlHistory(series);
+      } catch (e) {
+        setPnlHistory([]);
+      }
+      setPnlHistoryLoading(false);
+    };
+    fetchPnlHistory();
+  }, [tab, portfolio]);
 
   // Load alerts
   useEffect(() => {
@@ -3045,6 +3147,8 @@ export default function App() {
                       chartData0={chartData[0]}
                       truePnl={totalUnrealisedPnl}
                       totalCostBasisNow={positionsCostBasis}
+                      pnlHistory={pnlHistory}
+                      pnlHistoryLoading={pnlHistoryLoading}
                     />
                   );
                 })()}
