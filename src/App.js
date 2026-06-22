@@ -557,15 +557,15 @@ const DARK_THEME = {
 };
 
 const LIGHT_THEME = {
-  bg:          "#f4f3ef",
+  bg:          "#eceae5",
   surface:     "#ffffff",
-  surfaceHigh: "#ececea",
-  border:      "rgba(20,20,18,0.12)",
-  borderHover: "rgba(20,20,18,0.22)",
+  surfaceHigh: "#e3e1da",
+  border:      "rgba(20,20,18,0.18)",
+  borderHover: "rgba(20,20,18,0.32)",
   borderAccent:"rgba(22,140,80,0.5)",
   text1:       "#1c1d1b",
-  text2:       "rgba(28,29,27,0.68)",
-  text3:       "rgba(28,29,27,0.42)",
+  text2:       "rgba(28,29,27,0.78)",
+  text3:       "rgba(28,29,27,0.58)",
   green:       "#3ddc84",
   greenDim:    "rgba(61,220,132,0.14)",
   greenBorder: "rgba(61,220,132,0.4)",
@@ -576,12 +576,12 @@ const LIGHT_THEME = {
   blueDim:     "rgba(147,197,253,0.12)",
   // Light-theme equivalents of the modal/card-specific dark tones above
   modalBg:     "#ffffff",
-  modalBg2:    "#f7f6f3",
-  modalBg3:    "#f4f3ef",
-  modalBg4:    "#f7f6f3",
-  modalBg5:    "#f4f3ef",
-  labelDim:    "rgba(28,29,27,0.4)",
-  labelMute:   "rgba(28,29,27,0.55)",
+  modalBg2:    "#f1efe9",
+  modalBg3:    "#eceae5",
+  modalBg4:    "#f1efe9",
+  modalBg5:    "#eceae5",
+  labelDim:    "rgba(28,29,27,0.55)",
+  labelMute:   "rgba(28,29,27,0.68)",
   textSoft:    "#1c1d1b",
   accentBuy:   "#0ba968",
   accentSell:  "#c97f12",
@@ -2722,7 +2722,7 @@ export default function App() {
   // Keep the iOS status bar tint and body background in sync when the theme changes
   // mid-session (not just on reload — index.html handles that part separately)
   useEffect(() => {
-    const bg = theme === "light" ? "#f4f3ef" : "#070c09";
+    const bg = theme === "light" ? "#eceae5" : "#070c09";
     try {
       const meta = document.getElementById("theme-color-meta") || document.querySelector('meta[name="theme-color"]');
       if (meta) meta.setAttribute("content", bg);
