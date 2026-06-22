@@ -1674,6 +1674,31 @@ function calcPropertyValue(property) {
   const netEquity = currentValue - loanPrincipalOwing;
   const totalCapitalGain = currentValue - purchasePrice;
 
+  // Project forward from today's balance to estimate the loan completion date —
+  // continue the same period-by-period amortization walk until the balance hits zero.
+  let estimatedPayoffDate = null;
+  let payoffNeverHappens = false;
+  if (originalLoan > 0 && repayment > 0 && loanPrincipalOwing > 0) {
+    const periodRate = rate / periodsPerYear;
+    const minViablePayment = loanPrincipalOwing * periodRate;
+    if (repayment <= minViablePayment) {
+      // Repayment doesn't even cover the interest accruing — balance would grow forever, not shrink
+      payoffNeverHappens = true;
+    } else {
+      let projBalance = loanPrincipalOwing;
+      let periodsToPayoff = 0;
+      const maxPeriods = periodsPerYear * 100; // 100-year safety cap, prevents any runaway loop
+      while (projBalance > 0 && periodsToPayoff < maxPeriods) {
+        const interestThisPeriod = projBalance * periodRate;
+        const principalThisPeriod = Math.max(0, repayment - interestThisPeriod);
+        projBalance = Math.max(0, projBalance - principalThisPeriod);
+        periodsToPayoff++;
+      }
+      const daysToPayoff = Math.round(periodsToPayoff * (365 / periodsPerYear));
+      estimatedPayoffDate = new Date(today.getTime() + daysToPayoff * 24 * 60 * 60 * 1000);
+    }
+  }
+
   // Daily cash flow — weekly figures divided down to a daily rate, matching how
   // cash interest accrues continuously rather than only on payment dates.
   const weeklyRent = property.weeklyRent || 0;
@@ -1694,7 +1719,7 @@ function calcPropertyValue(property) {
     currentValue, purchasePrice, loanPrincipalOwing, netEquity, totalCapitalGain,
     dailyRent, dailyCosts, dailyInterestCost, dailyNetCashFlow,
     weeklyNetCashFlow, annualNetCashFlow, accruedNetCashFlow,
-    daysSinceAdded, periodsElapsed,
+    daysSinceAdded, periodsElapsed, estimatedPayoffDate, payoffNeverHappens,
   };
 }
 
@@ -1942,10 +1967,15 @@ function PropertyModal({ property, onSave, onClose }) {
                 ["Loan owing", fmtUSD(preview.loanPrincipalOwing)],
                 ["Weekly cash flow", `${preview.weeklyNetCashFlow>=0?"+":""}${fmtUSD(preview.weeklyNetCashFlow)}`],
                 ["Annual cash flow", `${preview.annualNetCashFlow>=0?"+":""}${fmtUSD(preview.annualNetCashFlow)}`],
+                ...((parseFloat(f.loanPrincipal) || 0) > 0 ? [["Est. payoff date", preview.payoffNeverHappens
+                  ? "Won't pay off at this rate"
+                  : preview.estimatedPayoffDate
+                    ? preview.estimatedPayoffDate.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                    : "—"]] : []),
               ].map(([l, v]) => (
                 <div key={l}>
                   <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2 }}>{l.toUpperCase()}</div>
-                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 13, color: l.includes("cash flow") ? (preview.weeklyNetCashFlow>=0?C.green:C.red) : C.text1 }}>{v}</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 13, color: l === "Est. payoff date" && preview.payoffNeverHappens ? C.red : (l.includes("cash flow") ? (preview.weeklyNetCashFlow>=0?C.green:C.red) : C.text1) }}>{v}</div>
                 </div>
               ))}
             </div>
@@ -2160,13 +2190,18 @@ function PropertyCard({ property, onEdit, onDelete }) {
               ...(hasLoan ? [
                 ["Loan owing", fmtUSD(calc.loanPrincipalOwing)],
                 ["Interest rate", `${property.interestRate}% p.a.`],
+                ["Est. payoff date", calc.payoffNeverHappens
+                  ? "Won't pay off at this rate"
+                  : calc.estimatedPayoffDate
+                    ? calc.estimatedPayoffDate.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                    : "—"],
               ] : []),
               ["Accrued P&L since added", `${calc.accruedNetCashFlow>=0?"+":""}${fmtUSD(calc.accruedNetCashFlow)}`],
               ["Annual cash flow", `${calc.annualNetCashFlow>=0?"+":""}${fmtUSD(calc.annualNetCashFlow)}`],
             ].map(([l, v]) => (
               <div key={l}>
                 <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2, textTransform: "uppercase" }}>{l}</div>
-                <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 13, color: C.text2 }}>{v}</div>
+                <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 13, color: l === "Est. payoff date" && calc.payoffNeverHappens ? C.red : C.text2 }}>{v}</div>
               </div>
             ))}
           </div>
