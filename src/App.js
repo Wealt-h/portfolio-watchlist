@@ -1646,14 +1646,11 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
 
             // Build ranked list — all assets + cash + S&P benchmark, all sorted together
             const allItems = [
-              ...positionSummaries.map(({sym, pos}) => {
-                const asset = watchlist.find(a => a.symbol === sym);
-                return { sym, type: asset?.type || "stock", pct: pos.unrealisedPct, pnl: pos.unrealisedPnl, isBenchmark: false };
+              ...periodPerformers.map(p => {
+                const asset = watchlist.find(a => a.symbol === p.sym);
+                return { sym: p.sym, type: asset?.type || "stock", pct: p.pct, pnl: p.pnl, isBenchmark: false };
               }),
-              ...(cashAccounts || []).map(a => {
-                const c = calcCashValue(a);
-                return { sym: a.institution, type: "cash", pct: a.principal > 0 ? (c.accruedInterest / a.principal) * 100 : 0, pnl: c.accruedInterest, isBenchmark: false };
-              }),
+              ...cashPeriodPerformers.map(p => ({ sym: p.sym, type: "cash", pct: p.pct, pnl: p.pnl, isBenchmark: false })),
               ...(spyChange !== null ? [{ sym: "S&P 500", type: "index", pct: spyChange, pnl: null, isBenchmark: true }] : []),
             ];
             const ranked = allItems.sort((a, b) => rankView === "pct" ? b.pct - a.pct : b.pnl - a.pnl);
