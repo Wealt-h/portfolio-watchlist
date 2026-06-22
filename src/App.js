@@ -1636,6 +1636,69 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
 }
 
 // ─── CASH HELPERS ────────────────────────────────────────────────────────────
+// ─── PROPERTY CALCULATION ENGINE ───────────────────────────────────────────────
+// Amortization: figures out today's loan balance given the original principal,
+// rate, repayment amount/frequency, and how much time has passed since the loan
+// started. Each payment period, interest accrues on the current balance, and
+// whatever's left of the payment after interest reduces the principal.
+function calcPropertyValue(property) {
+  const purchasePrice = property.purchasePrice || 0;
+  const currentValue = property.currentValue || purchasePrice;
+  const originalLoan = property.loanPrincipal || 0;
+  const rate = (property.interestRate || 0) / 100;
+  const repayment = property.repaymentAmount || 0;
+  const freq = property.repaymentFrequency || "monthly"; // weekly | fortnightly | monthly
+  const periodsPerYear = freq === "weekly" ? 52 : freq === "fortnightly" ? 26 : 12;
+  const startDate = new Date(property.loanStartDate || property.purchaseDate || Date.now());
+  const today = new Date();
+  const daysElapsed = Math.max(0, Math.floor((today - startDate) / (1000 * 60 * 60 * 24)));
+  const periodsElapsed = Math.floor(daysElapsed / (365 / periodsPerYear));
+
+  // Walk the amortization schedule forward period-by-period to find today's balance.
+  // (A closed-form formula exists, but the iterative walk is simpler to verify and
+  // naturally floors the balance at 0 if the loan would already be paid off.)
+  let balance = originalLoan;
+  if (originalLoan > 0 && repayment > 0) {
+    const periodRate = rate / periodsPerYear;
+    for (let i = 0; i < periodsElapsed && balance > 0; i++) {
+      const interestThisPeriod = balance * periodRate;
+      const principalThisPeriod = Math.max(0, repayment - interestThisPeriod);
+      balance = Math.max(0, balance - principalThisPeriod);
+    }
+  } else if (originalLoan > 0 && repayment === 0) {
+    // No repayment entered yet — balance stays at original principal (interest-only view)
+    balance = originalLoan;
+  }
+
+  const loanPrincipalOwing = balance;
+  const netEquity = currentValue - loanPrincipalOwing;
+  const totalCapitalGain = currentValue - purchasePrice;
+
+  // Daily cash flow — weekly figures divided down to a daily rate, matching how
+  // cash interest accrues continuously rather than only on payment dates.
+  const weeklyRent = property.weeklyRent || 0;
+  const weeklyCosts = property.weeklyCosts || 0;
+  const dailyInterestCost = (loanPrincipalOwing * rate) / 365;
+  const dailyRent = weeklyRent / 7;
+  const dailyCosts = weeklyCosts / 7;
+  const dailyNetCashFlow = dailyRent - dailyCosts - dailyInterestCost;
+  const weeklyNetCashFlow = dailyNetCashFlow * 7;
+  const annualNetCashFlow = dailyNetCashFlow * 365;
+
+  // Accrued net cash flow since the property was added — this is what folds into realised P&L
+  const propertyAddedDate = new Date(property.dateAdded || property.purchaseDate || Date.now());
+  const daysSinceAdded = Math.max(0, Math.floor((today - propertyAddedDate) / (1000 * 60 * 60 * 24)));
+  const accruedNetCashFlow = dailyNetCashFlow * daysSinceAdded;
+
+  return {
+    currentValue, purchasePrice, loanPrincipalOwing, netEquity, totalCapitalGain,
+    dailyRent, dailyCosts, dailyInterestCost, dailyNetCashFlow,
+    weeklyNetCashFlow, annualNetCashFlow, accruedNetCashFlow,
+    daysSinceAdded, periodsElapsed,
+  };
+}
+
+
 function calcCashValue(account) {
   const principal = account.principal || 0;
   const rate = (account.rate || 0) / 100;
@@ -1750,6 +1813,158 @@ function CashModal({ account, onSave, onClose }) {
   );
 }
 
+// ─── PROPERTY MODAL ─────────────────────────────────────────────────────────────
+function PropertyModal({ property, onSave, onClose }) {
+  const blank = {
+    name: "", purchasePrice: "", currentValue: "", purchaseDate: new Date().toISOString().slice(0,10),
+    loanPrincipal: "", interestRate: "", repaymentAmount: "", repaymentFrequency: "monthly", loanStartDate: new Date().toISOString().slice(0,10),
+    weeklyRent: "", weeklyCosts: "", notes: "",
+  };
+  const [f, setF] = useState(() => {
+    if (property && property !== "new") {
+      return {
+        ...blank, ...property,
+        purchasePrice: property.purchasePrice?.toString() ?? "",
+        currentValue: property.currentValue?.toString() ?? "",
+        loanPrincipal: property.loanPrincipal?.toString() ?? "",
+        interestRate: property.interestRate?.toString() ?? "",
+        repaymentAmount: property.repaymentAmount?.toString() ?? "",
+        weeklyRent: property.weeklyRent?.toString() ?? "",
+        weeklyCosts: property.weeklyCosts?.toString() ?? "",
+      };
+    }
+    return blank;
+  });
+  const set = (k, v) => setF(p => ({ ...p, [k]: v }));
+  const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
+  const LBL2 = { ...LBL, marginBottom: 3 };
+  const hasLoan = parseFloat(f.loanPrincipal) > 0;
+
+  const preview = f.currentValue ? calcPropertyValue({
+    purchasePrice: parseFloat(f.purchasePrice) || 0,
+    currentValue: parseFloat(f.currentValue) || 0,
+    loanPrincipal: parseFloat(f.loanPrincipal) || 0,
+    interestRate: parseFloat(f.interestRate) || 0,
+    repaymentAmount: parseFloat(f.repaymentAmount) || 0,
+    repaymentFrequency: f.repaymentFrequency,
+    loanStartDate: f.loanStartDate,
+    purchaseDate: f.purchaseDate,
+    dateAdded: property?.dateAdded || f.purchaseDate,
+    weeklyRent: parseFloat(f.weeklyRent) || 0,
+    weeklyCosts: parseFloat(f.weeklyCosts) || 0,
+  }) : null;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "90vh", overflowY: "auto" }}>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 15, color: C.text1 }}>
+            {property && property !== "new" ? "Edit Property" : "Add Property"}
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          <div style={LBL2}>PROPERTY NAME</div>
+          <input value={f.name} onChange={e => set("name", e.target.value)} placeholder="123 Smith St" style={SML} />
+        </div>
+
+        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>VALUE & PURCHASE</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+          <div>
+            <div style={LBL2}>PURCHASE PRICE ($)</div>
+            <input value={f.purchasePrice} onChange={e => set("purchasePrice", e.target.value)} type="number" placeholder="650000" style={SML} />
+          </div>
+          <div>
+            <div style={LBL2}>CURRENT VALUE ($)</div>
+            <input value={f.currentValue} onChange={e => set("currentValue", e.target.value)} type="number" placeholder="720000" style={SML} />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={LBL2}>PURCHASE DATE</div>
+            <input value={f.purchaseDate} onChange={e => set("purchaseDate", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark" }} />
+          </div>
+        </div>
+
+        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>LOAN (leave blank if paid off)</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+          <div>
+            <div style={LBL2}>LOAN PRINCIPAL ($)</div>
+            <input value={f.loanPrincipal} onChange={e => set("loanPrincipal", e.target.value)} type="number" placeholder="0" style={SML} />
+          </div>
+          <div>
+            <div style={LBL2}>INTEREST RATE (% P.A.)</div>
+            <input value={f.interestRate} onChange={e => set("interestRate", e.target.value)} type="number" placeholder="6.20" style={SML} />
+          </div>
+          <div>
+            <div style={LBL2}>REPAYMENT AMOUNT ($)</div>
+            <input value={f.repaymentAmount} onChange={e => set("repaymentAmount", e.target.value)} type="number" placeholder="2400" style={SML} />
+          </div>
+          <div>
+            <div style={LBL2}>FREQUENCY</div>
+            <select value={f.repaymentFrequency} onChange={e => set("repaymentFrequency", e.target.value)} style={{ ...SML, background: C.surfaceHigh }}>
+              <option value="weekly">Weekly</option>
+              <option value="fortnightly">Fortnightly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={LBL2}>LOAN START DATE</div>
+            <input value={f.loanStartDate} onChange={e => set("loanStartDate", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark" }} />
+          </div>
+        </div>
+
+        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>RENTAL INCOME</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+          <div>
+            <div style={LBL2}>WEEKLY RENT ($)</div>
+            <input value={f.weeklyRent} onChange={e => set("weeklyRent", e.target.value)} type="number" placeholder="650" style={SML} />
+          </div>
+          <div>
+            <div style={LBL2}>WEEKLY COSTS ($) <span style={{ color: "#2d4a3a" }}>rates, strata, etc.</span></div>
+            <input value={f.weeklyCosts} onChange={e => set("weeklyCosts", e.target.value)} type="number" placeholder="80" style={SML} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <div style={LBL2}>NOTES (optional)</div>
+          <input value={f.notes} onChange={e => set("notes", e.target.value)} placeholder="e.g. Tenant lease renews March" style={SML} />
+        </div>
+
+        {/* Live preview */}
+        {preview && (
+          <div style={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>PREVIEW</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {[
+                ["Net equity", fmtUSD(preview.netEquity)],
+                ["Loan owing", fmtUSD(preview.loanPrincipalOwing)],
+                ["Weekly cash flow", `${preview.weeklyNetCashFlow>=0?"+":""}${fmtUSD(preview.weeklyNetCashFlow)}`],
+                ["Annual cash flow", `${preview.annualNetCashFlow>=0?"+":""}${fmtUSD(preview.annualNetCashFlow)}`],
+              ].map(([l, v]) => (
+                <div key={l}>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2 }}>{l.toUpperCase()}</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 13, color: l.includes("cash flow") ? (preview.weeklyNetCashFlow>=0?C.green:C.red) : C.text1 }}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button onClick={() => onSave({
+          ...f, id: property?.id || Date.now(), dateAdded: property?.dateAdded || new Date().toISOString().slice(0,10),
+          purchasePrice: parseFloat(f.purchasePrice) || 0, currentValue: parseFloat(f.currentValue) || 0,
+          loanPrincipal: parseFloat(f.loanPrincipal) || 0, interestRate: parseFloat(f.interestRate) || 0,
+          repaymentAmount: parseFloat(f.repaymentAmount) || 0, weeklyRent: parseFloat(f.weeklyRent) || 0, weeklyCosts: parseFloat(f.weeklyCosts) || 0,
+        })}
+          style={{ width: "100%", background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>
+          {property && property !== "new" ? "Save changes" : "Add property"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── CASH CARD ────────────────────────────────────────────────────────────────
 function CashCard({ account, onEdit, onDelete, onAddCash }) {
   const [open, setOpen] = useState(false);
@@ -1851,6 +2066,117 @@ function CashCard({ account, onEdit, onDelete, onAddCash }) {
             <button onClick={() => onAddCash(account)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.greenBorder}`, color: C.green, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>+ Add cash</button>
             <button onClick={() => onEdit(account)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Edit</button>
             <button onClick={() => onDelete(account.id)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Remove</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PROPERTY CARD ──────────────────────────────────────────────────────────────
+function PropertyCard({ property, onEdit, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const calc = calcPropertyValue(property);
+  const hasLoan = (property.loanPrincipal || 0) > 0;
+  const cashFlowPositive = calc.weeklyNetCashFlow >= 0;
+
+  return (
+    <div onClick={() => setOpen(!open)}
+      style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${open ? C.borderAccent : C.borderHover}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `2px solid ${C.green}` : `1px solid ${C.borderHover}`, transition: "all 0.2s" }}>
+
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: C.greenDim, border: `1px solid ${C.greenBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+            🏠
+          </div>
+          <div>
+            <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 15, color: C.text1 }}>{property.name}</div>
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginTop: 1 }}>
+              {hasLoan ? `${fmtUSD(calc.loanPrincipalOwing)} owing` : "Paid off"}
+            </div>
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.text1 }}>{fmtUSD(calc.netEquity)}</div>
+          <div style={{ fontSize: 11, color: C.text3, fontFamily: MONO, marginTop: 1 }}>net equity</div>
+          <div style={{ fontSize: 11, color: cashFlowPositive ? C.green : C.red, fontFamily: MONO, marginTop: 3 }}>
+            {cashFlowPositive ? "+" : ""}{fmtUSD(calc.weeklyNetCashFlow)}/wk
+          </div>
+        </div>
+      </div>
+
+      {/* Key stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginTop: 14 }}>
+        {[
+          ["Current value", fmtUSD(calc.currentValue)],
+          ["Capital gain", `${calc.totalCapitalGain>=0?"+":""}${fmtUSD(calc.totalCapitalGain)}`],
+          ["Weekly rent", fmtUSD(property.weeklyRent || 0)],
+        ].map(([l, v]) => (
+          <div key={l}>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 3, textTransform: "uppercase" }}>{l}</div>
+            <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 13, color: l === "Capital gain" ? (calc.totalCapitalGain>=0?C.green:C.red) : C.text2 }}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Expanded */}
+      {open && (
+        <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }} onClick={e => e.stopPropagation()}>
+
+          {/* Cash flow breakdown */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>WEEKLY CASH FLOW</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 12 }}>
+                <span style={{ color: C.text3 }}>Rental income</span>
+                <span style={{ color: C.green }}>+{fmtUSD(property.weeklyRent || 0)}</span>
+              </div>
+              {hasLoan && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 12 }}>
+                  <span style={{ color: C.text3 }}>Loan interest</span>
+                  <span style={{ color: C.red }}>-{fmtUSD(calc.dailyInterestCost * 7)}</span>
+                </div>
+              )}
+              {(property.weeklyCosts || 0) > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 12 }}>
+                  <span style={{ color: C.text3 }}>Running costs</span>
+                  <span style={{ color: C.red }}>-{fmtUSD(property.weeklyCosts)}</span>
+                </div>
+              )}
+              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 13, borderTop: `1px solid ${C.border}`, paddingTop: 6, marginTop: 2 }}>
+                <span style={{ color: C.text2 }}>Net</span>
+                <span style={{ color: cashFlowPositive ? C.green : C.red, fontWeight: 700 }}>{cashFlowPositive?"+":""}{fmtUSD(calc.weeklyNetCashFlow)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Extended stats */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+            {[
+              ["Purchase price", fmtUSD(calc.purchasePrice)],
+              ["Purchase date", property.purchaseDate],
+              ...(hasLoan ? [
+                ["Loan owing", fmtUSD(calc.loanPrincipalOwing)],
+                ["Interest rate", `${property.interestRate}% p.a.`],
+              ] : []),
+              ["Accrued P&L since added", `${calc.accruedNetCashFlow>=0?"+":""}${fmtUSD(calc.accruedNetCashFlow)}`],
+              ["Annual cash flow", `${calc.annualNetCashFlow>=0?"+":""}${fmtUSD(calc.annualNetCashFlow)}`],
+            ].map(([l, v]) => (
+              <div key={l}>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 2, textTransform: "uppercase" }}>{l}</div>
+                <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 13, color: C.text2 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+
+          {property.notes && (
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, fontStyle: "italic", marginBottom: 12 }}>{property.notes}</div>
+          )}
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => onEdit(property)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Edit</button>
+            <button onClick={() => onDelete(property.id)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Remove</button>
           </div>
         </div>
       )}
@@ -2230,6 +2556,9 @@ export default function App() {
   const [cashAccounts, setCashAccounts] = useState([]);
   const [cashLoaded, setCashLoaded] = useState(false);
   const [cashModal, setCashModal] = useState(null); // null | account object | "new"
+  const [properties, setProperties] = useState([]);
+  const [propertiesLoaded, setPropertiesLoaded] = useState(false);
+  const [propertyModal, setPropertyModal] = useState(null); // null | property object | "new"
   const [alerts, setAlerts] = useState([]);
   const [alertsLoaded, setAlertsLoaded] = useState(false);
   const [alertModal, setAlertModal] = useState(null); // null | { symbol, currentPrice }
@@ -2386,6 +2715,15 @@ export default function App() {
     })();
   }, []);
   useEffect(() => { if (cashLoaded) save("pf_cash_v1", cashAccounts); }, [cashAccounts, cashLoaded]);
+
+  // Load properties
+  useEffect(() => {
+    (async () => {
+      const p = await load("pf_properties_v1", []);
+      setProperties(p); setPropertiesLoaded(true);
+    })();
+  }, []);
+  useEffect(() => { if (propertiesLoaded) save("pf_properties_v1", properties); }, [properties, propertiesLoaded]);
 
   const saveWatch = (form) => {
     if (watchModal?.asset) setWatchlist(w => w.map(x => x.id === watchModal.asset.id ? { ...form, id: x.id } : x));
@@ -2698,6 +3036,21 @@ export default function App() {
             </div>
           )}
 
+          {/* Investment properties */}
+          {properties.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10, marginTop: 4 }}>INVESTMENT PROPERTIES</div>
+              {properties.map(p => (
+                <PropertyCard key={p.id} property={p}
+                  onEdit={p => setPropertyModal(p)}
+                  onDelete={id => setProperties(ps => ps.filter(x => x.id !== id))}
+                />
+              ))}
+            </div>
+          )}
+
+          <button onClick={() => setPropertyModal("new")} style={{ width: "100%", marginTop: 10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Add property</button>
+
           <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ width: "100%", marginTop: 10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Log trade</button>
         </>
       )}
@@ -2762,6 +3115,11 @@ export default function App() {
         }
         setCashModal(null);
       }} onClose={() => setCashModal(null)} />}
+      {propertyModal !== null && <PropertyModal property={propertyModal} onSave={p => {
+        if (propertyModal === "new") setProperties(ps => [...ps, p]);
+        else setProperties(ps => ps.map(x => x.id === p.id ? p : x));
+        setPropertyModal(null);
+      }} onClose={() => setPropertyModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
       <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} />
