@@ -1366,11 +1366,73 @@ function EditTradeModal({ trade, onSave, onClose }) {
 }
 
 // ─── INSIGHTS TAB ────────────────────────────────────────────────────────────
-function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyPeriodData, getLivePrice, cashAccounts }) {
+function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyPeriodData, getLivePrice, cashAccounts, priceHistoryBySymbol, priceHistoryLoading }) {
 
   // Period days mapping
   const periodDays = { daily: 1, weekly: 7, monthly: 30 };
   const days = periodDays[period];
+
+  // Look up a symbol's price N days ago, walking backward up to 5 days to cover
+  // weekends/holidays when the market was closed (same approach used for the
+  // Portfolio tab's historical P&L chart).
+  const getPriceDaysAgo = (sym, daysAgo) => {
+    const hist = priceHistoryBySymbol?.[sym];
+    if (!hist) return null;
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    for (let i = 0; i < 6; i++) {
+      const dateStr = d.toISOString().slice(0, 10);
+      if (hist[dateStr] != null) return hist[dateStr];
+      d.setDate(d.getDate() - 1);
+    }
+    return null;
+  };
+
+  const hasHistory = priceHistoryBySymbol && Object.keys(priceHistoryBySymbol).length > 0;
+
+  // Per-position period change — units held now valued at (price now) vs (price N days ago).
+  // Falls back to all-time unrealised P&L for a symbol if no historical price is available yet,
+  // so the page still shows sensible numbers while history is loading rather than zeroing out.
+  const periodPerformers = positionSummaries.map(({ sym, pos }) => {
+    const priceNow = getLivePrice ? getLivePrice(sym) : null;
+    const priceAgo = getPriceDaysAgo(sym, days);
+    if (priceAgo != null && priceNow != null && pos.unitsHeld > 0) {
+      const valueNow = priceNow * pos.unitsHeld;
+      const valueAgo = priceAgo * pos.unitsHeld;
+      const periodPnl = valueNow - valueAgo;
+      const periodPct = valueAgo > 0 ? (periodPnl / valueAgo) * 100 : 0;
+      return { sym, pct: periodPct, pnl: periodPnl };
+    }
+    // No historical price yet — fall back to all-time figures rather than showing nothing
+    return { sym, pct: pos.unrealisedPct, pnl: pos.unrealisedPnl };
+  });
+
+  // Cash accounts: interest accrued specifically within the period (not all-time)
+  const cashPeriodPerformers = (cashAccounts || []).map(a => {
+    const calcNow = calcCashValue(a);
+    const startDate = new Date(a.startDate);
+    const daysRunningNow = Math.max(0, Math.floor((new Date() - startDate) / (1000*60*60*24)));
+    const daysRunningAgo = Math.max(0, daysRunningNow - days);
+    const rate = (a.rate || 0) / 100;
+    const valueAgo = a.principal * Math.pow(1 + rate/365, daysRunningAgo);
+    const periodInterest = calcNow.currentValue - valueAgo;
+    const periodPct = valueAgo > 0 ? (periodInterest / valueAgo) * 100 : 0;
+    return { sym: a.institution, pct: periodPct, pnl: periodInterest };
+  });
+
+  // Overall period P&L — real change in value over the selected window, not all-time P&L
+  const totalPeriodPnl = periodPerformers.reduce((s, p) => s + p.pnl, 0) + cashPeriodPerformers.reduce((s, p) => s + p.pnl, 0);
+  const periodValueAgoTotal = positionSummaries.reduce((s, {sym, pos}) => {
+    const priceAgo = getPriceDaysAgo(sym, days);
+    return s + (priceAgo != null ? priceAgo * pos.unitsHeld : pos.costBasis);
+  }, 0) + (cashAccounts || []).reduce((s, a) => {
+    const startDate = new Date(a.startDate);
+    const daysRunningNow = Math.max(0, Math.floor((new Date() - startDate) / (1000*60*60*24)));
+    const daysRunningAgo = Math.max(0, daysRunningNow - days);
+    const rate = (a.rate || 0) / 100;
+    return s + a.principal * Math.pow(1 + rate/365, daysRunningAgo);
+  }, 0);
+  const totalPeriodPnlPct = periodValueAgoTotal > 0 ? (totalPeriodPnl / periodValueAgoTotal) * 100 : 0;
 
   // Filter trades within period
   const cutoff = new Date();
@@ -1383,23 +1445,20 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   const cashTotalPrincipal = (cashAccounts || []).reduce((s, a) => s + a.principal, 0);
   const totalInvested = positionSummaries.reduce((s, {pos}) => s + pos.costBasis, 0) + cashTotalPrincipal;
   const totalValue = positionSummaries.reduce((s, {pos}) => s + pos.currentValue, 0) + cashTotalValue;
-  const totalPnl = totalValue - totalInvested;
-  const totalPnlPct = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
+  const totalPnl = totalPeriodPnl;
+  const totalPnlPct = totalPeriodPnlPct;
 
-  // Best / worst performer — includes cash accounts
+  // Best / worst performer — now reflects the selected period's actual change, not all-time
   const performers = [
-    ...positionSummaries.map(({sym, pos}) => ({ sym, pct: pos.unrealisedPct, pnl: pos.unrealisedPnl })),
-    ...(cashAccounts || []).map(a => {
-      const c = calcCashValue(a);
-      return { sym: a.institution, pct: a.principal > 0 ? (c.accruedInterest / a.principal) * 100 : 0, pnl: c.accruedInterest };
-    }),
+    ...periodPerformers,
+    ...cashPeriodPerformers,
   ].sort((a, b) => b.pct - a.pct);
   const best = performers[0] || null;
   const worst = performers[performers.length - 1] || null;
 
-  // Win rate — includes cash (cash always counts as a "win" since it only accrues, never loses)
+  // Win rate — now reflects how many holdings were up over the selected period specifically
   const totalHoldings = positionSummaries.length + (cashAccounts?.length || 0);
-  const winners = positionSummaries.filter(({pos}) => pos.unrealisedPnl > 0).length + (cashAccounts?.length || 0);
+  const winners = periodPerformers.filter(p => p.pnl > 0).length + cashPeriodPerformers.filter(p => p.pnl > 0).length;
   const winRate = totalHoldings > 0 ? (winners / totalHoldings) * 100 : 0;
 
   // Asset class breakdown — include cash
@@ -1454,7 +1513,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   return (
     <div>
       {/* Period toggle */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
         {["daily","weekly","monthly"].map(p => (
           <button key={p} onClick={() => setPeriod(p)}
             style={{ flex: 1, background: period===p?C.surfaceHigh:"transparent", border: `1px solid ${period===p?C.borderHover:C.border}`, color: period===p?C.text1:C.text3, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: FONT, fontWeight: period===p?500:300, cursor: "pointer", letterSpacing: 0.3, textTransform: "capitalize" }}>
@@ -1462,6 +1521,11 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
           </button>
         ))}
       </div>
+      {priceHistoryLoading && !hasHistory && (
+        <div style={{ fontSize: 10, color: C.text3, fontFamily: FONT, fontWeight: 300, fontStyle: "italic", marginBottom: 12 }}>
+          Loading historical prices — figures below will refine once ready
+        </div>
+      )}
 
       {positionSummaries.length === 0 && cashAccounts.length === 0 ? (
         <div style={{ textAlign: "center", color: C.text3, fontFamily: FONT, fontWeight: 300, fontSize: 13, padding: "60px 0" }}>
@@ -1471,14 +1535,14 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
         <>
           {/* Overall P&L */}
           <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
-            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>OVERALL P&L</div>
+            <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>{period.toUpperCase()} P&L</div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
               <div>
                 <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 28, color: totalPnl >= 0 ? C.green : C.red, letterSpacing: -1 }}>
                   {totalPnl >= 0 ? "+" : ""}{fmtUSD(totalPnl)}
                 </div>
                 <div style={{ fontFamily: MONO, fontSize: 11, color: totalPnl >= 0 ? "rgba(61,220,132,0.7)" : "rgba(255,107,107,0.7)", marginTop: 3 }}>
-                  {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}% since purchase
+                  {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}% this {period === "daily" ? "day" : period === "weekly" ? "week" : "month"}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -2293,8 +2357,8 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
                     <Tooltip
                       contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
                       labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
-                      itemStyle={{ color: pnlColor, fontSize: 11, fontFamily: MONO }}
-                      formatter={v => [`${v >= 0 ? "+" : ""}${fmtUSD(v)}`, "P&L"]}
+                      itemStyle={{ fontSize: 11, fontFamily: MONO }}
+                      formatter={v => [<span style={{ color: v >= 0 ? C.green : C.red }}>{`${v >= 0 ? "+" : ""}${fmtUSD(v)}`}</span>, "P&L"]}
                       cursor={{ fill: "rgba(255,255,255,0.04)" }}
                     />
                   </BarChart>
@@ -2624,6 +2688,7 @@ export default function App() {
   const [spyPeriodData, setSpyPeriodData] = useState({}); // { daily, weekly, monthly } each { pct }
   const [pnlHistory, setPnlHistory] = useState([]); // [{ date, pnl }] — real daily unrealised P&L, last 90 days
   const [pnlHistoryLoading, setPnlHistoryLoading] = useState(false);
+  const [priceHistoryBySymbol, setPriceHistoryBySymbol] = useState({}); // { SYM: { "YYYY-MM-DD": price } } — feeds Insights period comparisons
   const [cashAccounts, setCashAccounts] = useState([]);
   const [cashLoaded, setCashLoaded] = useState(false);
   const [cashModal, setCashModal] = useState(null); // null | account object | "new"
@@ -2769,10 +2834,11 @@ export default function App() {
   }, [tab]);
   useEffect(() => { if (loaded) save("pf_portfolio_v4", portfolio); }, [portfolio, loaded]);
 
-  // Build real day-by-day P&L history (last 90 days) for the Portfolio chart —
-  // replaces the old fake linear-interpolation chart with actual historical prices.
+  // Build real day-by-day P&L history (last 90 days) for the Portfolio chart and
+  // the Insights tab's period-over-period metrics — both need real historical prices
+  // instead of the current-only snapshot positionSummaries provides.
   useEffect(() => {
-    if (tab !== "portfolio" || portfolio.length === 0) return;
+    if ((tab !== "portfolio" && tab !== "insights") || portfolio.length === 0) return;
     const fetchPnlHistory = async () => {
       setPnlHistoryLoading(true);
       try {
@@ -2801,6 +2867,7 @@ export default function App() {
             priceBySymbolDate[symbol][dateStr] = p.v;
           });
         });
+        setPriceHistoryBySymbol(priceBySymbolDate);
 
         // Walk the last 90 calendar days, computing real unrealised P&L across all positions
         const today = new Date();
@@ -3205,6 +3272,8 @@ export default function App() {
           spyPeriodData={spyPeriodData}
           getLivePrice={getLivePrice}
           cashAccounts={cashAccounts}
+          priceHistoryBySymbol={priceHistoryBySymbol}
+          priceHistoryLoading={pnlHistoryLoading}
         />
       )}
 
