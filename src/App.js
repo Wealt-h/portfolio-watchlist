@@ -1366,7 +1366,7 @@ function EditTradeModal({ trade, onSave, onClose }) {
 }
 
 // ─── INSIGHTS TAB ────────────────────────────────────────────────────────────
-function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyPeriodData, getLivePrice, cashAccounts, priceHistoryBySymbol, priceHistoryLoading, properties }) {
+function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyPeriodData, getLivePrice, cashAccounts, priceHistoryBySymbol, priceHistoryLoading }) {
 
   // Period days mapping
   const periodDays = { daily: 1, weekly: 7, monthly: 30 };
@@ -1420,21 +1420,8 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
     return { sym: a.institution, pct: periodPct, pnl: periodInterest };
   });
 
-  // Properties: judged on net cash flow only (rent - interest - costs), not capital appreciation —
-  // matches how property cash flow is already treated as realised P&L everywhere else in the app.
-  // Daily cash flow is a stable rate (unlike cash interest, it doesn't compound), so the period
-  // contribution is simply the daily rate multiplied by the number of days in the selected window.
-  const propertyPeriodPerformers = (properties || []).map(p => {
-    const calc = calcPropertyValue(p);
-    const periodCashFlow = calc.dailyNetCashFlow * days;
-    // Use net equity as the denominator for a meaningful percentage (consistent with how
-    // property contributes to portfolio totals elsewhere)
-    const periodPct = calc.netEquity > 0 ? (periodCashFlow / calc.netEquity) * 100 : 0;
-    return { sym: p.name, pct: periodPct, pnl: periodCashFlow };
-  });
-
   // Overall period P&L — real change in value over the selected window, not all-time P&L
-  const totalPeriodPnl = periodPerformers.reduce((s, p) => s + p.pnl, 0) + cashPeriodPerformers.reduce((s, p) => s + p.pnl, 0) + propertyPeriodPerformers.reduce((s, p) => s + p.pnl, 0);
+  const totalPeriodPnl = periodPerformers.reduce((s, p) => s + p.pnl, 0) + cashPeriodPerformers.reduce((s, p) => s + p.pnl, 0);
   const periodValueAgoTotal = positionSummaries.reduce((s, {sym, pos}) => {
     const priceAgo = getPriceDaysAgo(sym, days);
     return s + (priceAgo != null ? priceAgo * pos.unitsHeld : pos.costBasis);
@@ -1444,7 +1431,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
     const daysRunningAgo = Math.max(0, daysRunningNow - days);
     const rate = (a.rate || 0) / 100;
     return s + a.principal * Math.pow(1 + rate/365, daysRunningAgo);
-  }, 0) + (properties || []).reduce((s, p) => s + calcPropertyValue(p).netEquity, 0);
+  }, 0);
   const totalPeriodPnlPct = periodValueAgoTotal > 0 ? (totalPeriodPnl / periodValueAgoTotal) * 100 : 0;
 
   // Filter trades within period
@@ -1465,14 +1452,13 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   const performers = [
     ...periodPerformers,
     ...cashPeriodPerformers,
-    ...propertyPeriodPerformers,
   ].sort((a, b) => b.pct - a.pct);
   const best = performers[0] || null;
   const worst = performers[performers.length - 1] || null;
 
   // Win rate — now reflects how many holdings were up over the selected period specifically
-  const totalHoldings = positionSummaries.length + (cashAccounts?.length || 0) + (properties?.length || 0);
-  const winners = periodPerformers.filter(p => p.pnl > 0).length + cashPeriodPerformers.filter(p => p.pnl > 0).length + propertyPeriodPerformers.filter(p => p.pnl > 0).length;
+  const totalHoldings = positionSummaries.length + (cashAccounts?.length || 0);
+  const winners = periodPerformers.filter(p => p.pnl > 0).length + cashPeriodPerformers.filter(p => p.pnl > 0).length;
   const winRate = totalHoldings > 0 ? (winners / totalHoldings) * 100 : 0;
 
   // Asset class breakdown — include cash
@@ -1490,22 +1476,6 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
       }),
     };
   }
-  if (properties && properties.length > 0) {
-    const propEquity = properties.reduce((s, p) => s + calcPropertyValue(p).netEquity, 0);
-    const propCost = properties.reduce((s, p) => s + (p.purchasePrice || 0), 0);
-    assetClasses["property"] = {
-      // Total P&L for the class includes both capital gain and accrued cash flow, since the
-      // class-level figure should reflect total return — best/worst within the class still
-      // judges each individual property on cash flow only, per the per-asset treatment above.
-      pnl: (propEquity - propCost) + properties.reduce((s, p) => s + calcPropertyValue(p).accruedNetCashFlow, 0),
-      value: propEquity,
-      cost: propCost,
-      assets: properties.map(p => {
-        const c = calcPropertyValue(p);
-        return { sym: p.name, pct: c.netEquity > 0 ? (c.accruedNetCashFlow / c.netEquity) * 100 : 0, pnl: c.accruedNetCashFlow };
-      }),
-    };
-  }
   positionSummaries.forEach(({sym, pos}) => {
     const asset = watchlist.find(a => a.symbol === sym);
     const type = asset?.type || "stock";
@@ -1516,8 +1486,8 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
     assetClasses[type].assets.push({ sym, pct: pos.unrealisedPct, pnl: pos.unrealisedPnl });
   });
 
-  const classColors = { crypto: C.amber, stock: C.blue, etf: C.green, cash: "#a8e6cf", commodity: "#fbbf24", property: "#c77dff" };
-  const classLabels = { crypto: "Crypto", stock: "Stocks", etf: "ETFs", cash: "Cash", commodity: "Commodities", property: "Property" };
+  const classColors = { crypto: C.amber, stock: C.blue, etf: C.green, cash: "#a8e6cf", commodity: "#fbbf24" };
+  const classLabels = { crypto: "Crypto", stock: "Stocks", etf: "ETFs", cash: "Cash", commodity: "Commodities" };
 
   // S&P period return matching current toggle
   const spyChange = spyPeriodData?.[period] ?? null;
@@ -1557,7 +1527,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
         </div>
       )}
 
-      {positionSummaries.length === 0 && cashAccounts.length === 0 && (properties?.length || 0) === 0 ? (
+      {positionSummaries.length === 0 && cashAccounts.length === 0 ? (
         <div style={{ textAlign: "center", color: C.text3, fontFamily: FONT, fontWeight: 300, fontSize: 13, padding: "60px 0" }}>
           No portfolio data yet<br/><span style={{ fontSize: 11, opacity: 0.6 }}>Add trades to see insights</span>
         </div>
@@ -1618,10 +1588,6 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                 const c = calcCashValue(a);
                 return { sym: a.institution, type: "cash", pct: a.principal > 0 ? (c.accruedInterest / a.principal) * 100 : 0, pnl: c.accruedInterest, isBenchmark: false };
               }),
-              ...(properties || []).map(p => {
-                const c = calcPropertyValue(p);
-                return { sym: p.name, type: "property", pct: c.netEquity > 0 ? (c.accruedNetCashFlow / c.netEquity) * 100 : 0, pnl: c.accruedNetCashFlow, isBenchmark: false };
-              }),
               ...(spyChange !== null ? [{ sym: "S&P 500", type: "index", pct: spyChange, pnl: null, isBenchmark: true }] : []),
             ];
             const ranked = allItems.sort((a, b) => rankView === "pct" ? b.pct - a.pct : b.pnl - a.pnl);
@@ -1644,7 +1610,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                 {/* Ranked rows */}
                 {ranked.map((item, i) => {
                   const isUp = item.pct >= 0;
-                  const typeColor = { crypto: C.amber, stock: C.blue, etf: C.green, benchmark: C.text3, cash: "#a8e6cf", commodity: "#fbbf24", property: "#c77dff" };
+                  const typeColor = { crypto: C.amber, stock: C.blue, etf: C.green, benchmark: C.text3, cash: "#a8e6cf", commodity: "#fbbf24" };
                   return (
                     <div key={item.sym} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < ranked.length - 1 ? `1px solid ${C.border}` : "none" }}>
                       {/* Rank number */}
@@ -1657,9 +1623,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                         ? <div style={{ width: 32, height: 32, borderRadius: 8, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: C.text3, fontFamily: MONO, flexShrink: 0 }}>SPY</div>
                         : item.type === "cash"
                           ? <div style={{ width: 32, height: 32, borderRadius: 8, background: C.greenDim, border: `1px solid ${C.greenBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>💰</div>
-                          : item.type === "property"
-                            ? <div style={{ width: 32, height: 32, borderRadius: 8, background: C.greenDim, border: `1px solid ${C.greenBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🏠</div>
-                            : <AssetLogo symbol={item.sym} size={32} />
+                          : <AssetLogo symbol={item.sym} size={32} />
                       }
 
                       {/* Name + type tag */}
@@ -2985,21 +2949,13 @@ export default function App() {
   const totalCashValue = cashAccounts.reduce((s, a) => s + calcCashValue(a).currentValue, 0);
   const totalCashInterest = Math.max(0, totalCashValue - totalCashPrincipal);
 
-  // Property totals — net equity (value minus loan owing) counts as "current value",
-  // purchase price as "cost basis", and accrued net cash flow (rent - interest - costs)
-  // as realised P&L, mirroring exactly how cash interest is treated above.
-  const totalPropertyPurchasePrice = properties.reduce((s, p) => s + (p.purchasePrice || 0), 0);
-  const totalPropertyNetEquity = properties.reduce((s, p) => s + calcPropertyValue(p).netEquity, 0);
-  const totalPropertyCashFlow = properties.reduce((s, p) => s + calcPropertyValue(p).accruedNetCashFlow, 0);
+  // Cost basis & current value — includes cash (principal counts as "basis", current value includes accrued interest)
+  const totalCostBasis = positionSummaries.reduce((s,{pos}) => s+pos.costBasis, 0) + totalCashPrincipal;
+  const totalCurrentValue = positionSummaries.reduce((s,{pos}) => s+pos.currentValue, 0) + totalCashValue;
 
-  // Cost basis & current value — includes cash and property (principal/purchase price counts as "basis")
-  const totalCostBasis = positionSummaries.reduce((s,{pos}) => s+pos.costBasis, 0) + totalCashPrincipal + totalPropertyPurchasePrice;
-  const totalCurrentValue = positionSummaries.reduce((s,{pos}) => s+pos.currentValue, 0) + totalCashValue + totalPropertyNetEquity;
-
-  const totalUnrealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.unrealisedPnl, 0) + (totalPropertyNetEquity - totalPropertyPurchasePrice);
-  // Cash interest and property cash flow are both treated as realised gain — they're locked in
-  // (compounding/accruing) rather than subject to market risk the way an open position is
-  const totalRealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.realisedPnl, 0) + totalCashInterest + totalPropertyCashFlow;
+  const totalUnrealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.unrealisedPnl, 0);
+  // Cash interest is treated as realised gain — it's locked in daily compounding, not subject to market risk like an open position
+  const totalRealisedPnl = positionSummaries.reduce((s,{pos}) => s+pos.realisedPnl, 0) + totalCashInterest;
   const totalPnl = totalUnrealisedPnl + totalRealisedPnl;
   const totalPnlPct = totalCostBasis > 0 ? (totalPnl/totalCostBasis)*100 : 0;
 
@@ -3212,11 +3168,10 @@ export default function App() {
 
                   const COLORS = [C.green, C.blue, C.amber, "#c77dff", "#f87171", "#67e8f9", "#a8e6cf"];
 
-                  // Build combined list of holdings: positions + cash accounts + properties
+                  // Build combined list of holdings: positions + cash accounts
                   const holdings = [
                     ...positionSummaries.map(({sym, pos}) => ({ name: sym, value: pos.currentValue })),
                     ...cashAccounts.map(a => ({ name: a.institution, value: calcCashValue(a).currentValue })),
-                    ...properties.map(p => ({ name: p.name, value: calcPropertyValue(p).netEquity })),
                   ];
 
                   const total = holdings.reduce((s, h) => s + h.value, 0) || 1;
@@ -3319,7 +3274,6 @@ export default function App() {
           cashAccounts={cashAccounts}
           priceHistoryBySymbol={priceHistoryBySymbol}
           priceHistoryLoading={pnlHistoryLoading}
-          properties={properties}
         />
       )}
 
