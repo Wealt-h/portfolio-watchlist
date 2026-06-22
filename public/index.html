@@ -27,7 +27,7 @@
       (function() {
         try {
           var theme = localStorage.getItem("accrue_theme") || "dark";
-          var bg = theme === "light" ? "#f4f3ef" : "#070c09";
+          var bg = theme === "light" ? "#eceae5" : "#070c09";
           document.write('<style>body { background: ' + bg + ' !important; }</style>');
           var meta = document.getElementById("theme-color-meta");
           if (meta) meta.setAttribute("content", bg);
