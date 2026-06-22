@@ -3052,12 +3052,10 @@ export default function App() {
 
   const filterMap = {
     all: watchlist,
-    "strong-buy": watchlist.filter(a => calcSignal(a).signal === "strong-buy"),
-    dip: watchlist.filter(a => calcSignal(a).signal === "dip"),
-    watch: watchlist.filter(a => calcSignal(a).signal === "watch"),
-    "near-high": watchlist.filter(a => calcSignal(a).signal === "near-high"),
     crypto: watchlist.filter(a => a.type === "crypto"),
+    etf: watchlist.filter(a => a.type === "etf"),
     stock: watchlist.filter(a => a.type === "stock"),
+    commodity: watchlist.filter(a => a.type === "commodity"),
   };
   const filteredWatch = filterMap[filterSig] || watchlist;
   const buyableCount = watchlist.filter(a => ["strong-buy","dip"].includes(calcSignal(a).signal)).length;
@@ -3170,13 +3168,8 @@ export default function App() {
             ))}
           </div>
 
-          <button onClick={() => setShowLegend(!showLegend)} style={{ width:"100%", background:"transparent", border:`1px solid ${C.border}`, color:C.text3, borderRadius:6, padding:"8px 0", fontSize:10, fontFamily:MONO, cursor:"pointer", letterSpacing:2, marginBottom:14, textTransform:"uppercase" }}>
-            {showLegend ? "↑ hide" : "↓ show"} signal logic
-          </button>
-          {showLegend && <SignalLegend />}
-
           <div style={{ display:"flex", gap:6, marginBottom:18, overflowX:"auto", paddingBottom:4, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
-            {[["all","All"],["strong-buy","Strong buy"],["dip","Buy dip"],["watch","Watching"],["near-high","Wait"],["crypto","Crypto"],["stock","Stock"]].map(([f,l]) => (
+            {[["all","All"],["crypto","Crypto"],["etf","ETF"],["stock","Stocks"],["commodity","Commodities"]].map(([f,l]) => (
               <button key={f} onClick={() => setFilterSig(f)} style={{ background: filterSig===f?C.surface:"transparent", border:`1px solid ${filterSig===f?C.borderHover:C.border}`, color:filterSig===f?C.text1:C.text3, borderRadius:4, padding:"4px 12px", fontSize:10, fontFamily:FONT, fontWeight:300, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.3 }}>{l}</button>
             ))}
           </div>
@@ -3184,32 +3177,28 @@ export default function App() {
           {/* Combined Fear & Greed card — crypto + stocks + VIX side by side */}
           {(fearGreedData || stockFearGreed || vixData) && (() => {
             const getColor = v => v <= 25 ? C.green : v <= 45 ? "rgba(74,222,128,0.6)" : v <= 55 ? C.text3 : v <= 75 ? C.amber : C.red;
-            const getEmoji = v => v <= 25 ? "😨" : v <= 45 ? "😟" : v <= 55 ? "😐" : v <= 75 ? "😏" : "🤑";
             // VIX uses an inverted scale — high VIX = fear (bad), low VIX = calm (good) — opposite framing from F&G's 0-100 scale
             const vixColor = l => l === "panic" ? C.red : l === "elevated" ? C.amber : l === "calm" ? "rgba(74,222,128,0.6)" : C.green;
-            const vixEmoji = l => l === "panic" ? "😱" : l === "elevated" ? "😟" : l === "calm" ? "😐" : "😎";
 
             const cols = [
-              fearGreedData && { key: "crypto", label: "CRYPTO", value: fearGreedData.value, sub: fearGreedData.label, color: getColor(fearGreedData.value), emoji: getEmoji(fearGreedData.value) },
-              stockFearGreed && { key: "stocks", label: "STOCKS", value: stockFearGreed.score, sub: (stockFearGreed.rating || "").replace(/\b\w/g, c => c.toUpperCase()) || "—", color: getColor(stockFearGreed.score), emoji: getEmoji(stockFearGreed.score) },
-              vixData && { key: "vix", label: "VOLATILITY", value: vixData.value, sub: vixData.label, color: vixColor(vixData.level), emoji: vixEmoji(vixData.level) },
+              fearGreedData && { key: "crypto", label: "CRYPTO", value: fearGreedData.value, sub: fearGreedData.label, color: getColor(fearGreedData.value) },
+              stockFearGreed && { key: "stocks", label: "STOCKS", value: stockFearGreed.score, sub: (stockFearGreed.rating || "").replace(/\b\w/g, c => c.toUpperCase()) || "—", color: getColor(stockFearGreed.score) },
+              vixData && { key: "vix", label: "VOLATILITY", value: vixData.value, sub: vixData.label, color: vixColor(vixData.level) },
             ].filter(Boolean);
 
             return (
               <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
-                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10, textAlign: "center" }}>MARKET SENTIMENT</div>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 12, textAlign: "center" }}>MARKET SENTIMENT</div>
                 <div style={{ display: "flex", gap: 0 }}>
                   {cols.map((col, i) => (
                     <React.Fragment key={col.key}>
-                      {i > 0 && <div style={{ width: 1, background: C.border, margin: "2px 12px" }} />}
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-                        <span style={{ fontSize: 14 }}>{col.emoji}</span>
+                      {i > 0 && <div style={{ width: 1, background: C.border, margin: "2px 10px" }} />}
+                      <div style={{ flex: 1, display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: col.color, marginTop: 6, flexShrink: 0 }} />
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1, marginBottom: 2 }}>{col.label}</div>
-                          <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-                            <span style={{ fontSize: 18, fontWeight: 500, fontFamily: FONT, color: col.color, letterSpacing: -0.5 }}>{col.value}</span>
-                            <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, whiteSpace: "nowrap" }}>{col.sub}</span>
-                          </div>
+                          <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1, marginBottom: 3 }}>{col.label}</div>
+                          <div style={{ fontSize: 18, fontWeight: 500, fontFamily: FONT, color: col.color, letterSpacing: -0.5, lineHeight: 1.1 }}>{col.value}</div>
+                          <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, marginTop: 2 }}>{col.sub}</div>
                         </div>
                       </div>
                     </React.Fragment>
