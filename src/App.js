@@ -70,23 +70,23 @@ function AboutScreen({ onClose }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 400 }}>
       <div style={{
-        background: "#0e1014", border: "1px solid rgba(255,255,255,0.14)", borderRadius: "16px 16px 0 0",
+        background: C.modalBg, border: `1px solid ${C.border}`, borderRadius: "16px 16px 0 0",
         padding: "28px 24px 40px", width: "100%", maxWidth: 540, maxHeight: "86vh", overflowY: "auto",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
             {[["A",1.0],["C",0.92],["C",0.84],["R",0.76],["U",0.68],["E",0.60]].map(([l,o],i) => (
-              <span key={i} style={{ fontSize: 24, fontWeight: 200, letterSpacing: 5, color: `rgba(240,245,242,${o})`, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{l}</span>
+              <span key={i} style={{ fontSize: 24, fontWeight: 200, letterSpacing: 5, color: C.text1, opacity: o, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{l}</span>
             ))}
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "rgba(240,245,242,0.4)", fontSize: 18, cursor: "pointer", padding: 4 }}>✕</button>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer", padding: 4 }}>✕</button>
         </div>
 
-        <div style={{ fontSize: 11, color: "rgba(61,220,132,0.7)", fontFamily: MONO, letterSpacing: 2, marginBottom: 22 }}>
+        <div style={{ fontSize: 11, color: C.green, opacity: 0.85, fontFamily: MONO, letterSpacing: 2, marginBottom: 22 }}>
           DISCIPLINED INVESTMENT INTELLIGENCE
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 18, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 300, fontSize: 14.5, lineHeight: 1.65, color: "rgba(240,245,242,0.75)" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 18, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 300, fontSize: 14.5, lineHeight: 1.65, color: C.text2 }}>
           <p style={{ margin: 0 }}>
             Accrue was built on a simple premise: the best time to buy a great asset is when everyone else is scared to.
           </p>
@@ -96,14 +96,14 @@ function AboutScreen({ onClose }) {
           <p style={{ margin: 0 }}>
             Accrue exists to remove emotion from the process — tracking what you own, what it's worth, and whether today is a day to act or a day to wait.
           </p>
-          <p style={{ margin: 0, color: "rgba(240,245,242,0.5)", fontSize: 13 }}>
+          <p style={{ margin: 0, color: C.text3, fontSize: 13 }}>
             This is a personal project, built and refined one feature at a time. If something feels off, I'd genuinely like to know — there's a feedback link in the menu.
           </p>
         </div>
 
-        <div style={{ marginTop: 28, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 10, color: "rgba(240,245,242,0.25)", fontFamily: MONO, letterSpacing: 1 }}>v1.0.0</span>
-          <span style={{ fontSize: 10, color: "rgba(240,245,242,0.25)", fontFamily: MONO, letterSpacing: 1 }}>Built with care</span>
+        <div style={{ marginTop: 28, paddingTop: 18, borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 1 }}>v1.0.0</span>
+          <span style={{ fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 1 }}>Built with care</span>
         </div>
       </div>
     </div>
@@ -111,18 +111,18 @@ function AboutScreen({ onClose }) {
 }
 
 
-function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker, onOpenAbout }) {
+function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker, onOpenAbout, theme, onToggleTheme }) {
   if (!open) return null;
 
   const NavItem = ({ icon, label, active, badge, onClick, dim }) => (
     <button onClick={onClick} style={{
       display: "flex", alignItems: "center", gap: 12, width: "100%",
-      background: active ? "rgba(255,255,255,0.05)" : "transparent",
+      background: active ? C.surfaceHigh : "transparent",
       border: "none", borderRadius: 8, padding: "11px 12px",
       cursor: "pointer", textAlign: "left",
     }}>
-      <span style={{ fontSize: 16, opacity: active ? 0.95 : (dim ? 0.4 : 0.6), width: 18, textAlign: "center" }}>{icon}</span>
-      <span style={{ fontSize: 13, fontFamily: FONT, fontWeight: 300, color: active ? "rgba(240,245,242,0.95)" : (dim ? "rgba(240,245,242,0.4)" : "rgba(240,245,242,0.6)") }}>{label}</span>
+      <span style={{ fontSize: 16, opacity: active ? 0.95 : (dim ? 0.6 : 0.8), width: 18, textAlign: "center", color: C.text1 }}>{icon}</span>
+      <span style={{ fontSize: 13, fontFamily: FONT, fontWeight: 300, color: active ? C.text1 : (dim ? C.text3 : C.text2) }}>{label}</span>
       {badge > 0 && <span style={{ marginLeft: "auto", fontSize: 10, color: C.green, fontFamily: MONO }}>{badge}</span>}
     </button>
   );
@@ -135,7 +135,7 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
       {/* Drawer panel */}
       <div style={{
         position: "relative", width: "78%", maxWidth: 280, height: "100%",
-        background: "#0a0c0e", borderRight: "1px solid rgba(255,255,255,0.08)",
+        background: C.surface, borderRight: `1px solid ${C.border}`,
         padding: "env(safe-area-inset-top, 28px) 20px 28px",
         display: "flex", flexDirection: "column",
         animation: "slideIn 0.22s ease",
@@ -146,10 +146,10 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
             {[["A",1.0],["C",0.92],["C",0.84],["R",0.76],["U",0.68],["E",0.60]].map(([l,o],i) => (
-              <span key={i} style={{ fontSize: 20, fontWeight: 200, letterSpacing: 4, color: `rgba(240,245,242,${o})`, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{l}</span>
+              <span key={i} style={{ fontSize: 20, fontWeight: 200, letterSpacing: 4, color: C.text1, opacity: o, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{l}</span>
             ))}
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "rgba(240,245,242,0.4)", fontSize: 18, cursor: "pointer" }}>✕</button>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
         </div>
 
         {/* Primary nav */}
@@ -159,12 +159,13 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
           <NavItem icon="◔" label="Insights" active={tab === "insights"} onClick={() => { setTab("insights"); onClose(); }} />
         </div>
 
-        <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "16px 0" }} />
+        <div style={{ height: 1, background: C.border, margin: "16px 0" }} />
 
         {/* Secondary nav */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <NavItem icon="◌" label="Alerts" dim badge={alertCount} onClick={() => { setTab("watchlist"); onClose(); }} />
           <NavItem icon="◎" label={`Currency · ${displayCurrency}`} dim onClick={() => { onOpenCurrencyPicker(); onClose(); }} />
+          <NavItem icon={theme === "dark" ? "☼" : "☾"} label={theme === "dark" ? "Light mode" : "Dark mode"} dim onClick={() => { onToggleTheme(); }} />
           <NavItem icon="↻" label="Replay intro" dim onClick={() => { onRestartOnboarding(); onClose(); }} />
           <NavItem icon="ⓘ" label="About Accrue" dim onClick={() => { onOpenAbout(); onClose(); }} />
           <NavItem icon="✉" label="Help & feedback" dim onClick={() => { window.location.href = "mailto:?subject=Accrue%20feedback"; onClose(); }} />
@@ -172,7 +173,7 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
 
         <div style={{ flex: 1 }} />
 
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 14, fontSize: 10, color: "rgba(240,245,242,0.25)", fontFamily: MONO, letterSpacing: 1 }}>
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14, fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 1 }}>
           v1.0.0
         </div>
       </div>
@@ -520,7 +521,10 @@ const fmtPct = (v) => (v >= 0 ? "+" : "") + Number(v).toFixed(2) + "%";
 // ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
 const FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 const MONO = "'Courier New', monospace";
-const C = {
+
+// green/red/amber/blue (and their *Dim/*Border variants) are intentionally identical
+// across both themes — only surfaces, borders, and text tones change.
+const DARK_THEME = {
   bg:          "#07080a",
   surface:     "#111318",
   surfaceHigh: "#181c22",
@@ -538,9 +542,71 @@ const C = {
   amber:       "#fbbf24",
   blue:        "#93c5fd",
   blueDim:     "rgba(147,197,253,0.12)",
+  // Modal/card-specific tones used outside the main C references (TradeModal, CashModal, etc.)
+  modalBg:     "#0e1014",
+  modalBg2:    "#0a0c0e",
+  modalBg3:    "#07090c",
+  modalBg4:    "#090b0e",
+  modalBg5:    "#08090a",
+  labelDim:    "#2d4a3a",
+  labelMute:   "#4a6655",
+  textSoft:    "#c8dfd1",
+  accentBuy:   "#00ff9d",
+  accentSell:  "#f5a623",
+  accentLink:  "#7eb8ff",
 };
-const INP = { background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "10px 12px", color: C.text1, fontSize: 16, fontFamily: FONT, fontWeight: 300, outline: "none", width: "100%", boxSizing: "border-box" };
-const LBL = { fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 4, textTransform: "uppercase" };
+
+const LIGHT_THEME = {
+  bg:          "#f4f3ef",
+  surface:     "#ffffff",
+  surfaceHigh: "#ececea",
+  border:      "rgba(20,20,18,0.12)",
+  borderHover: "rgba(20,20,18,0.22)",
+  borderAccent:"rgba(22,140,80,0.5)",
+  text1:       "#1c1d1b",
+  text2:       "rgba(28,29,27,0.68)",
+  text3:       "rgba(28,29,27,0.42)",
+  green:       "#3ddc84",
+  greenDim:    "rgba(61,220,132,0.14)",
+  greenBorder: "rgba(61,220,132,0.4)",
+  red:         "#ff6b6b",
+  redDim:      "rgba(255,107,107,0.12)",
+  amber:       "#fbbf24",
+  blue:        "#93c5fd",
+  blueDim:     "rgba(147,197,253,0.12)",
+  // Light-theme equivalents of the modal/card-specific dark tones above
+  modalBg:     "#ffffff",
+  modalBg2:    "#f7f6f3",
+  modalBg3:    "#f4f3ef",
+  modalBg4:    "#f7f6f3",
+  modalBg5:    "#f4f3ef",
+  labelDim:    "rgba(28,29,27,0.4)",
+  labelMute:   "rgba(28,29,27,0.55)",
+  textSoft:    "#1c1d1b",
+  accentBuy:   "#0ba968",
+  accentSell:  "#c97f12",
+  accentLink:  "#2566c9",
+};
+
+// Mutable theme object — every component reads C.xxx directly, so reassigning these
+// properties (rather than replacing the object reference) makes every component
+// pick up the new theme on next render without needing theme threaded through props.
+const C = { ...DARK_THEME };
+function applyTheme(themeName) {
+  const palette = themeName === "light" ? LIGHT_THEME : DARK_THEME;
+  Object.assign(C, palette);
+}
+
+// INP/LBL are derived from C, so they must be read live (as functions) rather than
+// computed once at module load, or they'd never reflect a theme change.
+const getINP = () => ({ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "10px 12px", color: C.text1, fontSize: 16, fontFamily: FONT, fontWeight: 300, outline: "none", width: "100%", boxSizing: "border-box" });
+const getLBL = () => ({ fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 4, textTransform: "uppercase" });
+// Kept as plain objects too (existing call sites use INP/LBL directly as static style
+// objects) — these getters are invoked at the top of App's render body each frame,
+// same pattern as setDisplayCurrencyGlobals, so INP/LBL stay in sync with the live theme.
+let INP = getINP();
+let LBL = getLBL();
+function refreshDerivedTokens() { INP = getINP(); LBL = getLBL(); }
 
 // ─── SIGNAL BADGE ─────────────────────────────────────────────────────────────
 function SignalBadge({ sig, size = "md" }) {
@@ -621,7 +687,7 @@ const STOCK_DOMAINS = {
 
 const CRYPTO_TICKERS = ["BTC","ETH","SOL","DOGE","ADA","XRP","BNB","AVAX","MATIC","DOT","LINK","LTC","UNI","ATOM","NEAR","APT","SHIB","TRX","TON"];
 
-function AssetLogo({ symbol, size = 40, color = "rgba(240,245,242,0.7)" }) {
+function AssetLogo({ symbol, size = 40, color = C.text2 }) {
   const [srcIndex, setSrcIndex] = useState(0);
   const ticker = symbol.replace("-USD","").replace("-","").toUpperCase();
   const isCrypto = CRYPTO_TICKERS.includes(ticker) || symbol.includes("-USD");
@@ -852,7 +918,7 @@ function WatchCard({ asset, onDelete, onNotesUpdate, onThesisUpdate, onAlert, al
                 <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
               </button>
             </div>
-            {aiLoading==="thesis" && <div style={{ fontSize: 12, color: "#6a3d80", fontFamily: "monospace", fontStyle: "italic" }}>Generating thesis...</div>}
+            {aiLoading==="thesis" && <div style={{ fontSize: 12, color: C.text3, fontFamily: "monospace", fontStyle: "italic" }}>Generating thesis...</div>}
             {asset.thesis && !aiLoading && (
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {asset.thesis.split("\n").filter(l => l.trim()).map((line, i) => {
@@ -874,7 +940,7 @@ function WatchCard({ asset, onDelete, onNotesUpdate, onThesisUpdate, onAlert, al
               </div>
             )}
             {!asset.thesis && !aiLoading && (
-              <div style={{ fontSize: 12, color: "#2d4a3a", fontStyle: "italic", fontFamily: "monospace" }}>Tap AI THESIS to generate a philosophy-aligned thesis →</div>
+              <div style={{ fontSize: 12, color: C.labelDim, fontStyle: "italic", fontFamily: "monospace" }}>Tap AI THESIS to generate a philosophy-aligned thesis →</div>
             )}
           </div>
 
@@ -892,7 +958,7 @@ function WatchCard({ asset, onDelete, onNotesUpdate, onThesisUpdate, onAlert, al
               <div style={{ background: "rgba(126,184,255,0.05)", border: "1px solid rgba(126,184,255,0.15)", borderRadius: 10, padding: "12px 14px" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#7eb8ff", animation: "pulse 1s infinite" }} />
-                  <span style={{ fontSize: 12, color: "#4a7a9a", fontFamily: "monospace" }}>Fetching market update...</span>
+                  <span style={{ fontSize: 12, color: C.text3, fontFamily: "monospace" }}>Fetching market update...</span>
                   <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.2} }`}</style>
                 </div>
               </div>
@@ -903,7 +969,7 @@ function WatchCard({ asset, onDelete, onNotesUpdate, onThesisUpdate, onAlert, al
               </div>
             )}
             {!aiLoading && !asset.notes && (
-              <div style={{ fontSize: 12, color: "#2d4a3a", fontStyle: "italic", fontFamily: "monospace" }}>Tap AI UPDATE for today's market briefing →</div>
+              <div style={{ fontSize: 12, color: C.labelDim, fontStyle: "italic", fontFamily: "monospace" }}>Tap AI UPDATE for today's market briefing →</div>
             )}
             {aiError && <div style={{ fontSize: 11, color: "#ff6b6b", marginTop: 6, fontFamily: "monospace" }}>{aiError}</div>}
           </div>
@@ -941,7 +1007,7 @@ function WatchModal({ asset, onSave, onClose }) {
           <div style={LBL}>TYPE</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {["stock","crypto","etf","commodity"].map(t => (
-              <button key={t} onClick={() => set("type", t)} style={{ flex: 1, background: f.type===t?C.surfaceHigh:"rgba(255,255,255,0.03)", border: `1px solid ${f.type===t?C.borderHover:C.border}`, color: f.type===t?C.text1:C.text3, borderRadius: 8, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1 }}>{t.toUpperCase()}</button>
+              <button key={t} onClick={() => set("type", t)} style={{ flex: 1, background: f.type===t?C.surfaceHigh:C.surface, border: `1px solid ${f.type===t?C.borderHover:C.border}`, color: f.type===t?C.text1:C.text3, borderRadius: 8, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1 }}>{t.toUpperCase()}</button>
             ))}
           </div>
         </div>
@@ -954,13 +1020,13 @@ function WatchModal({ asset, onSave, onClose }) {
           <div>
             <div style={LBL}>RSI (0–100)</div>
             <input value={f.rsi} onChange={e => set("rsi", e.target.value)} type="number" placeholder="34" style={INP} />
-            <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 3, fontFamily: "monospace" }}>{"<30 oversold · >70 overbought"}</div>
+            <div style={{ fontSize: 10, color: C.labelDim, marginTop: 3, fontFamily: "monospace" }}>{"<30 oversold · >70 overbought"}</div>
           </div>
           {f.type === "crypto" ? (
             <div>
               <div style={LBL}>FEAR & GREED (0–100)</div>
               <input value={f.fearGreed} onChange={e => set("fearGreed", e.target.value)} type="number" placeholder="30" style={INP} />
-              <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 3, fontFamily: "monospace" }}>{"<30 fear · >75 greed"}</div>
+              <div style={{ fontSize: 10, color: C.labelDim, marginTop: 3, fontFamily: "monospace" }}>{"<30 fear · >75 greed"}</div>
             </div>
           ) : (
             <div>
@@ -971,11 +1037,11 @@ function WatchModal({ asset, onSave, onClose }) {
         </div>
         {sig && (
           <div style={{ background: `${sig.color}08`, border: `1px solid ${sig.color}25`, borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
-            <div style={{ fontSize: 10, color: "#4a6655", fontFamily: "monospace", letterSpacing: 2, marginBottom: 8 }}>AUTO SIGNAL PREVIEW</div>
+            <div style={{ fontSize: 10, color: C.labelMute, fontFamily: "monospace", letterSpacing: 2, marginBottom: 8 }}>AUTO SIGNAL PREVIEW</div>
             <SignalBadge sig={sig} />
-            <div style={{ fontSize: 12, color: "#6a9a7a", marginTop: 6, fontStyle: "italic" }}>{sig.description}</div>
+            <div style={{ fontSize: 12, color: C.text3, marginTop: 6, fontStyle: "italic" }}>{sig.description}</div>
             <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {sig.reasons.map((r,i) => <span key={i} style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "monospace", background: "rgba(0,255,157,0.05)", border: "1px solid rgba(0,255,157,0.1)", borderRadius: 4, padding: "2px 6px" }}>{r}</span>)}
+              {sig.reasons.map((r,i) => <span key={i} style={{ fontSize: 10, color: C.labelMute, fontFamily: "monospace", background: "rgba(0,255,157,0.05)", border: "1px solid rgba(0,255,157,0.1)", borderRadius: 4, padding: "2px 6px" }}>{r}</span>)}
             </div>
           </div>
         )}
@@ -1077,7 +1143,7 @@ function AssetSearchModal({ onAdd, onClose }) {
             placeholder="Search stocks, crypto, ETFs..."
             style={{ ...INP, paddingLeft: 36, fontSize: 14 }}
           />
-          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#4a6655", fontSize: 14 }}>
+          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: C.labelMute, fontSize: 14 }}>
             {searching ? "⟳" : "⌕"}
           </span>
         </div>
@@ -1087,7 +1153,7 @@ function AssetSearchModal({ onAdd, onClose }) {
           {error && <div style={{ fontSize: 12, color: "#ff6b6b", fontFamily: "monospace", marginBottom: 10 }}>{error}</div>}
 
           {results.length === 0 && !searching && query.length > 0 && (
-            <div style={{ textAlign: "center", color: "#3d5449", fontFamily: "monospace", fontSize: 12, padding: "30px 0" }}>NO RESULTS FOUND</div>
+            <div style={{ textAlign: "center", color: C.labelDim, fontFamily: "monospace", fontSize: 12, padding: "30px 0" }}>NO RESULTS FOUND</div>
           )}
 
           {results.length === 0 && !query && (
@@ -1146,7 +1212,7 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
   const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
   const LBL2 = { ...LBL, marginBottom: 3 };
   const isBuy = tradeType === "buy";
-  const accent = isBuy ? "#00ff9d" : "#f5a623";
+  const accent = isBuy ? C.accentBuy : C.accentSell;
 
   const handleSave = async () => {
     let priceUSD = parseFloat(f.price) || 0;
@@ -1260,7 +1326,7 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
 
         {/* Fees */}
         <div style={{ marginBottom: 10 }}>
-          <div style={LBL2}>BROKERAGE FEE <span style={{ color: "#2d4a3a" }}>(optional, same currency as above)</span></div>
+          <div style={LBL2}>BROKERAGE FEE <span style={{ color: C.labelDim }}>(optional, same currency as above)</span></div>
           <input value={f.fees} onChange={e => set("fees", e.target.value)} type="number" placeholder="0.00" style={{ ...SML, width: "50%" }} />
         </div>
 
@@ -1268,15 +1334,15 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
         {subtotal > 0 && (
           <div style={{ background: isBuy?"rgba(0,255,157,0.06)":"rgba(245,166,35,0.06)", border: `1px solid ${isBuy?"rgba(0,255,157,0.15)":"rgba(245,166,35,0.15)"}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 12, marginBottom: fees>0?4:0 }}>
-              <span style={{ color: "#4a6655" }}>SUBTOTAL</span>
-              <span style={{ color: "#c8dfd1" }}>{CURRENCY_SYMBOLS[tradeCurrency] || ""}{subtotal.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+              <span style={{ color: C.labelMute }}>SUBTOTAL</span>
+              <span style={{ color: C.textSoft }}>{CURRENCY_SYMBOLS[tradeCurrency] || ""}{subtotal.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
             </div>
             {fees > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 12, marginBottom: 4 }}>
-              <span style={{ color: "#4a6655" }}>FEES</span>
+              <span style={{ color: C.labelMute }}>FEES</span>
               <span style={{ color: "#ff6b6b" }}>+{CURRENCY_SYMBOLS[tradeCurrency] || ""}{fees.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
             </div>}
             <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 13, borderTop: fees>0?"1px solid rgba(255,255,255,0.06)":"none", paddingTop: fees>0?4:0 }}>
-              <span style={{ color: "#4a6655" }}>{isBuy?"TOTAL COST":"NET PROCEEDS"}</span>
+              <span style={{ color: C.labelMute }}>{isBuy?"TOTAL COST":"NET PROCEEDS"}</span>
               <span style={{ color: accent, fontWeight: 800 }}>{CURRENCY_SYMBOLS[tradeCurrency] || ""}{total.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
             </div>
           </div>
@@ -1284,7 +1350,7 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
 
         {/* Notes */}
         <div style={{ marginBottom: 14 }}>
-          <div style={LBL2}>NOTES <span style={{ color: "#2d4a3a" }}>(optional)</span></div>
+          <div style={LBL2}>NOTES <span style={{ color: C.labelDim }}>(optional)</span></div>
           <textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={2} placeholder={isBuy?"Why I bought this dip...":"Why I'm taking profit / cutting loss..."} style={{ ...SML, resize: "none", width: "100%" }} />
         </div>
 
@@ -1314,7 +1380,7 @@ function EditTradeModal({ trade, onSave, onClose }) {
   const total = trade.type === "buy" ? subtotal + fees : subtotal - fees;
   const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
   const LBL2 = { ...LBL, marginBottom: 3 };
-  const accent = trade.type === "buy" ? "#00ff9d" : "#f5a623";
+  const accent = trade.type === "buy" ? C.accentBuy : C.accentSell;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }}>
@@ -1346,7 +1412,7 @@ function EditTradeModal({ trade, onSave, onClose }) {
         {/* Summary */}
         {subtotal > 0 && (
           <div style={{ background: `${accent}08`, border: `1px solid ${accent}20`, borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontFamily: "monospace", fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "#4a6655" }}>{trade.type === "buy" ? "TOTAL COST" : "NET PROCEEDS"}</span>
+            <span style={{ color: C.labelMute }}>{trade.type === "buy" ? "TOTAL COST" : "NET PROCEEDS"}</span>
             <span style={{ color: accent, fontWeight: 800 }}>{fmtUSD(total)}</span>
           </div>
         )}
@@ -1500,7 +1566,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   }));
 
   // Add benchmarks to bar chart
-  if (spyChange !== null) barData.push({ name: "S&P 500", pct: spyChange, color: "rgba(240,245,242,0.4)", isBenchmark: true });
+  if (spyChange !== null) barData.push({ name: "S&P 500", pct: spyChange, color: C.text3, isBenchmark: true });
 
   const StatCard = ({ label, value, sub, color }) => (
     <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 10, padding: "14px 16px" }}>
@@ -2014,7 +2080,7 @@ function PropertyModal({ property, onSave, onClose }) {
             <input value={f.weeklyCosts} onChange={e => set("weeklyCosts", e.target.value)} type="number" placeholder="80" style={SML} />
           </div>
         </div>
-        <div style={{ fontSize: 10, color: "#2d4a3a", fontFamily: FONT, fontWeight: 300, marginBottom: 12 }}>Costs: rates, strata, insurance, maintenance, etc.</div>
+        <div style={{ fontSize: 10, color: C.labelDim, fontFamily: FONT, fontWeight: 300, marginBottom: 12 }}>Costs: rates, strata, insurance, maintenance, etc.</div>
 
         <div style={{ marginBottom: 12 }}>
           <div style={LBL2}>NOTES (optional)</div>
@@ -2636,6 +2702,34 @@ export default function App() {
   const [navOpen, setNavOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
 
+  // ── Theme (dark default; light is a full alternate palette, same component tree)
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem("accrue_theme") || "dark"; } catch { return "dark"; }
+  });
+
+  // Keep the mutable C object and its derived tokens (INP/LBL) in sync with the live
+  // theme on every render — same approach as setDisplayCurrencyGlobals above, since C
+  // is referenced directly (not passed as a prop) by every component in this file.
+  applyTheme(theme);
+  refreshDerivedTokens();
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    try { localStorage.setItem("accrue_theme", next); } catch {}
+  };
+
+  // Keep the iOS status bar tint and body background in sync when the theme changes
+  // mid-session (not just on reload — index.html handles that part separately)
+  useEffect(() => {
+    const bg = theme === "light" ? "#f4f3ef" : "#070c09";
+    try {
+      const meta = document.getElementById("theme-color-meta") || document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", bg);
+      document.body.style.background = bg;
+    } catch (e) {}
+  }, [theme]);
+
   // ── Display currency (USD is always source of truth; this only affects display)
   const [displayCurrency, setDisplayCurrency] = useState(() => {
     try { return localStorage.getItem("accrue_currency") || "USD"; } catch { return "USD"; }
@@ -2981,7 +3075,7 @@ export default function App() {
     <>
       {!onboarded && <OnboardingScreen onComplete={completeOnboarding} />}
       {onboarded && showReturningSplash && <ReturningSplash onDone={() => setShowReturningSplash(false)} />}
-      {onboarded && !showReturningSplash && <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
+      {onboarded && !showReturningSplash && <div style={{ minHeight: "100vh", background: theme === "light" ? C.bg : "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
       {/* ── ACCRUE HEADER ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -3010,7 +3104,8 @@ export default function App() {
                   fontWeight: 200,
                   letterSpacing: 6,
                   fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-                  color: `rgba(240,245,242,${opacity})`,
+                  color: C.text1,
+                  opacity: opacity,
                   display: "inline-block",
                 }}>{letter}</span>
               ))}
@@ -3331,7 +3426,7 @@ export default function App() {
       }} onClose={() => setPropertyModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
-      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} />
+      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} theme={theme} onToggleTheme={toggleTheme} />
       {aboutOpen && <AboutScreen onClose={() => setAboutOpen(false)} />}
     </div>}
     </>
