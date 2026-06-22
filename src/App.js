@@ -1915,16 +1915,17 @@ function PropertyModal({ property, onSave, onClose }) {
         </div>
 
         <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>RENTAL INCOME</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 4 }}>
           <div>
             <div style={LBL2}>WEEKLY RENT ($)</div>
             <input value={f.weeklyRent} onChange={e => set("weeklyRent", e.target.value)} type="number" placeholder="650" style={SML} />
           </div>
           <div>
-            <div style={LBL2}>WEEKLY COSTS ($) <span style={{ color: "#2d4a3a" }}>rates, strata, etc.</span></div>
+            <div style={LBL2}>WEEKLY COSTS ($)</div>
             <input value={f.weeklyCosts} onChange={e => set("weeklyCosts", e.target.value)} type="number" placeholder="80" style={SML} />
           </div>
         </div>
+        <div style={{ fontSize: 10, color: "#2d4a3a", fontFamily: FONT, fontWeight: 300, marginBottom: 12 }}>Costs: rates, strata, insurance, maintenance, etc.</div>
 
         <div style={{ marginBottom: 12 }}>
           <div style={LBL2}>NOTES (optional)</div>
