@@ -1255,6 +1255,16 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
       setConverting(false);
     }
 
+    if (tradeType === "dividend") {
+      onSave({
+        id: Date.now(), type: "dividend", symbol: f.symbol.toUpperCase().trim(), name: f.name,
+        amount: priceUSD, units: 0, fees: 0,
+        date: f.date, notes: f.notes,
+        ...(tradeCurrency !== "USD" ? { originalCurrency: tradeCurrency, originalAmount: parseFloat(f.price) || 0 } : {}),
+      });
+      return;
+    }
+
     onSave({
       id: Date.now(), type: tradeType, symbol: f.symbol.toUpperCase().trim(), name: f.name,
       price: priceUSD, units: parseFloat(f.units) || 0, fees: feesUSD,
@@ -1272,7 +1282,7 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", gap: 6 }}>
-            {["buy","sell"].map(t => (
+            {["buy","sell","dividend"].map(t => (
               <button key={t} onClick={() => setTradeType(t)} style={{ background: tradeType===t?C.surface:"transparent", border:`1px solid ${tradeType===t?C.borderHover:C.border}`, color:tradeType===t?C.text1:C.text3, borderRadius:4, padding:"6px 16px", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:0.3 }}>
                 {t.charAt(0).toUpperCase()+t.slice(1)}
               </button>
@@ -1312,6 +1322,44 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
           )}
         </div>
 
+        {tradeType === "dividend" ? (
+          <>
+            {/* Dividend amount + currency — full width row */}
+            <div style={{ marginBottom: 8 }}>
+              <div style={LBL2}>DIVIDEND AMOUNT (TOTAL CASH RECEIVED)</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input value={f.price} onChange={e => set("price", e.target.value)} type="number" placeholder="0.00" style={{ ...SML, flex: 1, minWidth: 0 }} />
+                <select value={tradeCurrency} onChange={e => setTradeCurrency(e.target.value)}
+                  style={{ ...SML, width: 88, padding: "9px 8px", fontSize: 13, background: C.surfaceHigh, cursor: "pointer", flexShrink: 0 }}>
+                  {Object.keys(CURRENCY_SYMBOLS).map(cur => (
+                    <option key={cur} value={cur}>{cur}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <div style={LBL2}>DATE PAID</div>
+              <input value={f.date} onChange={e => set("date", e.target.value)} type="date" style={{ ...SML, colorScheme: "dark", textAlign: "left" }} />
+            </div>
+
+            {tradeCurrency !== "USD" && (
+              <div style={{ fontSize: 10, color: C.text3, fontFamily: FONT, fontWeight: 300, marginBottom: 10, fontStyle: "italic" }}>
+                Entered in {CURRENCY_NAMES[tradeCurrency] || tradeCurrency} — will be converted to USD using the exchange rate on {f.date}.
+              </div>
+            )}
+
+            {(parseFloat(f.price) || 0) > 0 && (
+              <div style={{ background: C.greenDim, border: `1px solid ${C.greenBorder}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 13 }}>
+                  <span style={{ color: C.labelMute }}>DIVIDEND RECEIVED</span>
+                  <span style={{ color: C.green, fontWeight: 800 }}>+{CURRENCY_SYMBOLS[tradeCurrency] || ""}{(parseFloat(f.price) || 0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
         {/* Price + currency — full width row */}
         <div style={{ marginBottom: 8 }}>
           <div style={LBL2}>{isBuy?"BUY":"SELL"} PRICE</div>
@@ -1361,18 +1409,20 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
             </div>
           </div>
         )}
+          </>
+        )}
 
         {/* Notes */}
         <div style={{ marginBottom: 14 }}>
           <div style={LBL2}>NOTES <span style={{ color: C.labelDim }}>(optional)</span></div>
-          <textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={2} placeholder={isBuy?"Why I bought this dip...":"Why I'm taking profit / cutting loss..."} style={{ ...SML, resize: "none", width: "100%" }} />
+          <textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={2} placeholder={tradeType === "dividend" ? "e.g. Quarterly dividend" : isBuy?"Why I bought this dip...":"Why I'm taking profit / cutting loss..."} style={{ ...SML, resize: "none", width: "100%" }} />
         </div>
 
         {convertError && <div style={{ fontSize: 11, color: C.red, fontFamily: FONT, fontWeight: 300, marginBottom: 10 }}>{convertError}</div>}
 
         <button onClick={handleSave} disabled={converting}
           style={{ width: "100%", background: C.surface, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: converting ? "default" : "pointer", letterSpacing: 0.5, opacity: converting ? 0.6 : 1 }}>
-          {converting ? "Converting..." : `Log ${tradeType}`}
+          {converting ? "Converting..." : tradeType === "dividend" ? "Log dividend" : `Log ${tradeType}`}
         </button>
       </div>
     </div>
@@ -1470,21 +1520,25 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
 
   const hasHistory = priceHistoryBySymbol && Object.keys(priceHistoryBySymbol).length > 0;
 
-  // Per-position period change — units held now valued at (price now) vs (price N days ago).
+  // Per-position period change — units held now valued at (price now) vs (price N days ago),
+  // plus any dividends actually paid within the selected period (a real cash gain, distinct
+  // from price movement, so it's added on top rather than baked into the price-based figure).
   // Falls back to all-time unrealised P&L for a symbol if no historical price is available yet,
   // so the page still shows sensible numbers while history is loading rather than zeroing out.
+  const cutoffDateStr = (() => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); })();
   const periodPerformers = positionSummaries.map(({ sym, pos }) => {
     const priceNow = getLivePrice ? getLivePrice(sym) : null;
     const priceAgo = getPriceDaysAgo(sym, days);
+    const dividendsInPeriod = portfolio.filter(t => t.symbol === sym && t.type === "dividend" && t.date >= cutoffDateStr).reduce((s, t) => s + (t.amount || 0), 0);
     if (priceAgo != null && priceNow != null && pos.unitsHeld > 0) {
       const valueNow = priceNow * pos.unitsHeld;
       const valueAgo = priceAgo * pos.unitsHeld;
-      const periodPnl = valueNow - valueAgo;
+      const periodPnl = valueNow - valueAgo + dividendsInPeriod;
       const periodPct = valueAgo > 0 ? (periodPnl / valueAgo) * 100 : 0;
       return { sym, pct: periodPct, pnl: periodPnl };
     }
     // No historical price yet — fall back to all-time figures rather than showing nothing
-    return { sym, pct: pos.unrealisedPct, pnl: pos.unrealisedPnl };
+    return { sym, pct: pos.unrealisedPct, pnl: pos.unrealisedPnl + dividendsInPeriod };
   });
 
   // Cash accounts: interest accrued specifically within the period (not all-time)
@@ -2510,6 +2564,7 @@ function calcPositionAsOf(trades, priceOnDate) {
 function calcPosition(trades, currentPrice) {
   const buys = trades.filter(t => t.type === "buy");
   const sells = trades.filter(t => t.type === "sell");
+  const dividends = trades.filter(t => t.type === "dividend");
   const totalBuyUnits = buys.reduce((s,t) => s+t.units, 0);
   const totalSellUnits = sells.reduce((s,t) => s+t.units, 0);
   const unitsHeld = totalBuyUnits - totalSellUnits;
@@ -2522,9 +2577,12 @@ function calcPosition(trades, currentPrice) {
   const costBasis = avgBuyPrice * unitsHeld + (unitsHeld/totalBuyUnitsForAvg)*totalFeesOnBuys;
   const unrealisedPnl = currentValue - costBasis;
   const unrealisedPct = costBasis > 0 ? (unrealisedPnl/costBasis)*100 : 0;
-  // Realised P&L: for each sell, profit = (sellPrice - avgBuyPrice) * units - fees
-  const realisedPnl = sells.reduce((s,t) => s + (t.price - avgBuyPrice)*t.units - (t.fees||0), 0);
-  return { unitsHeld, avgBuyPrice, breakEven, currentValue, costBasis, unrealisedPnl, unrealisedPct, realisedPnl, totalBuyUnits, totalSellUnits };
+  // Realised P&L: for each sell, profit = (sellPrice - avgBuyPrice) * units - fees.
+  // Dividends are pure cash gain (no cost-basis adjustment, since DRIP/reinvestment isn't tracked) —
+  // they're realised the moment they're paid, same treatment as cash interest elsewhere in the app.
+  const totalDividends = dividends.reduce((s,t) => s + (t.amount || 0), 0);
+  const realisedPnl = sells.reduce((s,t) => s + (t.price - avgBuyPrice)*t.units - (t.fees||0), 0) + totalDividends;
+  return { unitsHeld, avgBuyPrice, breakEven, currentValue, costBasis, unrealisedPnl, unrealisedPct, realisedPnl, totalBuyUnits, totalSellUnits, totalDividends };
 }
 
 // ─── POSITION CARD ────────────────────────────────────────────────────────────
@@ -2536,6 +2594,7 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
   const pos = calcPosition(trades, currentPrice);
   const isUp = pos.unrealisedPnl >= 0;
   const hasSells = trades.some(t => t.type === "sell");
+  const hasDividends = trades.some(t => t.type === "dividend");
 
   return (
     <div onClick={() => setOpen(!open)} style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `3px solid ${isUp ? C.green : C.red}` : `1px solid ${C.borderHover}`, transition: "border-color 0.2s, background 0.2s" }}>
@@ -2562,10 +2621,18 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
         ))}
       </div>
 
-      {hasSells && (
-        <div style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5 }}>REALISED</span>
-          <span style={{ fontSize: 12, fontFamily: FONT, fontWeight: 300, color: pos.realisedPnl>=0?C.green:C.red }}>{pos.realisedPnl>=0?"+":""}{fmtUSD(pos.realisedPnl)}</span>
+      {(hasSells || hasDividends) && (
+        <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 14 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5 }}>REALISED</span>
+            <span style={{ fontSize: 12, fontFamily: FONT, fontWeight: 300, color: pos.realisedPnl>=0?C.green:C.red }}>{pos.realisedPnl>=0?"+":""}{fmtUSD(pos.realisedPnl)}</span>
+          </div>
+          {hasDividends && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5 }}>DIVIDENDS</span>
+              <span style={{ fontSize: 12, fontFamily: FONT, fontWeight: 300, color: C.green }}>+{fmtUSD(pos.totalDividends)}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -2600,6 +2667,28 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
           {view === "trades" && (
             <div>
               {trades.sort((a,b) => new Date(b.date)-new Date(a.date)).map((t,i) => {
+                if (t.type === "dividend") {
+                  return (
+                    <div key={t.id} style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 9, fontFamily: MONO, color: C.green, letterSpacing: 1.5, textTransform: "uppercase" }}>Dividend</span>
+                          <span style={{ fontFamily: MONO, fontSize: 10, color: C.text3 }}>{t.date}</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 5 }}>
+                          <button onClick={() => onDelete(t.id)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 4, padding: "3px 7px", fontSize: 10, fontFamily: MONO, cursor: "pointer" }}>✕</button>
+                        </div>
+                      </div>
+                      <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 14, color: C.green }}>+{fmtUSD(t.amount)}</div>
+                      {t.originalCurrency && t.originalCurrency !== "USD" && (
+                        <div style={{ fontFamily: FONT, fontWeight: 300, fontSize: 10, color: C.text3, marginTop: 2 }}>
+                          Paid {CURRENCY_SYMBOLS[t.originalCurrency] || t.originalCurrency + " "}{Number(t.originalAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {t.originalCurrency}
+                        </div>
+                      )}
+                      {t.notes && <div style={{ fontSize: 11, color: C.text3, marginTop: 6, fontFamily: FONT, fontWeight: 300, fontStyle: "italic" }}>{t.notes}</div>}
+                    </div>
+                  );
+                }
                 // Per-trade P&L (only meaningful for buys)
                 const tradeCost = t.price * t.units + (t.fees || 0);
                 const tradeCurrentVal = currentPrice * t.units;
