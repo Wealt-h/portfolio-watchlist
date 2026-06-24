@@ -423,19 +423,19 @@ function calcSignal({ currentPrice, high52w, rsi, ma200, fearGreed, type }) {
 
   let signal, label, color, bg, description;
   if (score >= 6) {
-    signal = "strong-buy"; label = "STRONG BUY"; color = "#00ff9d"; bg = "rgba(0,255,157,0.12)";
+    signal = "strong-buy"; label = "STRONG BUY"; color = C.sigStrongBuy; bg = C.sigStrongBuyBg;
     description = "RSI oversold + significant dip from highs";
   } else if (score >= 4) {
-    signal = "dip"; label = "BUY DIP"; color = "#7dffb3"; bg = "rgba(125,255,179,0.1)";
+    signal = "dip"; label = "BUY DIP"; color = C.sigDip; bg = C.sigDipBg;
     description = "Good dip conditions across multiple indicators";
   } else if (score >= 2) {
-    signal = "watch"; label = "WATCHING"; color = "#7eb8ff"; bg = "rgba(126,184,255,0.1)";
+    signal = "watch"; label = "WATCHING"; color = C.sigWatch; bg = C.sigWatchBg;
     description = "Some weakness — monitor for better entry";
   } else if (score >= 0) {
-    signal = "near-high"; label = "WAIT"; color = "#f5a623"; bg = "rgba(245,166,35,0.1)";
+    signal = "near-high"; label = "WAIT"; color = C.sigWait; bg = C.sigWaitBg;
     description = "Near highs — wait for a meaningful pullback";
   } else {
-    signal = "avoid"; label = "AVOID"; color = "#ff6b6b"; bg = "rgba(255,107,107,0.1)";
+    signal = "avoid"; label = "AVOID"; color = C.sigAvoid; bg = C.sigAvoidBg;
     description = "Overbought or in greed territory";
   }
 
@@ -554,6 +554,13 @@ const DARK_THEME = {
   accentBuy:   "#00ff9d",
   accentSell:  "#f5a623",
   accentLink:  "#7eb8ff",
+  // Watchlist signal badge colors — strongBuy/dip are distinct greens to preserve
+  // the visual hierarchy between "strong buy" and "buy the dip"
+  sigStrongBuy: "#00ff9d", sigStrongBuyBg: "rgba(0,255,157,0.12)",
+  sigDip:       "#7dffb3", sigDipBg:       "rgba(125,255,179,0.1)",
+  sigWatch:     "#7eb8ff", sigWatchBg:     "rgba(126,184,255,0.1)",
+  sigWait:      "#f5a623", sigWaitBg:      "rgba(245,166,35,0.1)",
+  sigAvoid:     "#ff6b6b", sigAvoidBg:     "rgba(255,107,107,0.1)",
 };
 
 const LIGHT_THEME = {
@@ -586,6 +593,13 @@ const LIGHT_THEME = {
   accentBuy:   "#0ba968",
   accentSell:  "#c97f12",
   accentLink:  "#2566c9",
+  // Watchlist signal badge colors — deepened from the dark-theme neons so they read
+  // clearly on a white card instead of looking glaring/oversaturated
+  sigStrongBuy: "#0d9a5f", sigStrongBuyBg: "rgba(13,154,95,0.10)",
+  sigDip:       "#179a6b", sigDipBg:       "rgba(23,154,107,0.09)",
+  sigWatch:     "#2566c9", sigWatchBg:     "rgba(37,102,201,0.09)",
+  sigWait:      "#c97f12", sigWaitBg:      "rgba(201,127,18,0.10)",
+  sigAvoid:     "#d14f4f", sigAvoidBg:     "rgba(209,79,79,0.10)",
 };
 
 // Mutable theme object — every component reads C.xxx directly, so reassigning these
@@ -971,7 +985,7 @@ function WatchCard({ asset, onDelete, onNotesUpdate, onThesisUpdate, onAlert, al
             {!aiLoading && !asset.notes && (
               <div style={{ fontSize: 12, color: C.labelDim, fontStyle: "italic", fontFamily: "monospace" }}>Tap AI UPDATE for today's market briefing →</div>
             )}
-            {aiError && <div style={{ fontSize: 11, color: "#ff6b6b", marginTop: 6, fontFamily: "monospace" }}>{aiError}</div>}
+            {aiError && <div style={{ fontSize: 11, color: C.red, marginTop: 6, fontFamily: "monospace" }}>{aiError}</div>}
           </div>
 
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
@@ -1123,7 +1137,7 @@ function AssetSearchModal({ onAdd, onClose }) {
     setAdding(null);
   };
 
-  const TYPE_COLOR = { stock: "#7eb8ff", crypto: "#00ff9d", etf: "#f5a623" };
+  const TYPE_COLOR = { stock: C.sigWatch, crypto: C.sigStrongBuy, etf: C.sigWait };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
@@ -1150,7 +1164,7 @@ function AssetSearchModal({ onAdd, onClose }) {
 
         {/* Results */}
         <div style={{ overflowY: "auto", flex: 1 }}>
-          {error && <div style={{ fontSize: 12, color: "#ff6b6b", fontFamily: "monospace", marginBottom: 10 }}>{error}</div>}
+          {error && <div style={{ fontSize: 12, color: C.red, fontFamily: "monospace", marginBottom: 10 }}>{error}</div>}
 
           {results.length === 0 && !searching && query.length > 0 && (
             <div style={{ textAlign: "center", color: C.labelDim, fontFamily: "monospace", fontSize: 12, padding: "30px 0" }}>NO RESULTS FOUND</div>
@@ -1339,7 +1353,7 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
             </div>
             {fees > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 12, marginBottom: 4 }}>
               <span style={{ color: C.labelMute }}>FEES</span>
-              <span style={{ color: "#ff6b6b" }}>+{CURRENCY_SYMBOLS[tradeCurrency] || ""}{fees.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+              <span style={{ color: C.red }}>+{CURRENCY_SYMBOLS[tradeCurrency] || ""}{fees.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
             </div>}
             <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 13, borderTop: fees>0?"1px solid rgba(255,255,255,0.06)":"none", paddingTop: fees>0?4:0 }}>
               <span style={{ color: C.labelMute }}>{isBuy?"TOTAL COST":"NET PROCEEDS"}</span>
@@ -2657,11 +2671,11 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
 // ─── SIGNAL LEGEND ────────────────────────────────────────────────────────────
 function SignalLegend() {
   const rules = [
-    { sig: { label: "STRONG BUY", color: "#00ff9d", bg: "rgba(0,255,157,0.12)" }, rule: "RSI < 30 + 20%+ below 52W high" },
-    { sig: { label: "BUY DIP",    color: "#7dffb3", bg: "rgba(125,255,179,0.1)" }, rule: "RSI < 40 + 10–20% below 52W high" },
-    { sig: { label: "WATCHING",   color: "#7eb8ff", bg: "rgba(126,184,255,0.1)" }, rule: "Some weakness — monitor entry" },
-    { sig: { label: "WAIT",       color: "#f5a623", bg: "rgba(245,166,35,0.1)"  }, rule: "Near highs, no dip yet" },
-    { sig: { label: "AVOID",      color: "#ff6b6b", bg: "rgba(255,107,107,0.1)" }, rule: "Overbought / greed territory" },
+    { sig: { label: "STRONG BUY", color: C.sigStrongBuy, bg: C.sigStrongBuyBg }, rule: "RSI < 30 + 20%+ below 52W high" },
+    { sig: { label: "BUY DIP",    color: C.sigDip,        bg: C.sigDipBg },       rule: "RSI < 40 + 10–20% below 52W high" },
+    { sig: { label: "WATCHING",   color: C.sigWatch,      bg: C.sigWatchBg },     rule: "Some weakness — monitor entry" },
+    { sig: { label: "WAIT",       color: C.sigWait,       bg: C.sigWaitBg },      rule: "Near highs, no dip yet" },
+    { sig: { label: "AVOID",      color: C.sigAvoid,      bg: C.sigAvoidBg },     rule: "Overbought / greed territory" },
   ];
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 10, padding: "16px 18px", marginBottom: 20 }}>
