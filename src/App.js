@@ -3176,8 +3176,8 @@ export default function App() {
 
           {/* Combined Fear & Greed card — crypto + stocks + VIX side by side */}
           {(fearGreedData || stockFearGreed || vixData) && (() => {
-            const getColor = v => v <= 25 ? C.green : v <= 45 ? "rgba(74,222,128,0.6)" : v <= 55 ? C.text3 : v <= 75 ? C.amber : C.red;
-            // VIX uses an inverted scale — high VIX = fear (bad), low VIX = calm (good) — opposite framing from F&G's 0-100 scale
+            const getColor = v => v <= 25 ? C.red : v <= 45 ? C.amber : v <= 55 ? C.text3 : v <= 75 ? "rgba(74,222,128,0.6)" : C.green;
+            // VIX uses the same direct framing — high volatility (panic) red, low (complacent) green
             const vixColor = l => l === "panic" ? C.red : l === "elevated" ? C.amber : l === "calm" ? "rgba(74,222,128,0.6)" : C.green;
 
             const cols = [
@@ -3193,13 +3193,10 @@ export default function App() {
                   {cols.map((col, i) => (
                     <React.Fragment key={col.key}>
                       {i > 0 && <div style={{ width: 1, background: C.border, margin: "2px 10px" }} />}
-                      <div style={{ flex: 1, display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: col.color, marginTop: 6, flexShrink: 0 }} />
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1, marginBottom: 3 }}>{col.label}</div>
-                          <div style={{ fontSize: 18, fontWeight: 500, fontFamily: FONT, color: col.color, letterSpacing: -0.5, lineHeight: 1.1 }}>{col.value}</div>
-                          <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, marginTop: 2 }}>{col.sub}</div>
-                        </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1, marginBottom: 3 }}>{col.label}</div>
+                        <div style={{ fontSize: 18, fontWeight: 500, fontFamily: FONT, color: col.color, letterSpacing: -0.5, lineHeight: 1.1 }}>{col.value}</div>
+                        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, marginTop: 2 }}>{col.sub}</div>
                       </div>
                     </React.Fragment>
                   ))}
