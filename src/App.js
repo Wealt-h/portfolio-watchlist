@@ -2425,7 +2425,7 @@ function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, 
                 <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 6 }}>LAST 90 DAYS</div>
                 <ResponsiveContainer width="100%" height={90}>
                   <BarChart data={pnlData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <XAxis dataKey="date" hide />
                     <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
                       {pnlData.map((entry, i) => (
                         <Cell key={i} fill={entry.pnl >= 0 ? C.green : C.red} fillOpacity={0.75} />
