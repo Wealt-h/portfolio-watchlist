@@ -1863,6 +1863,158 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
               </div>
             </div>
           )}
+
+          {/* Dividend Calendar & Income Forecast */}
+          {(() => {
+            const allDividends = portfolio.filter(t => t.type === "dividend");
+            if (allDividends.length === 0) return null;
+
+            const today = new Date();
+            const twelveMonthsAgo = new Date(today);
+            twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+            // Trailing 12-month income, grouped by month
+            const monthBuckets = {};
+            for (let i = 11; i >= 0; i--) {
+              const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+              const key = d.toISOString().slice(0, 7); // YYYY-MM
+              monthBuckets[key] = 0;
+            }
+            allDividends.forEach(div => {
+              const divDate = new Date(div.date);
+              if (divDate >= twelveMonthsAgo) {
+                const key = div.date.slice(0, 7);
+                if (monthBuckets[key] !== undefined) monthBuckets[key] += div.amount || 0;
+              }
+            });
+            const trailing12moTotal = Object.values(monthBuckets).reduce((s, v) => s + v, 0);
+
+            // Income by position, trailing 12 months
+            const incomeBySymbol = {};
+            allDividends.forEach(div => {
+              if (new Date(div.date) >= twelveMonthsAgo) {
+                incomeBySymbol[div.symbol] = (incomeBySymbol[div.symbol] || 0) + (div.amount || 0);
+              }
+            });
+            const topIncomeSymbols = Object.entries(incomeBySymbol).sort((a, b) => b[1] - a[1]);
+
+            // Forecast next 12 months
+            const { forecast, frequencies } = forecastDividends(allDividends, 12);
+            const forecastTotal = forecast.reduce((s, f) => s + f.amount, 0);
+            const forecastByMonth = {};
+            for (let i = 0; i < 12; i++) {
+              const d = new Date(today.getFullYear(), today.getMonth() + i + 1, 1);
+              const key = d.toISOString().slice(0, 7);
+              forecastByMonth[key] = 0;
+            }
+            forecast.forEach(f => {
+              const key = f.date.slice(0, 7);
+              if (forecastByMonth[key] !== undefined) forecastByMonth[key] += f.amount;
+            });
+
+            const monthChartData = Object.entries(monthBuckets).map(([key, val]) => ({
+              month: new Date(key + "-01").toLocaleDateString("en-US", { month: "short" }),
+              amount: parseFloat(val.toFixed(2)),
+            }));
+            const forecastChartData = Object.entries(forecastByMonth).map(([key, val]) => ({
+              month: new Date(key + "-01").toLocaleDateString("en-US", { month: "short" }),
+              amount: parseFloat(val.toFixed(2)),
+            }));
+
+            const upcomingForecast = forecast
+              .filter(f => new Date(f.date) >= today)
+              .sort((a, b) => new Date(a.date) - new Date(b.date))
+              .slice(0, 8);
+
+            return (
+              <>
+                {/* Trailing 12mo income */}
+                <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>DIVIDEND INCOME · LAST 12 MONTHS</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 26, color: C.green, letterSpacing: -0.5, marginBottom: 14 }}>
+                    {fmtUSD(trailing12moTotal)}
+                  </div>
+                  <ResponsiveContainer width="100%" height={80}>
+                    <BarChart data={monthChartData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                      <XAxis dataKey="month" tick={{ fontSize: 8, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval={1} />
+                      <Bar dataKey="amount" radius={[2, 2, 0, 0]} fill={C.green} fillOpacity={0.75} />
+                      <Tooltip
+                        contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
+                        labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
+                        itemStyle={{ color: C.green, fontSize: 11, fontFamily: MONO }}
+                        formatter={v => [fmtUSD(v), "Received"]}
+                        cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Income by position */}
+                {topIncomeSymbols.length > 0 && (
+                  <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
+                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 12 }}>INCOME BY POSITION · LAST 12 MONTHS</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {topIncomeSymbols.map(([sym, amount]) => (
+                        <div key={sym} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <AssetLogo symbol={sym} size={24} />
+                            <span style={{ fontFamily: FONT, fontWeight: 300, fontSize: 13, color: C.text1 }}>{sym}</span>
+                            {frequencies[sym]?.label && (
+                              <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 0.5 }}>{frequencies[sym].label}</span>
+                            )}
+                          </div>
+                          <span style={{ fontFamily: FONT, fontWeight: 400, fontSize: 13, color: C.green }}>+{fmtUSD(amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Forecast */}
+                {forecast.length > 0 && (
+                  <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
+                    <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 10 }}>FORECASTED INCOME · NEXT 12 MONTHS</div>
+                    <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 26, color: C.text1, letterSpacing: -0.5, marginBottom: 4 }}>
+                      {fmtUSD(forecastTotal)}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.text3, fontFamily: FONT, fontWeight: 300, fontStyle: "italic", marginBottom: 14 }}>
+                      Estimate based on each position's historical payment pattern — not guaranteed
+                    </div>
+                    <ResponsiveContainer width="100%" height={80}>
+                      <BarChart data={forecastChartData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                        <XAxis dataKey="month" tick={{ fontSize: 8, fill: C.text3, fontFamily: MONO }} axisLine={false} tickLine={false} interval={1} />
+                        <Bar dataKey="amount" radius={[2, 2, 0, 0]} fill={C.text2} fillOpacity={0.6} />
+                        <Tooltip
+                          contentStyle={{ background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 6, padding: "4px 8px" }}
+                          labelStyle={{ color: C.text3, fontSize: 9, fontFamily: MONO }}
+                          itemStyle={{ color: C.text1, fontSize: 11, fontFamily: MONO }}
+                          formatter={v => [fmtUSD(v), "Forecast"]}
+                          cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+
+                    {upcomingForecast.length > 0 && (
+                      <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+                        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 10 }}>NEXT PAYMENTS</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                          {upcomingForecast.map((f, i) => (
+                            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ fontFamily: MONO, fontSize: 10, color: C.text3 }}>{new Date(f.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                                <span style={{ fontFamily: FONT, fontWeight: 300, fontSize: 12, color: C.text2 }}>{f.symbol}</span>
+                              </div>
+                              <span style={{ fontFamily: FONT, fontWeight: 300, fontSize: 12, color: C.text2 }}>~{fmtUSD(f.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </>
       )}
     </div>
@@ -2598,6 +2750,61 @@ function calcPositionAsOf(trades, priceOnDate) {
   const currentValue = (priceOnDate != null ? priceOnDate : avgBuyPrice) * unitsHeld;
   const unrealisedPnl = currentValue - costBasis;
   return { unitsHeld, costBasis, currentValue, unrealisedPnl };
+}
+
+// ─── DIVIDEND FORECASTING ───────────────────────────────────────────────────
+// Detects a position's typical payment interval from its dividend history (quarterly,
+// monthly, semi-annual, annual, or irregular), then projects the next 12 months forward
+// using the most recent payment amount as the estimate. This is a simple heuristic, not
+// a guarantee — real dividends can be cut, raised, or paused, so it's framed as a forecast.
+function detectDividendFrequency(dates) {
+  if (dates.length < 2) return null;
+  const sorted = [...dates].sort((a, b) => new Date(a) - new Date(b));
+  const gaps = [];
+  for (let i = 1; i < sorted.length; i++) {
+    gaps.push((new Date(sorted[i]) - new Date(sorted[i - 1])) / (1000 * 60 * 60 * 24));
+  }
+  const avgGap = gaps.reduce((s, g) => s + g, 0) / gaps.length;
+  if (avgGap <= 45) return { label: "Monthly", days: 30 };
+  if (avgGap <= 135) return { label: "Quarterly", days: 91 };
+  if (avgGap <= 270) return { label: "Semi-annual", days: 182 };
+  if (avgGap <= 450) return { label: "Annual", days: 365 };
+  return { label: "Irregular", days: null };
+}
+
+function forecastDividends(allDividends, months = 12) {
+  // Group by symbol
+  const bySymbol = {};
+  allDividends.forEach(d => {
+    if (!bySymbol[d.symbol]) bySymbol[d.symbol] = [];
+    bySymbol[d.symbol].push(d);
+  });
+
+  const forecast = []; // [{ date, symbol, amount, projected: true }]
+  const frequencies = {}; // { symbol: { label, days } }
+
+  Object.entries(bySymbol).forEach(([symbol, divs]) => {
+    const dates = divs.map(d => d.date);
+    const freq = detectDividendFrequency(dates);
+    frequencies[symbol] = freq;
+    if (!freq || !freq.days) return; // irregular or insufficient history — can't project
+
+    const sorted = [...divs].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const lastAmount = sorted[0].amount;
+    const lastDate = new Date(sorted[0].date);
+    const horizon = new Date();
+    horizon.setMonth(horizon.getMonth() + months);
+
+    let nextDate = new Date(lastDate);
+    nextDate.setDate(nextDate.getDate() + freq.days);
+    while (nextDate <= horizon) {
+      forecast.push({ date: nextDate.toISOString().slice(0, 10), symbol, amount: lastAmount, projected: true });
+      nextDate = new Date(nextDate);
+      nextDate.setDate(nextDate.getDate() + freq.days);
+    }
+  });
+
+  return { forecast, frequencies };
 }
 
 function calcPosition(trades, currentPrice) {
