@@ -3233,14 +3233,44 @@ export default function App() {
   const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setSessionChecked(true);
-    });
+    // If we've arrived here via an email confirmation (or OAuth) redirect, Supabase
+    // attaches auth info to the URL as a hash fragment (e.g. #access_token=...). In
+    // that case, wait for onAuthStateChange to report the session rather than trusting
+    // getSession()'s immediate result — getSession() can resolve "no session" a few
+    // milliseconds before Supabase finishes parsing that hash and creating the session,
+    // which is exactly what was causing confirmation links to land back on the login
+    // screen instead of logging the person in.
+    const arrivingFromAuthRedirect = window.location.hash.includes("access_token") || window.location.hash.includes("type=signup") || window.location.hash.includes("type=recovery");
+
+    if (!arrivingFromAuthRedirect) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        setSessionChecked(true);
+      });
+    }
+
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      setSessionChecked(true);
+      // Clean the hash out of the URL once we've consumed it, so refreshing the page
+      // or sharing the URL doesn't carry stale auth tokens around in the address bar
+      if (window.location.hash.includes("access_token")) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
     });
-    return () => listener.subscription.unsubscribe();
+
+    // Safety net: if we were waiting on an auth redirect but nothing arrives within
+    // a few seconds (e.g. an expired or already-used link), stop waiting and show
+    // the login screen rather than leaving the person stuck on a loading state forever.
+    let fallbackTimer;
+    if (arrivingFromAuthRedirect) {
+      fallbackTimer = setTimeout(() => setSessionChecked(true), 4000);
+    }
+
+    return () => {
+      listener.subscription.unsubscribe();
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+    };
   }, []);
 
   const [onboarded, setOnboarded] = useState(() => {
