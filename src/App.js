@@ -3522,18 +3522,13 @@ export default function App() {
             100% { background-position: 0% 0%; }
           }
 
-          /* ── Neon glow on headline-scale text. Text-shadow occupies zero layout space —
-             it paints outside the text's box without changing line height, width, or
-             position, so this can never cause overlap or reflow. Targets the actual
-             rendered font-size values used for big numbers/headlines throughout the app
-             (22px and up), rather than blanket-applying to every label, which would make
-             small mono captions look smudged instead of crisp. ── */
-          .accrue-cyberpunk [style*="font-size: 22"],
-          .accrue-cyberpunk [style*="font-size: 24"],
-          .accrue-cyberpunk [style*="font-size: 26"],
-          .accrue-cyberpunk [style*="font-size: 28"],
-          .accrue-cyberpunk [style*="font-size: 32"] {
-            text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+          /* ── Neon glow on every piece of text in the app, not just headlines — every
+             number, label, and letter gets a bloom. Text-shadow occupies zero layout
+             space (it paints outside the text's box without changing line height, width,
+             or position), so applying it universally still can't cause overlap, reflow,
+             or any layout shift — it's purely a paint-time glow on top of existing text. ── */
+          .accrue-cyberpunk * {
+            text-shadow: 0 0 6px currentColor, 0 0 14px currentColor;
           }
 
           /* ── Soft outer glow on every card/button border, on top of the existing
@@ -3565,18 +3560,35 @@ export default function App() {
             mix-blend-mode: screen;
           }
 
-          /* ── Glitch flicker on the wordmark — periodic, brief offset of the text-shadow
-             colors to suggest a chromatic-aberration glitch. Scoped to just the wordmark
-             via its own class, runs on a long interval so it reads as an occasional flicker
-             rather than a constant distracting animation. ── */
+          /* ── Broken-lamp flicker on the wordmark — irregular opacity drops layered with
+             a chromatic-aberration glitch, mimicking a failing fluorescent tube rather
+             than a smooth periodic pulse. Runs on a short 2.4s cycle with several uneven
+             flicker points rather than one predictable beat, then settles "on" most of
+             the time so it reads as occasional failure, not constant strobing. Scoped to
+             the wordmark's own class only — transform/opacity/text-shadow are all
+             paint/compositing properties, none of which affect layout or other elements. ── */
           .accrue-letter-cyber {
-            animation: cyberGlitch 6s infinite;
+            animation: cyberLamp 2.4s infinite;
           }
-          @keyframes cyberGlitch {
-            0%, 96%, 100% { text-shadow: none; transform: translateX(0); }
-            97% { text-shadow: -2px 0 #ff0a6c, 2px 0 #00f0ff; transform: translateX(-1px); }
-            98% { text-shadow: 2px 0 #ff0a6c, -2px 0 #00f0ff; transform: translateX(1px); }
-            99% { text-shadow: -1px 0 #ff0a6c, 1px 0 #00f0ff; transform: translateX(0); }
+          @keyframes cyberLamp {
+            0%   { opacity: 1;    text-shadow: none; transform: translateX(0); }
+            4%   { opacity: 0.2;  text-shadow: -2px 0 #ff0a6c, 2px 0 #00f0ff; transform: translateX(-1px); }
+            6%   { opacity: 1;    text-shadow: none; transform: translateX(0); }
+            9%   { opacity: 0.3;  text-shadow: 2px 0 #ff0a6c, -2px 0 #00f0ff; transform: translateX(1px); }
+            11%  { opacity: 1;    text-shadow: none; transform: translateX(0); }
+            12%  { opacity: 0.15; text-shadow: -1px 0 #ff0a6c, 1px 0 #00f0ff; transform: translateX(-1px); }
+            14%  { opacity: 1;    text-shadow: none; transform: translateX(0); }
+            45%  { opacity: 1;    text-shadow: none; transform: translateX(0); }
+            47%  { opacity: 0.25; text-shadow: 2px 0 #00f0ff, -2px 0 #ff0a6c; transform: translateX(1px); }
+            49%  { opacity: 1;    text-shadow: none; transform: translateX(0); }
+            50%  { opacity: 0.4;  text-shadow: -2px 0 #00f0ff, 2px 0 #ff0a6c; transform: translateX(-1px); }
+            52%  { opacity: 1;    text-shadow: none; transform: translateX(0); }
+            85%  { opacity: 1;    text-shadow: none; transform: translateX(0); }
+            87%  { opacity: 0.2;  text-shadow: -2px 0 #ff0a6c, 2px 0 #00f0ff; transform: translateX(1px); }
+            88%  { opacity: 0.6;  text-shadow: 1px 0 #00f0ff, -1px 0 #ff0a6c; transform: translateX(-1px); }
+            90%  { opacity: 0.15; text-shadow: -2px 0 #ff0a6c, 2px 0 #00f0ff; transform: translateX(0); }
+            92%  { opacity: 1;    text-shadow: none; transform: translateX(0); }
+            100% { opacity: 1;    text-shadow: none; transform: translateX(0); }
           }
 
           /* ── Animated gradient text on the wordmark itself, replacing the flat color
