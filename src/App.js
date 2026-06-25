@@ -3499,16 +3499,104 @@ export default function App() {
     <>
       {!onboarded && <OnboardingScreen onComplete={completeOnboarding} />}
       {onboarded && showReturningSplash && <ReturningSplash onDone={() => setShowReturningSplash(false)} />}
-      {onboarded && !showReturningSplash && <div className={theme === "cyberpunk" ? "accrue-cyberpunk" : ""} style={{ minHeight: "100vh", background: theme === "light" ? C.bg : theme === "cyberpunk" ? "linear-gradient(160deg, #1a0030 0%, #0a0014 45%, #150a28 100%)" : "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
+      {onboarded && !showReturningSplash && <div className={theme === "cyberpunk" ? "accrue-cyberpunk" : ""} style={{ minHeight: "100vh", position: "relative", background: theme === "light" ? C.bg : theme === "cyberpunk" ? "linear-gradient(160deg, #1a0030 0%, #0a0014 45%, #150a28 100%)" : "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", backgroundSize: theme === "cyberpunk" ? "200% 200%" : undefined, color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
       {theme === "cyberpunk" && (
         <style>{`
-          /* Cyberpunk borders run thicker across the board. Setting border-width alone
-             is safe here: CSS only renders a border when border-style is also set to
-             something visible (solid, dashed, etc) — elements with no border at all
-             (the vast majority, since most things in this app have border: none) are
-             completely unaffected, since their border-style stays "none" regardless. */
+          /* ── Borders run thicker across the board. Setting border-width alone is safe:
+             CSS only renders a border when border-style is also set to something visible,
+             so elements with no border at all (border: none, the vast majority) are
+             completely unaffected — their border-style stays "none" regardless. ── */
           .accrue-cyberpunk * {
             border-width: 2px !important;
+          }
+
+          /* ── Slowly drifting background gradient instead of a static one. Animates
+             background-position across an oversized gradient — pure CSS, no JS, and
+             since it's a background property it never affects layout or content flow. ── */
+          .accrue-cyberpunk {
+            animation: cyberDrift 18s ease-in-out infinite;
+          }
+          @keyframes cyberDrift {
+            0%   { background-position: 0% 0%; }
+            50%  { background-position: 100% 100%; }
+            100% { background-position: 0% 0%; }
+          }
+
+          /* ── Neon glow on headline-scale text. Text-shadow occupies zero layout space —
+             it paints outside the text's box without changing line height, width, or
+             position, so this can never cause overlap or reflow. Targets the actual
+             rendered font-size values used for big numbers/headlines throughout the app
+             (22px and up), rather than blanket-applying to every label, which would make
+             small mono captions look smudged instead of crisp. ── */
+          .accrue-cyberpunk [style*="font-size: 22"],
+          .accrue-cyberpunk [style*="font-size: 24"],
+          .accrue-cyberpunk [style*="font-size: 26"],
+          .accrue-cyberpunk [style*="font-size: 28"],
+          .accrue-cyberpunk [style*="font-size: 32"] {
+            text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+          }
+
+          /* ── Soft outer glow on every card/button border, on top of the existing
+             border color — box-shadow renders outside the box and never affects layout,
+             sibling positioning, or click targets (since "outside" the box doesn't mean
+             "on top of" neighboring elements at normal spacing). ── */
+          .accrue-cyberpunk [style*="border"] {
+            box-shadow: 0 0 6px rgba(0,240,255,0.15), 0 0 14px rgba(255,0,200,0.08);
+          }
+
+          /* ── Scanline overlay — classic CRT/cyberpunk texture. A fixed, full-screen
+             pseudo-element layered on top via z-index, with pointer-events: none so it
+             can never intercept taps or clicks on the real UI underneath it. Decorative
+             only — it isn't part of the DOM layout flow (position: fixed removes it from
+             flow entirely), so it cannot push, resize, or shift any real content. ── */
+          .accrue-cyberpunk::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+              0deg,
+              rgba(0,240,255,0.025) 0px,
+              rgba(0,240,255,0.025) 1px,
+              transparent 1px,
+              transparent 3px
+            );
+            pointer-events: none;
+            z-index: 600;
+            mix-blend-mode: screen;
+          }
+
+          /* ── Glitch flicker on the wordmark — periodic, brief offset of the text-shadow
+             colors to suggest a chromatic-aberration glitch. Scoped to just the wordmark
+             via its own class, runs on a long interval so it reads as an occasional flicker
+             rather than a constant distracting animation. ── */
+          .accrue-letter-cyber {
+            animation: cyberGlitch 6s infinite;
+          }
+          @keyframes cyberGlitch {
+            0%, 96%, 100% { text-shadow: none; transform: translateX(0); }
+            97% { text-shadow: -2px 0 #ff0a6c, 2px 0 #00f0ff; transform: translateX(-1px); }
+            98% { text-shadow: 2px 0 #ff0a6c, -2px 0 #00f0ff; transform: translateX(1px); }
+            99% { text-shadow: -1px 0 #ff0a6c, 1px 0 #00f0ff; transform: translateX(0); }
+          }
+
+          /* ── Animated gradient text on the wordmark itself, replacing the flat color
+             with a shifting magenta-to-cyan sweep. background-clip: text is well
+             supported and purely a paint-time effect — it doesn't change the element's
+             box model, so surrounding layout is unaffected. ── */
+          .accrue-wordmark-cyber {
+            background: linear-gradient(90deg, #ff0a6c, #00f0ff, #00ff9d, #ff0a6c);
+            background-size: 300% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: cyberTextSweep 5s linear infinite;
+          }
+          .accrue-wordmark-cyber .accrue-letter-cyber {
+            color: transparent !important;
+            -webkit-text-fill-color: transparent;
+          }
+          @keyframes cyberTextSweep {
+            0%   { background-position: 0% 50%; }
+            100% { background-position: 300% 50%; }
           }
         `}</style>
       )}
@@ -3526,7 +3614,7 @@ export default function App() {
             </button>
 
             {/* ACCRUE wordmark — letter fade */}
-            <div style={{ display: "flex", alignItems: "center", gap: 0, lineHeight: 1 }}>
+            <div className={theme === "cyberpunk" ? "accrue-wordmark-cyber" : ""} style={{ display: "flex", alignItems: "center", gap: 0, lineHeight: 1 }}>
               {[
                 ["A", 1.0],
                 ["C", 0.92],
@@ -3535,7 +3623,7 @@ export default function App() {
                 ["U", 0.68],
                 ["E", 0.60],
               ].map(([letter, opacity], i) => (
-                <span key={i} style={{
+                <span key={i} className={theme === "cyberpunk" ? "accrue-letter-cyber" : ""} style={{
                   fontSize: 26,
                   fontWeight: 200,
                   letterSpacing: 6,
