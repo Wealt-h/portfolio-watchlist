@@ -624,6 +624,40 @@ async function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
+// ─── SUPABASE: WATCHLIST ──────────────────────────────────────────────────────
+// Maps between the app's camelCase watchlist shape and Supabase's snake_case columns.
+async function fetchWatchlistFromSupabase(userId) {
+  const { data, error } = await supabase.from("watchlist").select("*").eq("user_id", userId).order("id", { ascending: true });
+  if (error) { console.error("fetchWatchlistFromSupabase:", error.message); return null; }
+  return data.map(row => ({
+    id: row.id, symbol: row.symbol, name: row.name, type: row.type,
+    notes: row.notes || "", thesis: row.thesis || "",
+  }));
+}
+
+async function pushWatchlistItemToSupabase(userId, asset) {
+  const row = {
+    user_id: userId, symbol: asset.symbol, name: asset.name, type: asset.type,
+    notes: asset.notes || "", thesis: asset.thesis || "",
+  };
+  if (asset.id && typeof asset.id === "number" && asset.id < 1e12) {
+    // Looks like a real Supabase-issued id already (small sequential integer) — update
+    const { error } = await supabase.from("watchlist").update(row).eq("id", asset.id).eq("user_id", userId);
+    if (error) console.error("pushWatchlistItemToSupabase (update):", error.message);
+    return asset.id;
+  } else {
+    // New item, or a legacy local Date.now()-style id — insert fresh and let Supabase assign a real id
+    const { data, error } = await supabase.from("watchlist").insert(row).select("id").single();
+    if (error) { console.error("pushWatchlistItemToSupabase (insert):", error.message); return null; }
+    return data.id;
+  }
+}
+
+async function deleteWatchlistItemFromSupabase(userId, id) {
+  const { error } = await supabase.from("watchlist").delete().eq("id", id).eq("user_id", userId);
+  if (error) console.error("deleteWatchlistItemFromSupabase:", error.message);
+}
+
 // ─── REAL-TIME PRICES (via serverless to avoid CORS) ─────────────────────────
 async function fetchLivePrices(symbols) {
   try {
@@ -3470,12 +3504,33 @@ export default function App() {
   }, [loaded]);
 
   useEffect(() => {
+    if (!sessionChecked || !session) return; // wait until we actually know who's logged in
     (async () => {
-      const w = await load("pf_watchlist_v3", DEFAULT_WATCHLIST);
+      const userId = session.user.id;
+      const localWatchlist = await load("pf_watchlist_v3", null);
+      const remoteWatchlist = await fetchWatchlistFromSupabase(userId);
+
+      if (remoteWatchlist !== null && remoteWatchlist.length > 0) {
+        // Supabase already has data for this account — that's the source of truth now
+        setWatchlist(remoteWatchlist);
+      } else if (localWatchlist && localWatchlist.length > 0) {
+        // First time this account has synced, but there's existing local data from
+        // before accounts existed — migrate it up to Supabase once, then use it
+        const migrated = [];
+        for (const asset of localWatchlist) {
+          const newId = await pushWatchlistItemToSupabase(userId, asset);
+          migrated.push({ ...asset, id: newId || asset.id });
+        }
+        setWatchlist(migrated);
+      } else {
+        setWatchlist(DEFAULT_WATCHLIST);
+      }
+
       const p = await load("pf_portfolio_v4", DEFAULT_PORTFOLIO);
-      setWatchlist(w); setPortfolio(p); setLoaded(true);
+      setPortfolio(p);
+      setLoaded(true);
     })();
-  }, []);
+  }, [sessionChecked, session]);
   useEffect(() => { if (loaded) save("pf_watchlist_v3", watchlist); }, [watchlist, loaded]);
 
   // Fetch benchmark period returns for insights — generalized so any symbol can be
@@ -3627,9 +3682,20 @@ export default function App() {
   }, []);
   useEffect(() => { if (propertiesLoaded) save("pf_properties_v1", properties); }, [properties, propertiesLoaded]);
 
-  const saveWatch = (form) => {
-    if (watchModal?.asset) setWatchlist(w => w.map(x => x.id === watchModal.asset.id ? { ...form, id: x.id } : x));
-    else setWatchlist(w => [...w, { ...form, id: Date.now() }]);
+  const saveWatch = async (form) => {
+    if (watchModal?.asset) {
+      const updated = { ...form, id: watchModal.asset.id };
+      setWatchlist(w => w.map(x => x.id === watchModal.asset.id ? updated : x));
+      if (session?.user?.id) await pushWatchlistItemToSupabase(session.user.id, updated);
+    } else {
+      const tempId = Date.now();
+      const newAsset = { ...form, id: tempId };
+      setWatchlist(w => [...w, newAsset]);
+      if (session?.user?.id) {
+        const realId = await pushWatchlistItemToSupabase(session.user.id, newAsset);
+        if (realId) setWatchlist(w => w.map(x => x.id === tempId ? { ...x, id: realId } : x));
+      }
+    }
     setWatchModal(null);
   };
 
@@ -3934,7 +4000,22 @@ export default function App() {
 
           {filteredWatch.length === 0
             ? <div style={{ textAlign:"center", color:C.text3, fontFamily:FONT, fontWeight:300, fontSize:13, padding:"40px 0" }}>No assets match filter</div>
-            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} onDelete={id => setWatchlist(w => w.filter(x => x.id !== id))} onNotesUpdate={(id, note) => setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x))} onThesisUpdate={(id, thesis) => setWatchlist(w => w.map(x => x.id === id ? {...x, thesis} : x))} onAlert={(asset) => setAlertModal({ symbol: asset.symbol, currentPrice: asset.currentPrice })} alertCount={alerts.filter(al => al.symbol === a.symbol && !al.triggered).length} onLogTrade={(sym) => setTradeModal({ defaultType: "buy", symbol: sym })} />)
+            : filteredWatch.map(a => <WatchCard key={a.id} asset={a}
+                onDelete={id => {
+                  setWatchlist(w => w.filter(x => x.id !== id));
+                  if (session?.user?.id) deleteWatchlistItemFromSupabase(session.user.id, id);
+                }}
+                onNotesUpdate={(id, note) => {
+                  setWatchlist(w => w.map(x => x.id === id ? {...x, notes: note} : x));
+                  const asset = watchlist.find(x => x.id === id);
+                  if (session?.user?.id && asset) pushWatchlistItemToSupabase(session.user.id, { ...asset, notes: note });
+                }}
+                onThesisUpdate={(id, thesis) => {
+                  setWatchlist(w => w.map(x => x.id === id ? {...x, thesis} : x));
+                  const asset = watchlist.find(x => x.id === id);
+                  if (session?.user?.id && asset) pushWatchlistItemToSupabase(session.user.id, { ...asset, thesis });
+                }}
+                onAlert={(asset) => setAlertModal({ symbol: asset.symbol, currentPrice: asset.currentPrice })} alertCount={alerts.filter(al => al.symbol === a.symbol && !al.triggered).length} onLogTrade={(sym) => setTradeModal({ defaultType: "buy", symbol: sym })} />)
           }
           <button onClick={() => setSearchModal(true)} style={{ width:"100%", marginTop:10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"16px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Add asset</button>
         </>
@@ -4106,7 +4187,14 @@ export default function App() {
       )}
 
       {watchModal !== null && <WatchModal asset={watchModal.asset} onSave={saveWatch} onClose={() => setWatchModal(null)} />}
-      {searchModal && <AssetSearchModal onAdd={asset => { setWatchlist(w => [...w, asset]); }} onClose={() => setSearchModal(false)} />}
+      {searchModal && <AssetSearchModal onAdd={asset => {
+        setWatchlist(w => [...w, asset]);
+        if (session?.user?.id) {
+          pushWatchlistItemToSupabase(session.user.id, asset).then(realId => {
+            if (realId) setWatchlist(w => w.map(x => x.id === asset.id ? { ...x, id: realId } : x));
+          });
+        }
+      }} onClose={() => setSearchModal(false)} />}
       {alertModal && <AlertModal symbol={alertModal.symbol} currentPrice={alertModal.currentPrice} alerts={alerts} onSave={alert => setAlerts(a => [...a, alert])} onDelete={id => setAlerts(a => a.filter(x => x.id !== id))} onClose={() => setAlertModal(null)} />}
       {cashModal !== null && <CashModal account={cashModal} onSave={acc => {
         const isMergeCase = cashModal === "new" || (typeof cashModal === "object" && cashModal.topUpFor);
