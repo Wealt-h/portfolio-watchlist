@@ -658,6 +658,47 @@ async function deleteWatchlistItemFromSupabase(userId, id) {
   if (error) console.error("deleteWatchlistItemFromSupabase:", error.message);
 }
 
+// ─── SUPABASE: TRADES (buy / sell / dividend) ─────────────────────────────────
+async function fetchTradesFromSupabase(userId) {
+  const { data, error } = await supabase.from("trades").select("*").eq("user_id", userId).order("id", { ascending: true });
+  if (error) { console.error("fetchTradesFromSupabase:", error.message); return null; }
+  return data.map(row => ({
+    id: row.id, type: row.type, symbol: row.symbol, name: row.name,
+    price: row.price, units: row.units, fees: row.fees || 0, amount: row.amount,
+    date: row.date, notes: row.notes || "", brokerage: row.brokerage || "",
+    ...(row.original_currency ? { originalCurrency: row.original_currency } : {}),
+    ...(row.original_price != null ? { originalPrice: row.original_price } : {}),
+    ...(row.original_amount != null ? { originalAmount: row.original_amount } : {}),
+  }));
+}
+
+async function pushTradeToSupabase(userId, trade) {
+  const row = {
+    user_id: userId, type: trade.type, symbol: trade.symbol, name: trade.name,
+    price: trade.price ?? null, units: trade.units ?? null, fees: trade.fees || 0, amount: trade.amount ?? null,
+    date: trade.date, notes: trade.notes || "", brokerage: trade.brokerage || "",
+    original_currency: trade.originalCurrency || null,
+    original_price: trade.originalPrice ?? null,
+    original_amount: trade.originalAmount ?? null,
+  };
+  if (trade.id && typeof trade.id === "number" && trade.id < 1e12) {
+    // Small sequential id — already a real Supabase row, update it
+    const { error } = await supabase.from("trades").update(row).eq("id", trade.id).eq("user_id", userId);
+    if (error) console.error("pushTradeToSupabase (update):", error.message);
+    return trade.id;
+  } else {
+    // New trade, or a legacy local Date.now()-style id — insert fresh
+    const { data, error } = await supabase.from("trades").insert(row).select("id").single();
+    if (error) { console.error("pushTradeToSupabase (insert):", error.message); return null; }
+    return data.id;
+  }
+}
+
+async function deleteTradeFromSupabase(userId, id) {
+  const { error } = await supabase.from("trades").delete().eq("id", id).eq("user_id", userId);
+  if (error) console.error("deleteTradeFromSupabase:", error.message);
+}
+
 // ─── REAL-TIME PRICES (via serverless to avoid CORS) ─────────────────────────
 async function fetchLivePrices(symbols) {
   try {
@@ -3526,8 +3567,22 @@ export default function App() {
         setWatchlist(DEFAULT_WATCHLIST);
       }
 
-      const p = await load("pf_portfolio_v4", DEFAULT_PORTFOLIO);
-      setPortfolio(p);
+      const localPortfolio = await load("pf_portfolio_v4", null);
+      const remotePortfolio = await fetchTradesFromSupabase(userId);
+
+      if (remotePortfolio !== null && remotePortfolio.length > 0) {
+        setPortfolio(remotePortfolio);
+      } else if (localPortfolio && localPortfolio.length > 0) {
+        const migratedTrades = [];
+        for (const trade of localPortfolio) {
+          const newId = await pushTradeToSupabase(userId, trade);
+          migratedTrades.push({ ...trade, id: newId || trade.id });
+        }
+        setPortfolio(migratedTrades);
+      } else {
+        setPortfolio(DEFAULT_PORTFOLIO);
+      }
+
       setLoaded(true);
     })();
   }, [sessionChecked, session]);
@@ -4108,7 +4163,10 @@ export default function App() {
 
                 {positionSummaries.map(({sym, trades}) => (
                   <PositionCard key={sym} trades={trades} currentPrice={getLivePrice(sym)}
-                    onDelete={id => setPortfolio(p => p.filter(x => x.id !== id))}
+                    onDelete={id => {
+                      setPortfolio(p => p.filter(x => x.id !== id));
+                      if (session?.user?.id) deleteTradeFromSupabase(session.user.id, id);
+                    }}
                     onAddTrade={(sym) => setTradeModal({ defaultType:"buy", symbol:sym })}
                     onEdit={(trade) => setEditTradeModal(trade)} />
                 ))}
@@ -4225,8 +4283,22 @@ export default function App() {
         else setProperties(ps => ps.map(x => x.id === p.id ? p : x));
         setPropertyModal(null);
       }} onClose={() => setPropertyModal(null)} />}
-      {editTradeModal && <EditTradeModal trade={editTradeModal} portfolio={portfolio} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
-      {tradeModal !== null && <TradeModal watchlist={watchlist} portfolio={portfolio} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
+      {editTradeModal && <EditTradeModal trade={editTradeModal} portfolio={portfolio} onSave={(updated) => {
+        setPortfolio(p => p.map(t => t.id === updated.id ? updated : t));
+        if (session?.user?.id) pushTradeToSupabase(session.user.id, updated);
+        setEditTradeModal(null);
+      }} onClose={() => setEditTradeModal(null)} />}
+      {tradeModal !== null && <TradeModal watchlist={watchlist} portfolio={portfolio} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade => {
+        const tempId = trade.id || Date.now();
+        const newTrade = { ...trade, id: tempId };
+        setPortfolio(p => [...p, newTrade]);
+        if (session?.user?.id) {
+          pushTradeToSupabase(session.user.id, newTrade).then(realId => {
+            if (realId) setPortfolio(p => p.map(t => t.id === tempId ? { ...t, id: realId } : t));
+          });
+        }
+        setTradeModal(null);
+      }} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
       <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} theme={theme} onSetTheme={setThemeDirect} onLogout={() => supabase.auth.signOut()} />
       {aboutOpen && <AboutScreen onClose={() => setAboutOpen(false)} />}
     </div>}
