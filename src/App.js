@@ -702,6 +702,102 @@ async function deleteTradeFromSupabase(userId, id) {
   if (error) console.error("deleteTradeFromSupabase:", error.message);
 }
 
+// ─── SUPABASE: CASH ACCOUNTS ──────────────────────────────────────────────────
+async function fetchCashAccountsFromSupabase(userId) {
+  const { data, error } = await supabase.from("cash_accounts").select("*").eq("user_id", userId).order("id", { ascending: true });
+  if (error) { console.error("fetchCashAccountsFromSupabase:", error.message); return null; }
+  return data.map(row => ({
+    id: row.id, institution: row.institution, principal: row.principal, rate: row.rate,
+    startDate: row.start_date, accountType: row.account_type || "Savings", notes: row.notes || "", _synced: true,
+  }));
+}
+
+async function pushCashAccountToSupabase(userId, account) {
+  const row = {
+    user_id: userId, institution: account.institution, principal: account.principal, rate: account.rate,
+    start_date: account.startDate, account_type: account.accountType || "Savings", notes: account.notes || "",
+  };
+  if (account._synced && account.id) {
+    const { error } = await supabase.from("cash_accounts").update(row).eq("id", account.id).eq("user_id", userId);
+    if (error) console.error("pushCashAccountToSupabase (update):", error.message);
+    return account.id;
+  } else {
+    const { data, error } = await supabase.from("cash_accounts").insert(row).select("id").single();
+    if (error) { console.error("pushCashAccountToSupabase (insert):", error.message); return null; }
+    return data.id;
+  }
+}
+
+async function deleteCashAccountFromSupabase(userId, id) {
+  const { error } = await supabase.from("cash_accounts").delete().eq("id", id).eq("user_id", userId);
+  if (error) console.error("deleteCashAccountFromSupabase:", error.message);
+}
+
+// ─── SUPABASE: PROPERTIES ──────────────────────────────────────────────────────
+async function fetchPropertiesFromSupabase(userId) {
+  const { data, error } = await supabase.from("properties").select("*").eq("user_id", userId).order("id", { ascending: true });
+  if (error) { console.error("fetchPropertiesFromSupabase:", error.message); return null; }
+  return data.map(row => ({
+    id: row.id, name: row.name, purchasePrice: row.purchase_price, currentValue: row.current_value,
+    purchaseDate: row.purchase_date, loanPrincipal: row.loan_principal, interestRate: row.interest_rate,
+    repaymentAmount: row.repayment_amount, repaymentFrequency: row.repayment_frequency,
+    loanStartDate: row.loan_start_date, weeklyRent: row.weekly_rent, weeklyCosts: row.weekly_costs,
+    notes: row.notes || "", dateAdded: row.date_added, _synced: true,
+  }));
+}
+
+async function pushPropertyToSupabase(userId, property) {
+  const row = {
+    user_id: userId, name: property.name, purchase_price: property.purchasePrice, current_value: property.currentValue,
+    purchase_date: property.purchaseDate, loan_principal: property.loanPrincipal || 0, interest_rate: property.interestRate || 0,
+    repayment_amount: property.repaymentAmount || 0, repayment_frequency: property.repaymentFrequency || "monthly",
+    loan_start_date: property.loanStartDate, weekly_rent: property.weeklyRent || 0, weekly_costs: property.weeklyCosts || 0,
+    notes: property.notes || "", date_added: property.dateAdded || new Date().toISOString().slice(0, 10),
+  };
+  if (property._synced && property.id) {
+    const { error } = await supabase.from("properties").update(row).eq("id", property.id).eq("user_id", userId);
+    if (error) console.error("pushPropertyToSupabase (update):", error.message);
+    return property.id;
+  } else {
+    const { data, error } = await supabase.from("properties").insert(row).select("id").single();
+    if (error) { console.error("pushPropertyToSupabase (insert):", error.message); return null; }
+    return data.id;
+  }
+}
+
+async function deletePropertyFromSupabase(userId, id) {
+  const { error } = await supabase.from("properties").delete().eq("id", id).eq("user_id", userId);
+  if (error) console.error("deletePropertyFromSupabase:", error.message);
+}
+
+// ─── SUPABASE: ALERTS ──────────────────────────────────────────────────────────
+async function fetchAlertsFromSupabase(userId) {
+  const { data, error } = await supabase.from("alerts").select("*").eq("user_id", userId).order("id", { ascending: true });
+  if (error) { console.error("fetchAlertsFromSupabase:", error.message); return null; }
+  return data.map(row => ({
+    id: row.id, symbol: row.symbol, target: row.target, direction: row.direction,
+    triggered: row.triggered, _synced: true,
+  }));
+}
+
+async function pushAlertToSupabase(userId, alert) {
+  const row = { user_id: userId, symbol: alert.symbol, target: alert.target, direction: alert.direction, triggered: alert.triggered || false };
+  if (alert._synced && alert.id) {
+    const { error } = await supabase.from("alerts").update(row).eq("id", alert.id).eq("user_id", userId);
+    if (error) console.error("pushAlertToSupabase (update):", error.message);
+    return alert.id;
+  } else {
+    const { data, error } = await supabase.from("alerts").insert(row).select("id").single();
+    if (error) { console.error("pushAlertToSupabase (insert):", error.message); return null; }
+    return data.id;
+  }
+}
+
+async function deleteAlertFromSupabase(userId, id) {
+  const { error } = await supabase.from("alerts").delete().eq("id", id).eq("user_id", userId);
+  if (error) console.error("deleteAlertFromSupabase:", error.message);
+}
+
 // ─── REAL-TIME PRICES (via serverless to avoid CORS) ─────────────────────────
 async function fetchLivePrices(symbols) {
   try {
@@ -3715,29 +3811,77 @@ export default function App() {
 
   // Load alerts
   useEffect(() => {
+    if (!sessionChecked || !session) return;
     (async () => {
-      const a = await load("pf_alerts_v1", []);
-      setAlerts(a); setAlertsLoaded(true);
+      const userId = session.user.id;
+      const localAlerts = await load("pf_alerts_v1", null);
+      const remoteAlerts = await fetchAlertsFromSupabase(userId);
+
+      if (remoteAlerts !== null && remoteAlerts.length > 0) {
+        setAlerts(remoteAlerts);
+      } else if (localAlerts && localAlerts.length > 0) {
+        const migrated = [];
+        for (const alert of localAlerts) {
+          const newId = await pushAlertToSupabase(userId, alert);
+          migrated.push({ ...alert, id: newId || alert.id, _synced: !!newId });
+        }
+        setAlerts(migrated);
+      } else {
+        setAlerts([]);
+      }
+      setAlertsLoaded(true);
     })();
-  }, []);
+  }, [sessionChecked, session]);
   useEffect(() => { if (alertsLoaded) save("pf_alerts_v1", alerts); }, [alerts, alertsLoaded]);
 
   // Load cash accounts
   useEffect(() => {
+    if (!sessionChecked || !session) return;
     (async () => {
-      const c = await load("pf_cash_v1", []);
-      setCashAccounts(c); setCashLoaded(true);
+      const userId = session.user.id;
+      const localCash = await load("pf_cash_v1", null);
+      const remoteCash = await fetchCashAccountsFromSupabase(userId);
+
+      if (remoteCash !== null && remoteCash.length > 0) {
+        setCashAccounts(remoteCash);
+      } else if (localCash && localCash.length > 0) {
+        const migrated = [];
+        for (const account of localCash) {
+          const newId = await pushCashAccountToSupabase(userId, account);
+          migrated.push({ ...account, id: newId || account.id, _synced: !!newId });
+        }
+        setCashAccounts(migrated);
+      } else {
+        setCashAccounts([]);
+      }
+      setCashLoaded(true);
     })();
-  }, []);
+  }, [sessionChecked, session]);
   useEffect(() => { if (cashLoaded) save("pf_cash_v1", cashAccounts); }, [cashAccounts, cashLoaded]);
 
   // Load properties
   useEffect(() => {
+    if (!sessionChecked || !session) return;
     (async () => {
-      const p = await load("pf_properties_v1", []);
-      setProperties(p); setPropertiesLoaded(true);
+      const userId = session.user.id;
+      const localProperties = await load("pf_properties_v1", null);
+      const remoteProperties = await fetchPropertiesFromSupabase(userId);
+
+      if (remoteProperties !== null && remoteProperties.length > 0) {
+        setProperties(remoteProperties);
+      } else if (localProperties && localProperties.length > 0) {
+        const migrated = [];
+        for (const property of localProperties) {
+          const newId = await pushPropertyToSupabase(userId, property);
+          migrated.push({ ...property, id: newId || property.id, _synced: !!newId });
+        }
+        setProperties(migrated);
+      } else {
+        setProperties([]);
+      }
+      setPropertiesLoaded(true);
     })();
-  }, []);
+  }, [sessionChecked, session]);
   useEffect(() => { if (propertiesLoaded) save("pf_properties_v1", properties); }, [properties, propertiesLoaded]);
 
   const saveWatch = async (form) => {
@@ -4186,7 +4330,10 @@ export default function App() {
               {cashAccounts.map(a => (
                 <CashCard key={a.id} account={a}
                   onEdit={a => setCashModal(a)}
-                  onDelete={id => setCashAccounts(c => c.filter(x => x.id !== id))}
+                  onDelete={id => {
+                    setCashAccounts(c => c.filter(x => x.id !== id));
+                    if (session?.user?.id) deleteCashAccountFromSupabase(session.user.id, id);
+                  }}
                   onAddCash={a => setCashModal({ topUpFor: a.institution })}
                 />
               ))}
@@ -4200,7 +4347,10 @@ export default function App() {
               {properties.map(p => (
                 <PropertyCard key={p.id} property={p}
                   onEdit={p => setPropertyModal(p)}
-                  onDelete={id => setProperties(ps => ps.filter(x => x.id !== id))}
+                  onDelete={id => {
+                    setProperties(ps => ps.filter(x => x.id !== id));
+                    if (session?.user?.id) deletePropertyFromSupabase(session.user.id, id);
+                  }}
                 />
               ))}
             </div>
@@ -4259,7 +4409,22 @@ export default function App() {
           });
         }
       }} onClose={() => setSearchModal(false)} />}
-      {alertModal && <AlertModal symbol={alertModal.symbol} currentPrice={alertModal.currentPrice} alerts={alerts} onSave={alert => setAlerts(a => [...a, alert])} onDelete={id => setAlerts(a => a.filter(x => x.id !== id))} onClose={() => setAlertModal(null)} />}
+      {alertModal && <AlertModal symbol={alertModal.symbol} currentPrice={alertModal.currentPrice} alerts={alerts}
+        onSave={alert => {
+          const tempId = alert.id || Date.now();
+          const newAlert = { ...alert, id: tempId, _synced: false };
+          setAlerts(a => [...a, newAlert]);
+          if (session?.user?.id) {
+            pushAlertToSupabase(session.user.id, newAlert).then(realId => {
+              if (realId) setAlerts(a => a.map(x => x.id === tempId ? { ...x, id: realId, _synced: true } : x));
+            });
+          }
+        }}
+        onDelete={id => {
+          setAlerts(a => a.filter(x => x.id !== id));
+          if (session?.user?.id) deleteAlertFromSupabase(session.user.id, id);
+        }}
+        onClose={() => setAlertModal(null)} />}
       {cashModal !== null && <CashModal account={cashModal} onSave={acc => {
         const isMergeCase = cashModal === "new" || (typeof cashModal === "object" && cashModal.topUpFor);
         if (isMergeCase) {
@@ -4275,18 +4440,39 @@ export default function App() {
                 rate: acc.rate, // use latest rate in case it changed
                 notes: acc.notes || existing.notes,
               };
+              if (session?.user?.id) pushCashAccountToSupabase(session.user.id, merged);
               return c.map((x, i) => i === existingIdx ? merged : x);
             }
-            return [...c, acc];
+            const newAccount = { ...acc, _synced: false };
+            if (session?.user?.id) {
+              pushCashAccountToSupabase(session.user.id, newAccount).then(realId => {
+                if (realId) setCashAccounts(cs => cs.map(x => x.id === newAccount.id ? { ...x, id: realId, _synced: true } : x));
+              });
+            }
+            return [...c, newAccount];
           });
         } else {
-          setCashAccounts(c => c.map(x => x.id === acc.id ? acc : x));
+          const updated = { ...acc, _synced: cashModal._synced };
+          setCashAccounts(c => c.map(x => x.id === acc.id ? updated : x));
+          if (session?.user?.id) pushCashAccountToSupabase(session.user.id, updated);
         }
         setCashModal(null);
       }} onClose={() => setCashModal(null)} />}
       {propertyModal !== null && <PropertyModal property={propertyModal} onSave={p => {
-        if (propertyModal === "new") setProperties(ps => [...ps, p]);
-        else setProperties(ps => ps.map(x => x.id === p.id ? p : x));
+        if (propertyModal === "new") {
+          const tempId = p.id || Date.now();
+          const newProperty = { ...p, id: tempId, _synced: false };
+          setProperties(ps => [...ps, newProperty]);
+          if (session?.user?.id) {
+            pushPropertyToSupabase(session.user.id, newProperty).then(realId => {
+              if (realId) setProperties(ps => ps.map(x => x.id === tempId ? { ...x, id: realId, _synced: true } : x));
+            });
+          }
+        } else {
+          const updated = { ...p, _synced: propertyModal._synced };
+          setProperties(ps => ps.map(x => x.id === p.id ? updated : x));
+          if (session?.user?.id) pushPropertyToSupabase(session.user.id, updated);
+        }
         setPropertyModal(null);
       }} onClose={() => setPropertyModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} portfolio={portfolio} onSave={(updated) => {
