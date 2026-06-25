@@ -1209,11 +1209,11 @@ function AssetSearchModal({ onAdd, onClose }) {
 }
 
 // ─── TRADE MODAL (BUY + SELL) ─────────────────────────────────────────────────
-function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSymbol = "", onAddCash }) {
+function TradeModal({ watchlist, portfolio, onSave, onClose, defaultType = "buy", defaultSymbol = "", onAddCash }) {
   const [tradeType, setTradeType] = useState(defaultType);
   const [f, setF] = useState(() => {
     const match = watchlist.find(x => x.symbol === defaultSymbol);
-    return { symbol: defaultSymbol || "", name: match?.name || "", price: "", units: "", fees: "", date: new Date().toISOString().slice(0,10), notes: "" };
+    return { symbol: defaultSymbol || "", name: match?.name || "", price: "", units: "", fees: "", date: new Date().toISOString().slice(0,10), notes: "", brokerage: "" };
   });
   const [tradeCurrency, setTradeCurrency] = useState("USD");
   const [converting, setConverting] = useState(false);
@@ -1227,6 +1227,8 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
   const LBL2 = { ...LBL, marginBottom: 3 };
   const isBuy = tradeType === "buy";
   const accent = isBuy ? C.accentBuy : C.accentSell;
+  // Previously-used brokerage names, most recent first, for the autocomplete suggestions
+  const knownBrokerages = [...new Set((portfolio || []).filter(t => t.brokerage).sort((a,b) => new Date(b.date)-new Date(a.date)).map(t => t.brokerage))];
 
   const handleSave = async () => {
     let priceUSD = parseFloat(f.price) || 0;
@@ -1259,7 +1261,7 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
       onSave({
         id: Date.now(), type: "dividend", symbol: f.symbol.toUpperCase().trim(), name: f.name,
         amount: priceUSD, units: 0, fees: 0,
-        date: f.date, notes: f.notes,
+        date: f.date, notes: f.notes, brokerage: f.brokerage || "",
         ...(tradeCurrency !== "USD" ? { originalCurrency: tradeCurrency, originalAmount: parseFloat(f.price) || 0 } : {}),
       });
       return;
@@ -1268,7 +1270,7 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
     onSave({
       id: Date.now(), type: tradeType, symbol: f.symbol.toUpperCase().trim(), name: f.name,
       price: priceUSD, units: parseFloat(f.units) || 0, fees: feesUSD,
-      date: f.date, notes: f.notes, total: tradeType === "buy" ? (priceUSD * (parseFloat(f.units)||0) + feesUSD) : (priceUSD * (parseFloat(f.units)||0) - feesUSD),
+      date: f.date, notes: f.notes, brokerage: f.brokerage || "", total: tradeType === "buy" ? (priceUSD * (parseFloat(f.units)||0) + feesUSD) : (priceUSD * (parseFloat(f.units)||0) - feesUSD),
       ...(tradeCurrency !== "USD" ? { originalCurrency: tradeCurrency, originalPrice: parseFloat(f.price) || 0 } : {}),
     });
   };
@@ -1412,6 +1414,21 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
           </>
         )}
 
+        {/* Brokerage */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={LBL2}>BROKERAGE <span style={{ color: C.labelDim }}>(optional)</span></div>
+          <input
+            value={f.brokerage}
+            onChange={e => set("brokerage", e.target.value)}
+            list="brokerage-suggestions"
+            placeholder="e.g. Robinhood, IBKR, CommSec..."
+            style={SML}
+          />
+          <datalist id="brokerage-suggestions">
+            {knownBrokerages.map(b => <option key={b} value={b} />)}
+          </datalist>
+        </div>
+
         {/* Notes */}
         <div style={{ marginBottom: 14 }}>
           <div style={LBL2}>NOTES <span style={{ color: C.labelDim }}>(optional)</span></div>
@@ -1430,13 +1447,14 @@ function TradeModal({ watchlist, onSave, onClose, defaultType = "buy", defaultSy
 }
 
 // ─── EDIT TRADE MODAL ────────────────────────────────────────────────────────
-function EditTradeModal({ trade, onSave, onClose }) {
+function EditTradeModal({ trade, portfolio, onSave, onClose }) {
   const [f, setF] = useState({
     price: trade.price,
     units: trade.units,
     fees: trade.fees || 0,
     date: trade.date,
     notes: trade.notes || "",
+    brokerage: trade.brokerage || "",
   });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const subtotal = (parseFloat(f.price)||0) * (parseFloat(f.units)||0);
@@ -1445,6 +1463,7 @@ function EditTradeModal({ trade, onSave, onClose }) {
   const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
   const LBL2 = { ...LBL, marginBottom: 3 };
   const accent = trade.type === "buy" ? C.accentBuy : C.accentSell;
+  const knownBrokerages = [...new Set((portfolio || []).filter(t => t.brokerage).sort((a,b) => new Date(b.date)-new Date(a.date)).map(t => t.brokerage))];
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }}>
@@ -1481,12 +1500,20 @@ function EditTradeModal({ trade, onSave, onClose }) {
           </div>
         )}
 
+        <div style={{ marginBottom: 10 }}>
+          <div style={LBL2}>BROKERAGE <span style={{ color: C.labelDim }}>(where this trade was placed, optional)</span></div>
+          <input value={f.brokerage} onChange={e => set("brokerage", e.target.value)} list="brokerage-suggestions-edit" placeholder="e.g. Robinhood, IBKR, CommSec..." style={SML} />
+          <datalist id="brokerage-suggestions-edit">
+            {knownBrokerages.map(b => <option key={b} value={b} />)}
+          </datalist>
+        </div>
+
         <div style={{ marginBottom: 14 }}>
           <div style={LBL2}>NOTES</div>
           <textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={2} style={{ ...SML, resize: "none", width: "100%" }} />
         </div>
 
-        <button onClick={() => onSave({ ...trade, price: parseFloat(f.price)||0, units: parseFloat(f.units)||0, fees: parseFloat(f.fees)||0, date: f.date, notes: f.notes, total })}
+        <button onClick={() => onSave({ ...trade, price: parseFloat(f.price)||0, units: parseFloat(f.units)||0, fees: parseFloat(f.fees)||0, date: f.date, notes: f.notes, brokerage: f.brokerage || "", total })}
           style={{ width: "100%", background: C.surface, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>
           Save changes
         </button>
@@ -2685,6 +2712,9 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
                           Paid {CURRENCY_SYMBOLS[t.originalCurrency] || t.originalCurrency + " "}{Number(t.originalAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {t.originalCurrency}
                         </div>
                       )}
+                      {t.brokerage && (
+                        <div style={{ fontSize: 10, color: C.text3, marginTop: 4, fontFamily: MONO, letterSpacing: 0.5 }}>via {t.brokerage}</div>
+                      )}
                       {t.notes && <div style={{ fontSize: 11, color: C.text3, marginTop: 6, fontFamily: FONT, fontWeight: 300, fontStyle: "italic" }}>{t.notes}</div>}
                     </div>
                   );
@@ -2732,6 +2762,9 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
                       </div>
                     )}
                   </div>
+                  {t.brokerage && (
+                    <div style={{ fontSize: 10, color: C.text3, marginTop: 6, fontFamily: MONO, letterSpacing: 0.5 }}>via {t.brokerage}</div>
+                  )}
                   {t.notes && <div style={{ fontSize: 11, color: C.text3, marginTop: 6, fontFamily: FONT, fontWeight: 300, fontStyle: "italic" }}>{t.notes}</div>}
                 </div>
                 );
@@ -3510,8 +3543,8 @@ export default function App() {
         else setProperties(ps => ps.map(x => x.id === p.id ? p : x));
         setPropertyModal(null);
       }} onClose={() => setPropertyModal(null)} />}
-      {editTradeModal && <EditTradeModal trade={editTradeModal} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
-      {tradeModal !== null && <TradeModal watchlist={watchlist} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
+      {editTradeModal && <EditTradeModal trade={editTradeModal} portfolio={portfolio} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
+      {tradeModal !== null && <TradeModal watchlist={watchlist} portfolio={portfolio} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
       <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} theme={theme} onToggleTheme={toggleTheme} />
       {aboutOpen && <AboutScreen onClose={() => setAboutOpen(false)} />}
     </div>}
