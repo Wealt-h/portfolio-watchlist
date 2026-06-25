@@ -631,7 +631,7 @@ async function fetchWatchlistFromSupabase(userId) {
   if (error) { console.error("fetchWatchlistFromSupabase:", error.message); return null; }
   return data.map(row => ({
     id: row.id, symbol: row.symbol, name: row.name, type: row.type,
-    notes: row.notes || "", thesis: row.thesis || "",
+    notes: row.notes || "", thesis: row.thesis || "", _synced: true,
   }));
 }
 
@@ -640,13 +640,15 @@ async function pushWatchlistItemToSupabase(userId, asset) {
     user_id: userId, symbol: asset.symbol, name: asset.name, type: asset.type,
     notes: asset.notes || "", thesis: asset.thesis || "",
   };
-  if (asset.id && typeof asset.id === "number" && asset.id < 1e12) {
-    // Looks like a real Supabase-issued id already (small sequential integer) — update
+  // Use an explicit flag to know whether this item already has a real Supabase row,
+  // rather than guessing from the size of the id — hardcoded default watchlist items
+  // use small ids (1, 2, 3...) that collide with Supabase's own auto-generated ids,
+  // which made the old size-based heuristic unreliable and caused duplicate/broken rows.
+  if (asset._synced && asset.id) {
     const { error } = await supabase.from("watchlist").update(row).eq("id", asset.id).eq("user_id", userId);
     if (error) console.error("pushWatchlistItemToSupabase (update):", error.message);
     return asset.id;
   } else {
-    // New item, or a legacy local Date.now()-style id — insert fresh and let Supabase assign a real id
     const { data, error } = await supabase.from("watchlist").insert(row).select("id").single();
     if (error) { console.error("pushWatchlistItemToSupabase (insert):", error.message); return null; }
     return data.id;
@@ -665,7 +667,7 @@ async function fetchTradesFromSupabase(userId) {
   return data.map(row => ({
     id: row.id, type: row.type, symbol: row.symbol, name: row.name,
     price: row.price, units: row.units, fees: row.fees || 0, amount: row.amount,
-    date: row.date, notes: row.notes || "", brokerage: row.brokerage || "",
+    date: row.date, notes: row.notes || "", brokerage: row.brokerage || "", _synced: true,
     ...(row.original_currency ? { originalCurrency: row.original_currency } : {}),
     ...(row.original_price != null ? { originalPrice: row.original_price } : {}),
     ...(row.original_amount != null ? { originalAmount: row.original_amount } : {}),
@@ -681,13 +683,14 @@ async function pushTradeToSupabase(userId, trade) {
     original_price: trade.originalPrice ?? null,
     original_amount: trade.originalAmount ?? null,
   };
-  if (trade.id && typeof trade.id === "number" && trade.id < 1e12) {
-    // Small sequential id — already a real Supabase row, update it
+  // Same explicit-flag approach as watchlist — trade ids created locally with Date.now()
+  // are reliably large, but that's not something we should depend on; an explicit flag
+  // set at the moment a row is actually confirmed synced is unambiguous either way.
+  if (trade._synced && trade.id) {
     const { error } = await supabase.from("trades").update(row).eq("id", trade.id).eq("user_id", userId);
     if (error) console.error("pushTradeToSupabase (update):", error.message);
     return trade.id;
   } else {
-    // New trade, or a legacy local Date.now()-style id — insert fresh
     const { data, error } = await supabase.from("trades").insert(row).select("id").single();
     if (error) { console.error("pushTradeToSupabase (insert):", error.message); return null; }
     return data.id;
@@ -3560,7 +3563,7 @@ export default function App() {
         const migrated = [];
         for (const asset of localWatchlist) {
           const newId = await pushWatchlistItemToSupabase(userId, asset);
-          migrated.push({ ...asset, id: newId || asset.id });
+          migrated.push({ ...asset, id: newId || asset.id, _synced: !!newId });
         }
         setWatchlist(migrated);
       } else {
@@ -3576,7 +3579,7 @@ export default function App() {
         const migratedTrades = [];
         for (const trade of localPortfolio) {
           const newId = await pushTradeToSupabase(userId, trade);
-          migratedTrades.push({ ...trade, id: newId || trade.id });
+          migratedTrades.push({ ...trade, id: newId || trade.id, _synced: !!newId });
         }
         setPortfolio(migratedTrades);
       } else {
@@ -3739,16 +3742,19 @@ export default function App() {
 
   const saveWatch = async (form) => {
     if (watchModal?.asset) {
-      const updated = { ...form, id: watchModal.asset.id };
+      const updated = { ...form, id: watchModal.asset.id, _synced: watchModal.asset._synced };
       setWatchlist(w => w.map(x => x.id === watchModal.asset.id ? updated : x));
-      if (session?.user?.id) await pushWatchlistItemToSupabase(session.user.id, updated);
+      if (session?.user?.id) {
+        const realId = await pushWatchlistItemToSupabase(session.user.id, updated);
+        if (realId) setWatchlist(w => w.map(x => x.id === updated.id ? { ...x, id: realId, _synced: true } : x));
+      }
     } else {
       const tempId = Date.now();
-      const newAsset = { ...form, id: tempId };
+      const newAsset = { ...form, id: tempId, _synced: false };
       setWatchlist(w => [...w, newAsset]);
       if (session?.user?.id) {
         const realId = await pushWatchlistItemToSupabase(session.user.id, newAsset);
-        if (realId) setWatchlist(w => w.map(x => x.id === tempId ? { ...x, id: realId } : x));
+        if (realId) setWatchlist(w => w.map(x => x.id === tempId ? { ...x, id: realId, _synced: true } : x));
       }
     }
     setWatchModal(null);
@@ -4246,10 +4252,10 @@ export default function App() {
 
       {watchModal !== null && <WatchModal asset={watchModal.asset} onSave={saveWatch} onClose={() => setWatchModal(null)} />}
       {searchModal && <AssetSearchModal onAdd={asset => {
-        setWatchlist(w => [...w, asset]);
+        setWatchlist(w => [...w, { ...asset, _synced: false }]);
         if (session?.user?.id) {
           pushWatchlistItemToSupabase(session.user.id, asset).then(realId => {
-            if (realId) setWatchlist(w => w.map(x => x.id === asset.id ? { ...x, id: realId } : x));
+            if (realId) setWatchlist(w => w.map(x => x.id === asset.id ? { ...x, id: realId, _synced: true } : x));
           });
         }
       }} onClose={() => setSearchModal(false)} />}
@@ -4284,17 +4290,18 @@ export default function App() {
         setPropertyModal(null);
       }} onClose={() => setPropertyModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} portfolio={portfolio} onSave={(updated) => {
-        setPortfolio(p => p.map(t => t.id === updated.id ? updated : t));
-        if (session?.user?.id) pushTradeToSupabase(session.user.id, updated);
+        const withFlag = { ...updated, _synced: editTradeModal._synced };
+        setPortfolio(p => p.map(t => t.id === withFlag.id ? withFlag : t));
+        if (session?.user?.id) pushTradeToSupabase(session.user.id, withFlag);
         setEditTradeModal(null);
       }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} portfolio={portfolio} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade => {
         const tempId = trade.id || Date.now();
-        const newTrade = { ...trade, id: tempId };
+        const newTrade = { ...trade, id: tempId, _synced: false };
         setPortfolio(p => [...p, newTrade]);
         if (session?.user?.id) {
           pushTradeToSupabase(session.user.id, newTrade).then(realId => {
-            if (realId) setPortfolio(p => p.map(t => t.id === tempId ? { ...t, id: realId } : t));
+            if (realId) setPortfolio(p => p.map(t => t.id === tempId ? { ...t, id: realId, _synced: true } : t));
           });
         }
         setTradeModal(null);
