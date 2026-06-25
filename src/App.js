@@ -2492,7 +2492,15 @@ function CashModal({ account, onSave, onClose }) {
   const isTopUp = account && typeof account === "object" && account.topUpFor;
   const blank = { institution: "", accountType: "Savings", principal: "", rate: "", startDate: new Date().toISOString().slice(0,10), notes: "" };
   const [f, setF] = useState(() => {
-    if (isTopUp) return { ...blank, institution: account.topUpFor };
+    if (isTopUp) return {
+      ...blank,
+      institution: account.topUpFor,
+      // Pre-fill with the existing account's current rate/type, so topping up an
+      // account defaults to keeping the same rate unless deliberately changed —
+      // leaving this blank previously caused the rate to silently reset to 0%.
+      rate: account.existingRate != null ? account.existingRate.toString() : "",
+      accountType: account.existingAccountType || "Savings",
+    };
     if (account && account !== "new") return { ...account, principal: account.principal.toString(), rate: account.rate.toString() };
     return blank;
   });
@@ -2579,8 +2587,15 @@ function CashModal({ account, onSave, onClose }) {
           </div>
         )}
 
-        <button onClick={() => onSave({ ...f, id: account?.id || Date.now(), principal: parseFloat(f.principal) || 0, rate: parseFloat(f.rate) || 0 })}
-          style={{ width: "100%", background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>
+        {f.rate === "" && (
+          <div style={{ fontSize: 11, color: C.red, fontFamily: FONT, fontWeight: 300, marginBottom: 10, lineHeight: 1.4 }}>
+            Interest rate is empty — this would save as 0%. Enter the rate to continue.
+          </div>
+        )}
+
+        <button onClick={() => { if (f.rate === "") return; onSave({ ...f, id: account?.id || Date.now(), principal: parseFloat(f.principal) || 0, rate: parseFloat(f.rate) || 0 }); }}
+          disabled={f.rate === ""}
+          style={{ width: "100%", background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: f.rate === "" ? "default" : "pointer", opacity: f.rate === "" ? 0.5 : 1 }}>
           {isTopUp ? "Add to balance" : (account && account !== "new" ? "Save changes" : "Add account")}
         </button>
       </div>
@@ -4334,7 +4349,7 @@ export default function App() {
                     setCashAccounts(c => c.filter(x => x.id !== id));
                     if (session?.user?.id) deleteCashAccountFromSupabase(session.user.id, id);
                   }}
-                  onAddCash={a => setCashModal({ topUpFor: a.institution })}
+                  onAddCash={a => setCashModal({ topUpFor: a.institution, existingRate: a.rate, existingAccountType: a.accountType })}
                 />
               ))}
             </div>
