@@ -1523,7 +1523,7 @@ function EditTradeModal({ trade, portfolio, onSave, onClose }) {
 }
 
 // ─── INSIGHTS TAB ────────────────────────────────────────────────────────────
-function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyPeriodData, getLivePrice, cashAccounts, priceHistoryBySymbol, priceHistoryLoading }) {
+function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyPeriodData, getLivePrice, cashAccounts, priceHistoryBySymbol, priceHistoryLoading, benchmarkData, selectedBenchmark, setSelectedBenchmark }) {
 
   // Period days mapping
   const periodDays = { daily: 1, weekly: 7, monthly: 30 };
@@ -1651,7 +1651,9 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   const classLabels = { crypto: "Crypto", stock: "Stocks", etf: "ETFs", cash: "Cash", commodity: "Commodities" };
 
   // S&P period return matching current toggle
-  const spyChange = spyPeriodData?.[period] ?? null;
+  const BENCHMARK_LABELS = { SPY: "S&P 500", QQQ: "Nasdaq 100", BTC: "Bitcoin", GLD: "Gold" };
+  const benchmarkLabel = BENCHMARK_LABELS[selectedBenchmark] || selectedBenchmark;
+  const spyChange = benchmarkData?.[selectedBenchmark]?.[period] ?? null;
 
   // Bar chart data for asset classes
   const barData = Object.entries(assetClasses).map(([type, data]) => ({
@@ -1661,7 +1663,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   }));
 
   // Add benchmarks to bar chart
-  if (spyChange !== null) barData.push({ name: "S&P 500", pct: spyChange, color: C.text3, isBenchmark: true });
+  if (spyChange !== null) barData.push({ name: benchmarkLabel, pct: spyChange, color: C.text3, isBenchmark: true });
 
   const StatCard = ({ label, value, sub, color }) => (
     <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 10, padding: "14px 16px" }}>
@@ -1746,7 +1748,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                 return { sym: p.sym, type: asset?.type || "stock", pct: p.pct, pnl: p.pnl, isBenchmark: false };
               }),
               ...cashPeriodPerformers.map(p => ({ sym: p.sym, type: "cash", pct: p.pct, pnl: p.pnl, isBenchmark: false })),
-              ...(spyChange !== null ? [{ sym: "S&P 500", type: "index", pct: spyChange, pnl: null, isBenchmark: true }] : []),
+              ...(spyChange !== null ? [{ sym: benchmarkLabel, type: "index", pct: spyChange, pnl: null, isBenchmark: true }] : []),
             ];
             const ranked = allItems.sort((a, b) => rankView === "pct" ? b.pct - a.pct : b.pnl - a.pnl);
 
@@ -1778,7 +1780,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
 
                       {/* Asset logo or benchmark icon */}
                       {item.isBenchmark
-                        ? <div style={{ width: 32, height: 32, borderRadius: 8, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: C.text3, fontFamily: MONO, flexShrink: 0 }}>SPY</div>
+                        ? <div style={{ width: 32, height: 32, borderRadius: 8, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: C.text3, fontFamily: MONO, flexShrink: 0 }}>{selectedBenchmark}</div>
                         : item.type === "cash"
                           ? <div style={{ width: 32, height: 32, borderRadius: 8, background: C.greenDim, border: `1px solid ${C.greenBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>💰</div>
                           : <AssetLogo symbol={item.sym} size={32} />
@@ -1820,10 +1822,20 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
             );
           })()}
 
-          {/* vs S&P 500 */}
+          {/* vs Benchmark */}
           {spyChange !== null && (
             <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
-              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 12 }}>VS S&P 500 · {period.toUpperCase()}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2 }}>VS BENCHMARK · {period.toUpperCase()}</div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {Object.keys(BENCHMARK_LABELS).map(b => (
+                    <button key={b} onClick={() => setSelectedBenchmark(b)}
+                      style={{ background: selectedBenchmark===b?C.surfaceHigh:"transparent", border:`1px solid ${selectedBenchmark===b?C.borderHover:C.border}`, color:selectedBenchmark===b?C.text1:C.text3, borderRadius:4, padding:"3px 8px", fontSize:9, fontFamily:MONO, fontWeight:300, cursor:"pointer", letterSpacing:0.5 }}>
+                      {b}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4 }}>YOUR PORTFOLIO</div>
@@ -1832,7 +1844,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4 }}>S&P 500 ({period.toUpperCase()})</div>
+                  <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1.5, marginBottom: 4 }}>{benchmarkLabel.toUpperCase()} ({period.toUpperCase()})</div>
                   <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: 22, color: spyChange >= 0 ? C.green : C.red, letterSpacing: -0.5 }}>
                     {spyChange >= 0 ? "+" : ""}{spyChange.toFixed(2)}%
                   </div>
@@ -1844,7 +1856,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                   const beating = diff >= 0;
                   return (
                     <div style={{ fontSize: 12, color: beating ? C.green : C.red, fontFamily: FONT, fontWeight: 300 }}>
-                      {beating ? "↑" : "↓"} {Math.abs(diff).toFixed(2)}% {beating ? "ahead of" : "behind"} the S&P 500
+                      {beating ? "↑" : "↓"} {Math.abs(diff).toFixed(2)}% {beating ? "ahead of" : "behind"} {benchmarkLabel}
                     </div>
                   );
                 })()}
@@ -2912,7 +2924,11 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [fearGreedData, setFearGreedData] = useState(null); // { value, label }
   const [insightsPeriod, setInsightsPeriod] = useState("weekly"); // daily | weekly | monthly
-  const [spyPeriodData, setSpyPeriodData] = useState({}); // { daily, weekly, monthly } each { pct }
+  const [spyPeriodData, setSpyPeriodData] = useState({}); // { daily, weekly, monthly } each { pct } — kept for backward compat with existing spyChange references
+  const [benchmarkData, setBenchmarkData] = useState({}); // { SPY: {...}, QQQ: {...}, BTC: {...} }
+  const [selectedBenchmark, setSelectedBenchmark] = useState(() => {
+    try { return localStorage.getItem("accrue_benchmark") || "SPY"; } catch { return "SPY"; }
+  });
   const [pnlHistory, setPnlHistory] = useState([]); // [{ date, pnl }] — real daily unrealised P&L, last 90 days
   const [pnlHistoryLoading, setPnlHistoryLoading] = useState(false);
   const [priceHistoryBySymbol, setPriceHistoryBySymbol] = useState({}); // { SYM: { "YYYY-MM-DD": price } } — feeds Insights period comparisons
@@ -3019,45 +3035,56 @@ export default function App() {
   }, []);
   useEffect(() => { if (loaded) save("pf_watchlist_v3", watchlist); }, [watchlist, loaded]);
 
-  // Fetch SPY period returns for insights
+  // Fetch benchmark period returns for insights — generalized so any symbol can be
+  // compared against, not just SPY. Reuses the same period-return math for each.
   useEffect(() => {
     if (tab !== "insights") return;
-    const fetchSpyPeriods = async () => {
+    const calcPeriodReturn = (points, daysBack) => {
+      if (points.length < 2) return null;
+      if (daysBack === 1) {
+        const start = points[points.length - 2].v;
+        const end = points[points.length - 1].v;
+        return parseFloat((((end - start) / start) * 100).toFixed(2));
+      }
+      const cutoff = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+      const periodPoints = points.filter(p => p.t >= cutoff);
+      if (periodPoints.length < 2) return null;
+      const start = periodPoints[0].v;
+      const end = periodPoints[periodPoints.length - 1].v;
+      return parseFloat((((end - start) / start) * 100).toFixed(2));
+    };
+
+    const fetchBenchmarkPeriods = async (symbol) => {
       try {
-        // Fetch 1 month of SPY history to cover all periods
         const res = await fetch("/api/sparkline", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ symbol: "SPY" }),
+          body: JSON.stringify({ symbol }),
         });
         const data = await res.json();
         const points = data.points || [];
-        if (points.length < 2) return;
-
-        const calcPeriodReturn = (daysBack) => {
-          if (daysBack === 1) {
-            // Daily: just compare the most recent two data points (today vs previous close)
-            if (points.length < 2) return null;
-            const start = points[points.length - 2].v;
-            const end = points[points.length - 1].v;
-            return parseFloat((((end - start) / start) * 100).toFixed(2));
-          }
-          const cutoff = Date.now() - daysBack * 24 * 60 * 60 * 1000;
-          const periodPoints = points.filter(p => p.t >= cutoff);
-          if (periodPoints.length < 2) return null;
-          const start = periodPoints[0].v;
-          const end = periodPoints[periodPoints.length - 1].v;
-          return parseFloat((((end - start) / start) * 100).toFixed(2));
+        if (points.length < 2) return null;
+        return {
+          daily: calcPeriodReturn(points, 1),
+          weekly: calcPeriodReturn(points, 7),
+          monthly: calcPeriodReturn(points, 30),
         };
-
-        setSpyPeriodData({
-          daily: calcPeriodReturn(1),
-          weekly: calcPeriodReturn(7),
-          monthly: calcPeriodReturn(30),
-        });
-      } catch {}
+      } catch {
+        return null;
+      }
     };
-    fetchSpyPeriods();
+
+    const fetchAll = async () => {
+      const [spy, qqq, btc, gld] = await Promise.all([
+        fetchBenchmarkPeriods("SPY"),
+        fetchBenchmarkPeriods("QQQ"),
+        fetchBenchmarkPeriods("BTC-USD"),
+        fetchBenchmarkPeriods("GLD"),
+      ]);
+      setSpyPeriodData(spy || {});
+      setBenchmarkData({ SPY: spy, QQQ: qqq, BTC: btc, GLD: gld });
+    };
+    fetchAll();
   }, [tab]);
   useEffect(() => { if (loaded) save("pf_portfolio_v4", portfolio); }, [portfolio, loaded]);
 
@@ -3488,6 +3515,9 @@ export default function App() {
           cashAccounts={cashAccounts}
           priceHistoryBySymbol={priceHistoryBySymbol}
           priceHistoryLoading={pnlHistoryLoading}
+          benchmarkData={benchmarkData}
+          selectedBenchmark={selectedBenchmark}
+          setSelectedBenchmark={(b) => { setSelectedBenchmark(b); try { localStorage.setItem("accrue_benchmark", b); } catch {} }}
         />
       )}
 
