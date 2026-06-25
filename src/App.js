@@ -111,7 +111,7 @@ function AboutScreen({ onClose }) {
 }
 
 
-function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker, onOpenAbout, theme, onToggleTheme }) {
+function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker, onOpenAbout, theme, onSetTheme }) {
   if (!open) return null;
 
   const NavItem = ({ icon, label, active, badge, onClick, dim }) => (
@@ -165,7 +165,24 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <NavItem icon="◌" label="Alerts" dim badge={alertCount} onClick={() => { setTab("watchlist"); onClose(); }} />
           <NavItem icon="◎" label={`Currency · ${displayCurrency}`} dim onClick={() => { onOpenCurrencyPicker(); onClose(); }} />
-          <NavItem icon={theme === "dark" ? "☼" : "☾"} label={theme === "dark" ? "Light mode" : "Dark mode"} dim onClick={() => { onToggleTheme(); }} />
+
+          <div style={{ padding: "11px 12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+              <span style={{ fontSize: 16, opacity: 0.6, width: 18, textAlign: "center", color: C.text1 }}>◐</span>
+              <span style={{ fontSize: 13, fontFamily: FONT, fontWeight: 300, color: C.text3 }}>Theme</span>
+            </div>
+            <div style={{ display: "flex", gap: 6, marginLeft: 30 }}>
+              {[["dark","Dark"],["light","Light"],["cyberpunk","Cyberpunk"]].map(([t, l]) => (
+                <button key={t} onClick={() => onSetTheme(t)} style={{
+                  flex: 1, background: theme===t?C.surfaceHigh:"transparent", border: `1px solid ${theme===t?C.borderHover:C.border}`,
+                  color: theme===t?C.text1:C.text3, borderRadius: 6, padding: "6px 4px", fontSize: 10, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.3,
+                }}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <NavItem icon="↻" label="Replay intro" dim onClick={() => { onRestartOnboarding(); onClose(); }} />
           <NavItem icon="ⓘ" label="About Accrue" dim onClick={() => { onOpenAbout(); onClose(); }} />
           <NavItem icon="✉" label="Help & feedback" dim onClick={() => { window.location.href = "mailto:?subject=Accrue%20feedback"; onClose(); }} />
@@ -602,12 +619,53 @@ const LIGHT_THEME = {
   sigAvoid:     "#d14f4f", sigAvoidBg:     "rgba(209,79,79,0.10)",
 };
 
+// Cyberpunk — a deliberately loud third option, distinct from the restrained dark/light
+// themes. Deep violet-black base, hot magenta + electric cyan as the two signature accents,
+// acid green standing in for "buy" the way it does in old terminal/hacker aesthetics.
+const CYBERPUNK_THEME = {
+  bg:          "#0a0014",
+  surface:     "#150a28",
+  surfaceHigh: "#1f1238",
+  border:      "rgba(255,0,200,0.28)",
+  borderHover: "rgba(0,240,255,0.45)",
+  borderAccent:"rgba(0,240,255,0.6)",
+  text1:       "#f4ecff",
+  text2:       "rgba(244,236,255,0.72)",
+  text3:       "rgba(200,180,255,0.5)",
+  green:       "#39ff8c",
+  greenDim:    "rgba(57,255,140,0.16)",
+  greenBorder: "rgba(57,255,140,0.45)",
+  red:         "#ff2d6e",
+  redDim:      "rgba(255,45,110,0.14)",
+  amber:       "#ffd23f",
+  blue:        "#00f0ff",
+  blueDim:     "rgba(0,240,255,0.14)",
+  // Cyberpunk equivalents of the modal/card-specific tones
+  modalBg:     "#150a28",
+  modalBg2:    "#1f1238",
+  modalBg3:    "#0a0014",
+  modalBg4:    "#1f1238",
+  modalBg5:    "#0a0014",
+  labelDim:    "rgba(200,180,255,0.45)",
+  labelMute:   "rgba(200,180,255,0.65)",
+  textSoft:    "#f4ecff",
+  accentBuy:   "#39ff8c",
+  accentSell:  "#ff2d6e",
+  accentLink:  "#00f0ff",
+  // Watchlist signal badges — full neon, this theme is meant to pop
+  sigStrongBuy: "#39ff8c", sigStrongBuyBg: "rgba(57,255,140,0.16)",
+  sigDip:       "#00f0ff", sigDipBg:       "rgba(0,240,255,0.14)",
+  sigWatch:     "#bd6bff", sigWatchBg:     "rgba(189,107,255,0.16)",
+  sigWait:      "#ffd23f", sigWaitBg:      "rgba(255,210,63,0.14)",
+  sigAvoid:     "#ff2d6e", sigAvoidBg:     "rgba(255,45,110,0.16)",
+};
+
 // Mutable theme object — every component reads C.xxx directly, so reassigning these
 // properties (rather than replacing the object reference) makes every component
 // pick up the new theme on next render without needing theme threaded through props.
 const C = { ...DARK_THEME };
 function applyTheme(themeName) {
-  const palette = themeName === "light" ? LIGHT_THEME : DARK_THEME;
+  const palette = themeName === "light" ? LIGHT_THEME : themeName === "cyberpunk" ? CYBERPUNK_THEME : DARK_THEME;
   Object.assign(C, palette);
 }
 
@@ -3065,8 +3123,7 @@ export default function App() {
   applyTheme(theme);
   refreshDerivedTokens();
 
-  const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
+  const setThemeDirect = (next) => {
     setTheme(next);
     try { localStorage.setItem("accrue_theme", next); } catch {}
   };
@@ -3074,7 +3131,7 @@ export default function App() {
   // Keep the iOS status bar tint and body background in sync when the theme changes
   // mid-session (not just on reload — index.html handles that part separately)
   useEffect(() => {
-    const bg = theme === "light" ? "#eceae5" : "#070c09";
+    const bg = theme === "light" ? "#eceae5" : theme === "cyberpunk" ? "#0a0014" : "#070c09";
     try {
       const meta = document.getElementById("theme-color-meta") || document.querySelector('meta[name="theme-color"]');
       if (meta) meta.setAttribute("content", bg);
@@ -3440,7 +3497,7 @@ export default function App() {
     <>
       {!onboarded && <OnboardingScreen onComplete={completeOnboarding} />}
       {onboarded && showReturningSplash && <ReturningSplash onDone={() => setShowReturningSplash(false)} />}
-      {onboarded && !showReturningSplash && <div style={{ minHeight: "100vh", background: theme === "light" ? C.bg : "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
+      {onboarded && !showReturningSplash && <div style={{ minHeight: "100vh", background: theme === "light" ? C.bg : theme === "cyberpunk" ? "linear-gradient(180deg, #0a0014 0%, #150a28 100%)" : "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
       {/* ── ACCRUE HEADER ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -3782,7 +3839,7 @@ export default function App() {
       }} onClose={() => setPropertyModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} portfolio={portfolio} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} portfolio={portfolio} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
-      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} theme={theme} onToggleTheme={toggleTheme} />
+      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} theme={theme} onSetTheme={setThemeDirect} />
       {aboutOpen && <AboutScreen onClose={() => setAboutOpen(false)} />}
     </div>}
     </>
