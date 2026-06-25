@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import React from "react";
 import { AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { supabase } from "./supabaseClient";
 
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────
 const ONBOARDING_STEPS = [
@@ -111,7 +112,7 @@ function AboutScreen({ onClose }) {
 }
 
 
-function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker, onOpenAbout, theme, onSetTheme }) {
+function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker, onOpenAbout, theme, onSetTheme, onLogout }) {
   if (!open) return null;
 
   const NavItem = ({ icon, label, active, badge, onClick, dim }) => (
@@ -190,6 +191,10 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
 
         <div style={{ flex: 1 }} />
 
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
+          <NavItem icon="⏻" label="Log out" dim onClick={() => { onLogout(); onClose(); }} />
+        </div>
+
         <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14, fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 1 }}>
           v1.0.0
         </div>
@@ -232,6 +237,131 @@ function ReturningSplash({ onDone }) {
         Disciplined Investment Intelligence
       </div>
       <div className="rsplash-line" style={{ width: 36, height: 1, background: "rgba(61,220,132,0.45)" }} />
+    </div>
+  );
+}
+
+// ─── AUTH SCREEN ─────────────────────────────────────────────────────────────
+function AuthScreen({ onAuthed }) {
+  const [mode, setMode] = useState("login"); // login | signup
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [infoMessage, setInfoMessage] = useState(null);
+
+  const SML = { ...INP, padding: "12px 14px", fontSize: 16 };
+  const LBL2 = { ...LBL, marginBottom: 5 };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setInfoMessage(null);
+    setLoading(true);
+
+    try {
+      if (mode === "signup") {
+        const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+        if (signUpError) throw signUpError;
+        if (data?.user && !data.session) {
+          // Email confirmation required before a session exists
+          setInfoMessage("Check your email to confirm your account, then log in.");
+          setMode("login");
+        } else if (data?.session) {
+          onAuthed(data.session);
+        }
+      } else {
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) throw signInError;
+        onAuthed(data.session);
+      }
+    } catch (err) {
+      setError(err.message || "Something went wrong — please try again.");
+    }
+    setLoading(false);
+  };
+
+  const handleOAuth = async (provider) => {
+    setError(null);
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({ provider });
+      if (oauthError) throw oauthError;
+      // Browser will redirect away to the provider's login page; nothing more to do here
+    } catch (err) {
+      setError(err.message || "Could not start sign-in — please try again.");
+    }
+  };
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(180deg, #07090c 0%, #08090a 100%)",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      padding: "40px 24px",
+      fontFamily: FONT,
+    }}>
+      {/* Wordmark */}
+      <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 8 }}>
+        {[["A",1.0],["C",0.92],["C",0.84],["R",0.76],["U",0.68],["E",0.60]].map(([l,o],i) => (
+          <span key={i} style={{ fontSize: 32, fontWeight: 100, letterSpacing: 7, color: `rgba(240,245,242,${o})`, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{l}</span>
+        ))}
+      </div>
+      <div style={{ fontSize: 12, color: "rgba(240,245,242,0.4)", fontWeight: 300, letterSpacing: 1.5, marginBottom: 36 }}>
+        Disciplined Investment Intelligence
+      </div>
+
+      {/* Form card */}
+      <div style={{ width: "100%", maxWidth: 380, background: "#111318", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 14, padding: "26px 22px" }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 22 }}>
+          {["login","signup"].map(m => (
+            <button key={m} onClick={() => { setMode(m); setError(null); setInfoMessage(null); }}
+              style={{ flex: 1, background: mode===m?"#181c22":"transparent", border: `1px solid ${mode===m?"rgba(255,255,255,0.26)":"rgba(255,255,255,0.14)"}`, color: mode===m?"#f0f5f2":"rgba(240,245,242,0.35)", borderRadius: 6, padding: "8px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.3 }}>
+              {m === "login" ? "Log in" : "Sign up"}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 12 }}>
+            <div style={LBL2}>EMAIL</div>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" placeholder="you@example.com" style={SML} />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={LBL2}>PASSWORD</div>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} autoComplete={mode === "signup" ? "new-password" : "current-password"} placeholder="••••••••" style={SML} />
+          </div>
+
+          {error && <div style={{ fontSize: 12, color: "#ff6b6b", fontFamily: FONT, fontWeight: 300, marginBottom: 14, lineHeight: 1.4 }}>{error}</div>}
+          {infoMessage && <div style={{ fontSize: 12, color: "#3ddc84", fontFamily: FONT, fontWeight: 300, marginBottom: 14, lineHeight: 1.4 }}>{infoMessage}</div>}
+
+          <button type="submit" disabled={loading}
+            style={{ width: "100%", background: "#181c22", border: "1px solid rgba(255,255,255,0.26)", color: "#f0f5f2", borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: loading ? "default" : "pointer", letterSpacing: 0.5, opacity: loading ? 0.6 : 1 }}>
+            {loading ? "Please wait..." : mode === "login" ? "Log in" : "Create account"}
+          </button>
+        </form>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "20px 0" }}>
+          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+          <span style={{ fontSize: 10, color: "rgba(240,245,242,0.3)", fontFamily: MONO, letterSpacing: 1 }}>OR</span>
+          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button onClick={() => handleOAuth("apple")}
+            style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.14)", color: "#f0f5f2", borderRadius: 8, padding: "11px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.3 }}>
+            Continue with Apple
+          </button>
+          <button onClick={() => handleOAuth("google")}
+            style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.14)", color: "#f0f5f2", borderRadius: 8, padding: "11px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.3 }}>
+            Continue with Google
+          </button>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 10, color: "rgba(240,245,242,0.25)", fontFamily: MONO, letterSpacing: 1, marginTop: 28 }}>
+        v1.0.0
+      </div>
     </div>
   );
 }
@@ -3096,6 +3226,23 @@ function SignalLegend() {
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
+  // ── Auth session — gates the entire app behind login. Starts as "loading" (null +
+  // sessionChecked false) so we don't flash the login screen for an instant before
+  // Supabase has had a chance to report an existing session from a previous visit.
+  const [session, setSession] = useState(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setSessionChecked(true);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
   const [onboarded, setOnboarded] = useState(() => {
     try { return localStorage.getItem("accrue_onboarded") === "true"; } catch { return false; }
   });
@@ -3488,6 +3635,15 @@ export default function App() {
   };
   const filteredWatch = filterMap[filterSig] || watchlist;
   const buyableCount = watchlist.filter(a => ["strong-buy","dip"].includes(calcSignal(a).signal)).length;
+
+  // Auth gate — show nothing meaningful until we know whether there's a session,
+  // then the login/signup screen if there isn't one, before any app data loads.
+  if (!sessionChecked) return (
+    <div style={{ minHeight: "100vh", background: "#07090c", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ fontFamily: FONT, fontWeight: 100, color: "rgba(240,245,242,0.35)", fontSize: 18, letterSpacing: 8 }}>accrue</div>
+    </div>
+  );
+  if (!session) return <AuthScreen onAuthed={(s) => setSession(s)} />;
 
   if (!loaded) return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -3953,7 +4109,7 @@ export default function App() {
       }} onClose={() => setPropertyModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} portfolio={portfolio} onSave={(updated) => { setPortfolio(p => p.map(t => t.id === updated.id ? updated : t)); setEditTradeModal(null); }} onClose={() => setEditTradeModal(null)} />}
       {tradeModal !== null && <TradeModal watchlist={watchlist} portfolio={portfolio} defaultType={tradeModal.defaultType} defaultSymbol={tradeModal.symbol} onSave={trade=>{setPortfolio(p=>[...p,trade]);setTradeModal(null);}} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
-      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} theme={theme} onSetTheme={setThemeDirect} />
+      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} theme={theme} onSetTheme={setThemeDirect} onLogout={() => supabase.auth.signOut()} />
       {aboutOpen && <AboutScreen onClose={() => setAboutOpen(false)} />}
     </div>}
     </>
