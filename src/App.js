@@ -798,6 +798,35 @@ async function deleteAlertFromSupabase(userId, id) {
   if (error) console.error("deleteAlertFromSupabase:", error.message);
 }
 
+// ─── SUPABASE: USER PREFERENCES (single row per user) ────────────────────────
+async function fetchPreferencesFromSupabase(userId) {
+  const { data, error } = await supabase.from("user_preferences").select("*").eq("user_id", userId).maybeSingle();
+  if (error) { console.error("fetchPreferencesFromSupabase:", error.message); return null; }
+  if (!data) return null; // no row yet for this user — caller should fall back to local/defaults
+  return {
+    theme: data.theme || "dark",
+    displayCurrency: data.display_currency || "USD",
+    selectedBenchmark: data.selected_benchmark || "SPY",
+    onboarded: !!data.onboarded,
+  };
+}
+
+// Upserts the whole preferences row — since this is a single row per user (not a list
+// of items like everything else), there's no per-item id/sync tracking needed here;
+// we just write the full current state every time something changes.
+async function pushPreferencesToSupabase(userId, prefs) {
+  const row = {
+    user_id: userId,
+    theme: prefs.theme,
+    display_currency: prefs.displayCurrency,
+    selected_benchmark: prefs.selectedBenchmark,
+    onboarded: prefs.onboarded,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("user_preferences").upsert(row, { onConflict: "user_id" });
+  if (error) console.error("pushPreferencesToSupabase:", error.message);
+}
+
 // ─── REAL-TIME PRICES (via serverless to avoid CORS) ─────────────────────────
 async function fetchLivePrices(symbols) {
   try {
@@ -3469,6 +3498,7 @@ export default function App() {
   const completeOnboarding = () => {
     try { localStorage.setItem("accrue_onboarded", "true"); } catch {}
     setOnboarded(true);
+    if (session?.user?.id) pushPreferencesToSupabase(session.user.id, { theme, displayCurrency, selectedBenchmark, onboarded: true });
   };
 
   // Lightweight splash shown on every cold start for returning users (already onboarded)
@@ -3494,6 +3524,7 @@ export default function App() {
   const setThemeDirect = (next) => {
     setTheme(next);
     try { localStorage.setItem("accrue_theme", next); } catch {}
+    if (session?.user?.id) pushPreferencesToSupabase(session.user.id, { theme: next, displayCurrency, selectedBenchmark, onboarded });
   };
 
   // Keep the iOS status bar tint and body background in sync when the theme changes
@@ -3520,6 +3551,7 @@ export default function App() {
   const changeDisplayCurrency = (currency) => {
     setDisplayCurrency(currency);
     try { localStorage.setItem("accrue_currency", currency); } catch {}
+    if (session?.user?.id) pushPreferencesToSupabase(session.user.id, { theme, displayCurrency: currency, selectedBenchmark, onboarded });
   };
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
 
@@ -3540,6 +3572,7 @@ export default function App() {
   const restartOnboarding = () => {
     try { localStorage.removeItem("accrue_onboarded"); } catch {}
     setOnboarded(false);
+    if (session?.user?.id) pushPreferencesToSupabase(session.user.id, { theme, displayCurrency, selectedBenchmark, onboarded: false });
   };
 
   const [tab, setTab] = useState("watchlist");
@@ -3561,6 +3594,36 @@ export default function App() {
   const [selectedBenchmark, setSelectedBenchmark] = useState(() => {
     try { return localStorage.getItem("accrue_benchmark") || "SPY"; } catch { return "SPY"; }
   });
+
+  // Load preferences from Supabase once the session is known. If no remote row exists
+  // yet (first sync for this account), migrate up whatever's currently in local state —
+  // which itself was already initialised from localStorage above, so this naturally
+  // carries over a returning user's existing theme/currency/benchmark/onboarding choices.
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  useEffect(() => {
+    if (!sessionChecked || !session) return;
+    (async () => {
+      const userId = session.user.id;
+      const remotePrefs = await fetchPreferencesFromSupabase(userId);
+      if (remotePrefs) {
+        setTheme(remotePrefs.theme);
+        setDisplayCurrency(remotePrefs.displayCurrency);
+        setSelectedBenchmark(remotePrefs.selectedBenchmark);
+        setOnboarded(remotePrefs.onboarded);
+        try {
+          localStorage.setItem("accrue_theme", remotePrefs.theme);
+          localStorage.setItem("accrue_currency", remotePrefs.displayCurrency);
+          localStorage.setItem("accrue_benchmark", remotePrefs.selectedBenchmark);
+          localStorage.setItem("accrue_onboarded", remotePrefs.onboarded ? "true" : "false");
+        } catch {}
+      } else {
+        // No remote row yet — push up the current (locally-derived) state once
+        await pushPreferencesToSupabase(userId, { theme, displayCurrency, selectedBenchmark, onboarded });
+      }
+      setPrefsLoaded(true);
+    })();
+  }, [sessionChecked, session]);
+
   const [pnlHistory, setPnlHistory] = useState([]); // [{ date, pnl }] — real daily unrealised P&L, last 90 days
   const [pnlHistoryLoading, setPnlHistoryLoading] = useState(false);
   const [priceHistoryBySymbol, setPriceHistoryBySymbol] = useState({}); // { SYM: { "YYYY-MM-DD": price } } — feeds Insights period comparisons
@@ -4391,7 +4454,11 @@ export default function App() {
           priceHistoryLoading={pnlHistoryLoading}
           benchmarkData={benchmarkData}
           selectedBenchmark={selectedBenchmark}
-          setSelectedBenchmark={(b) => { setSelectedBenchmark(b); try { localStorage.setItem("accrue_benchmark", b); } catch {} }}
+          setSelectedBenchmark={(b) => {
+            setSelectedBenchmark(b);
+            try { localStorage.setItem("accrue_benchmark", b); } catch {}
+            if (session?.user?.id) pushPreferencesToSupabase(session.user.id, { theme, displayCurrency, selectedBenchmark: b, onboarded });
+          }}
         />
       )}
 
