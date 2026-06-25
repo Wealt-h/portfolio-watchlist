@@ -3499,7 +3499,19 @@ export default function App() {
     <>
       {!onboarded && <OnboardingScreen onComplete={completeOnboarding} />}
       {onboarded && showReturningSplash && <ReturningSplash onDone={() => setShowReturningSplash(false)} />}
-      {onboarded && !showReturningSplash && <div style={{ minHeight: "100vh", background: theme === "light" ? C.bg : theme === "cyberpunk" ? "linear-gradient(160deg, #1a0030 0%, #0a0014 45%, #150a28 100%)" : "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
+      {onboarded && !showReturningSplash && <div className={theme === "cyberpunk" ? "accrue-cyberpunk" : ""} style={{ minHeight: "100vh", background: theme === "light" ? C.bg : theme === "cyberpunk" ? "linear-gradient(160deg, #1a0030 0%, #0a0014 45%, #150a28 100%)" : "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
+      {theme === "cyberpunk" && (
+        <style>{`
+          /* Cyberpunk borders run thicker across the board. Setting border-width alone
+             is safe here: CSS only renders a border when border-style is also set to
+             something visible (solid, dashed, etc) — elements with no border at all
+             (the vast majority, since most things in this app have border: none) are
+             completely unaffected, since their border-style stays "none" regardless. */
+          .accrue-cyberpunk * {
+            border-width: 2px !important;
+          }
+        `}</style>
+      )}
       {/* ── ACCRUE HEADER ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
