@@ -3,6 +3,17 @@ import React from "react";
 import { AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "./supabaseClient";
 
+// ─── API BASE URL (web vs native) ───────────────────────────────────────────
+// On the web, relative fetches like "/api/prices" correctly resolve against
+// whatever domain the page is loaded from. Inside the Capacitor-wrapped native
+// app, the page is loaded from capacitor://localhost, which has no server of
+// its own — so the same relative path would 404/fail silently. When running
+// natively, prefix every API call with the real deployed URL instead.
+const API_BASE = (typeof window !== "undefined" && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
+  ? "https://portfolio-watchlist-cumx.vercel.app"
+  : "";
+const apiUrl = (path) => `${API_BASE}${path}`;
+
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────
 const ONBOARDING_STEPS = [
   {
@@ -830,7 +841,7 @@ async function pushPreferencesToSupabase(userId, prefs) {
 // ─── REAL-TIME PRICES (via serverless to avoid CORS) ─────────────────────────
 async function fetchLivePrices(symbols) {
   try {
-    const res = await fetch("/api/prices", {
+    const res = await fetch(apiUrl("/api/prices"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbols })
@@ -1210,7 +1221,7 @@ function WatchCard({ asset, onDelete, onNotesUpdate, onThesisUpdate, onAlert, al
   useEffect(() => {
     if (!open || sparkData) return;
     setSparkLoading(true);
-    fetch("/api/sparkline", {
+    fetch(apiUrl("/api/sparkline"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbol: asset.symbol, range: "5y" }),
@@ -1226,7 +1237,7 @@ function WatchCard({ asset, onDelete, onNotesUpdate, onThesisUpdate, onAlert, al
     setAiLoading(mode);
     setAiError(null);
     try {
-      const res = await fetch("/api/update-notes", {
+      const res = await fetch(apiUrl("/api/update-notes"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1478,7 +1489,7 @@ function AssetSearchModal({ onAdd, onClose }) {
     setSearching(true);
     setError(null);
     try {
-      const res = await fetch("/api/search", {
+      const res = await fetch(apiUrl("/api/search"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q }),
@@ -1500,7 +1511,7 @@ function AssetSearchModal({ onAdd, onClose }) {
     setAdding(result.symbol);
     setError(null);
     try {
-      const res = await fetch("/api/asset-details", {
+      const res = await fetch(apiUrl("/api/asset-details"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol: result.symbol }),
@@ -3559,7 +3570,7 @@ export default function App() {
   useEffect(() => {
     const fetchFx = async () => {
       try {
-        const res = await fetch("/api/fx-rates");
+        const res = await fetch(apiUrl("/api/fx-rates"));
         const data = await res.json();
         if (data?.rates) setFxRates(data.rates);
       } catch {}
@@ -3651,8 +3662,8 @@ export default function App() {
     const [prices, fgRes, stockFgRes, vixRes] = await Promise.all([
       fetchLivePrices(symbols),
       fetch("https://api.alternative.me/fng/?limit=1").then(r => r.json()).catch(() => null),
-      fetch("/api/stock-sentiment").then(r => r.json()).catch(() => null),
-      fetch("/api/vix").then(r => r.json()).catch(() => null),
+      fetch(apiUrl("/api/stock-sentiment")).then(r => r.json()).catch(() => null),
+      fetch(apiUrl("/api/vix")).then(r => r.json()).catch(() => null),
     ]);
 
     if (stockFgRes && !stockFgRes.error) setStockFearGreed(stockFgRes);
@@ -3786,7 +3797,7 @@ export default function App() {
 
     const fetchBenchmarkPeriods = async (symbol) => {
       try {
-        const res = await fetch("/api/sparkline", {
+        const res = await fetch(apiUrl("/api/sparkline"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ symbol }),
@@ -3830,7 +3841,7 @@ export default function App() {
         // Fetch 3 months of daily price history per symbol (covers the 90-day window with margin)
         const histories = await Promise.all(symbols.map(async (sym) => {
           try {
-            const res = await fetch("/api/sparkline", {
+            const res = await fetch(apiUrl("/api/sparkline"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ symbol: sym, range: "3mo" }),
