@@ -9,10 +9,19 @@ import { supabase } from "./supabaseClient";
 // app, the page is loaded from capacitor://localhost, which has no server of
 // its own — so the same relative path would 404/fail silently. When running
 // natively, prefix every API call with the real deployed URL instead.
-const API_BASE = (typeof window !== "undefined" && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
-  ? "https://portfolio-watchlist-cumx.vercel.app"
-  : "";
+//
+// Detect "running natively" via the page's own protocol (capacitor:// or
+// ionic://) rather than checking window.Capacitor.isNativePlatform() — that
+// check depends on Capacitor's JS bridge having already finished injecting
+// itself by the time this line runs at module load, which isn't guaranteed
+// and was silently causing this to resolve to the wrong (empty) value.
+const IS_NATIVE_APP = typeof window !== "undefined" && window.location && (window.location.protocol === "capacitor:" || window.location.protocol === "ionic:");
+const API_BASE = IS_NATIVE_APP ? "https://portfolio-watchlist-cumx.vercel.app" : "";
 const apiUrl = (path) => `${API_BASE}${path}`;
+// TEMP DIAGNOSTIC — remove once native price loading is confirmed working
+if (typeof window !== "undefined") {
+  console.log("⚡️ DIAGNOSTIC: protocol=" + window.location.protocol + " IS_NATIVE_APP=" + IS_NATIVE_APP + " API_BASE=" + API_BASE);
+}
 
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────
 const ONBOARDING_STEPS = [
