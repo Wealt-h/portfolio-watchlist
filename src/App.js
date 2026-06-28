@@ -850,14 +850,18 @@ async function pushPreferencesToSupabase(userId, prefs) {
 // ─── REAL-TIME PRICES (via serverless to avoid CORS) ─────────────────────────
 async function fetchLivePrices(symbols) {
   try {
-    const res = await fetch(apiUrl("/api/prices"), {
+    const url = apiUrl("/api/prices");
+    console.log("⚡️ DIAGNOSTIC fetchLivePrices URL:", url);
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbols })
     });
+    console.log("⚡️ DIAGNOSTIC fetchLivePrices status:", res.status);
     const data = await res.json();
     return data.prices || {};
-  } catch {
+  } catch (err) {
+    console.log("⚡️ DIAGNOSTIC fetchLivePrices ERROR:", err.message);
     return {};
   }
 }
