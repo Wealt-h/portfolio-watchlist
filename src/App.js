@@ -4033,16 +4033,29 @@ export default function App() {
 
   // Auth gate — show nothing meaningful until we know whether there's a session,
   // then the login/signup screen if there isn't one, before any app data loads.
-  if (!sessionChecked) return (
-    <div style={{ minHeight: "100vh", background: "#07090c", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ fontFamily: FONT, fontWeight: 100, color: "rgba(240,245,242,0.35)", fontSize: 18, letterSpacing: 8 }}>accrue</div>
-    </div>
-  );
+  if (!sessionChecked) {
+    // We don't know the account's theme yet (that lives in Supabase, tied to a
+    // session we haven't resolved), but we can use whatever was last cached in
+    // local storage as a very-likely-correct approximation, rather than always
+    // showing a fixed dark screen that flashes jarringly against a light/cyberpunk
+    // theme before the real app takes over.
+    let cachedTheme = "dark";
+    try { cachedTheme = localStorage.getItem("accrue_theme") || "dark"; } catch {}
+    const splashBg = cachedTheme === "light" ? "#eceae5" : cachedTheme === "cyberpunk" ? "#0a0014" : "#07090c";
+    const splashText = cachedTheme === "light" ? "rgba(28,29,27,0.55)" : cachedTheme === "cyberpunk" ? "rgba(0,240,255,0.6)" : "rgba(240,245,242,0.35)";
+    return (
+      <div style={{ minHeight: "100vh", background: splashBg, display: "flex", alignItems: "center", justifyContent: "center", animation: "splashFadeIn 0.5s ease" }}>
+        <style>{`@keyframes splashFadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
+        <div style={{ fontFamily: FONT, fontWeight: 100, color: splashText, fontSize: 18, letterSpacing: 8, animation: "splashFadeIn 0.7s ease" }}>accrue</div>
+      </div>
+    );
+  }
   if (!session) return <AuthScreen onAuthed={(s) => setSession(s)} />;
 
   if (!loaded) return (
-    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ fontFamily: FONT, fontWeight: 100, color: C.text3, fontSize: 18, letterSpacing: 8 }}>accrue</div>
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", animation: "splashFadeIn 0.5s ease" }}>
+      <style>{`@keyframes splashFadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
+      <div style={{ fontFamily: FONT, fontWeight: 100, color: C.text3, fontSize: 18, letterSpacing: 8, animation: "splashFadeIn 0.7s ease" }}>accrue</div>
     </div>
   );
 
