@@ -4049,8 +4049,7 @@ export default function App() {
   return (
     <>
       {!onboarded && <OnboardingScreen onComplete={completeOnboarding} />}
-      {onboarded && showReturningSplash && <ReturningSplash onDone={() => setShowReturningSplash(false)} />}
-      {onboarded && !showReturningSplash && <div className={theme === "cyberpunk" ? "accrue-cyberpunk" : ""} style={{ minHeight: "100vh", position: "relative", background: theme === "light" ? C.bg : theme === "cyberpunk" ? "linear-gradient(160deg, #1a0030 0%, #0a0014 45%, #150a28 100%)" : "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", backgroundSize: theme === "cyberpunk" ? "200% 200%" : undefined, color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
+      {onboarded && <div className={theme === "cyberpunk" ? "accrue-cyberpunk" : ""} style={{ minHeight: "100vh", position: "relative", background: theme === "light" ? C.bg : theme === "cyberpunk" ? "linear-gradient(160deg, #1a0030 0%, #0a0014 45%, #150a28 100%)" : "linear-gradient(180deg, #090b0e 0%, #08090a 100%)", backgroundSize: theme === "cyberpunk" ? "200% 200%" : undefined, color: C.text1, fontFamily: FONT, fontWeight: 300, padding: "env(safe-area-inset-top, 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px" }}>
       {theme === "cyberpunk" && (
         <style>{`
           /* ── Borders run thicker across the board. Setting border-width alone is safe:
