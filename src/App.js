@@ -3466,6 +3466,16 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [sessionChecked, setSessionChecked] = useState(false);
 
+  // Guarantee the splash screen is visible for a deliberate minimum stretch of time,
+  // rather than disappearing the instant the real check resolves — on a fast
+  // connection the real check can finish in well under the fade-in's own duration,
+  // which made the animation feel like it never actually got to play.
+  const [minSplashTimeElapsed, setMinSplashTimeElapsed] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setMinSplashTimeElapsed(true), 1200);
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     // If we've arrived here via an email confirmation (or OAuth) redirect, Supabase
     // attaches auth info to the URL as a hash fragment (e.g. #access_token=...). In
@@ -4033,7 +4043,7 @@ export default function App() {
 
   // Auth gate — show nothing meaningful until we know whether there's a session,
   // then the login/signup screen if there isn't one, before any app data loads.
-  if (!sessionChecked) {
+  if (!sessionChecked || !minSplashTimeElapsed) {
     // We don't know the account's theme yet (that lives in Supabase, tied to a
     // session we haven't resolved), but we can use whatever was last cached in
     // local storage as a very-likely-correct approximation, rather than always
@@ -4052,7 +4062,7 @@ export default function App() {
   }
   if (!session) return <AuthScreen onAuthed={(s) => setSession(s)} />;
 
-  if (!loaded) return (
+  if (!loaded || !minSplashTimeElapsed) return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", animation: "splashFadeIn 0.5s ease" }}>
       <style>{`@keyframes splashFadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
       <div style={{ fontFamily: FONT, fontWeight: 100, color: C.text3, fontSize: 18, letterSpacing: 8, animation: "splashFadeIn 0.7s ease" }}>accrue</div>
