@@ -1,4 +1,17 @@
 export default async function handler(req, res) {
+  // Browsers (and native app webviews making cross-origin requests) send an
+  // automatic OPTIONS "preflight" request before a real POST with a JSON body,
+  // to check whether the server allows it. Without explicitly answering this
+  // OPTIONS request successfully, the browser/webview cancels the real POST
+  // entirely — same root cause as the fix already applied to prices.js.
+  if (req.method === "OPTIONS") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    return res.status(204).end();
+  }
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   let body;

@@ -3,6 +3,16 @@
 // Falls back to the most recent prior business day if the requested date has no rate
 // (weekends / public holidays aren't published by the ECB) — walks back up to 10 days
 export default async function handler(req, res) {
+  // This is a GET request with URL params (no JSON body/custom headers), so it
+  // shouldn't trigger a CORS preflight at all — but setting this is a cheap,
+  // harmless safety net in case that ever changes.
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  if (req.method === "OPTIONS") {
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    return res.status(204).end();
+  }
+
   const { date, currency } = req.query;
 
   if (!date || !currency) {

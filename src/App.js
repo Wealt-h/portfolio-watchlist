@@ -18,10 +18,6 @@ import { supabase } from "./supabaseClient";
 const IS_NATIVE_APP = typeof window !== "undefined" && window.location && (window.location.protocol === "capacitor:" || window.location.protocol === "ionic:");
 const API_BASE = IS_NATIVE_APP ? "https://portfolio-watchlist-cumx.vercel.app" : "";
 const apiUrl = (path) => `${API_BASE}${path}`;
-// TEMP DIAGNOSTIC — remove once native price loading is confirmed working
-if (typeof window !== "undefined") {
-  console.log("⚡️ DIAGNOSTIC: protocol=" + window.location.protocol + " IS_NATIVE_APP=" + IS_NATIVE_APP + " API_BASE=" + API_BASE);
-}
 
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────
 const ONBOARDING_STEPS = [
@@ -850,18 +846,14 @@ async function pushPreferencesToSupabase(userId, prefs) {
 // ─── REAL-TIME PRICES (via serverless to avoid CORS) ─────────────────────────
 async function fetchLivePrices(symbols) {
   try {
-    const url = apiUrl("/api/prices");
-    console.log("⚡️ DIAGNOSTIC fetchLivePrices URL:", url);
-    const res = await fetch(url, {
+    const res = await fetch(apiUrl("/api/prices"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbols })
     });
-    console.log("⚡️ DIAGNOSTIC fetchLivePrices status:", res.status);
     const data = await res.json();
     return data.prices || {};
-  } catch (err) {
-    console.log("⚡️ DIAGNOSTIC fetchLivePrices ERROR:", err.message);
+  } catch {
     return {};
   }
 }
