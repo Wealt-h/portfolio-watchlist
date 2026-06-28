@@ -1,6 +1,24 @@
 export const config = { runtime: "edge" };
 
 export default async function handler(req) {
+  // Browsers (and native app webviews making cross-origin requests) send an
+  // automatic OPTIONS "preflight" request before a real POST with a JSON body,
+  // to check whether the server allows it. Without explicitly answering this
+  // OPTIONS request successfully, the browser/webview cancels the real POST
+  // entirely — which is exactly what was causing "Load failed" on the native
+  // app (a same-origin web request never triggers this preflight, which is
+  // why this was invisible on the website but broke the iOS app).
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }
+
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
@@ -56,6 +74,9 @@ export default async function handler(req) {
 
   return new Response(JSON.stringify({ prices: results }), {
     status: 200,
-    headers: { "Content-Type": "application/json" }
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    }
   });
 }
