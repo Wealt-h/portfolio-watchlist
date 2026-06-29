@@ -1228,6 +1228,10 @@ function WatchCard({ asset, period = "day", onDelete, onNotesUpdate, onThesisUpd
           type: asset.type,
           currentPrice: asset.currentPrice,
           change24h: asset.change24h,
+          rsi: asset.rsi,
+          high52w: asset.high52w,
+          ma200: asset.ma200,
+          periods: asset.periods,
           mode,
         }),
       });
@@ -1365,7 +1369,18 @@ function WatchCard({ asset, period = "day", onDelete, onNotesUpdate, onThesisUpd
             )}
             {!aiLoading && asset.notes && (
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "12px 14px" }}>
-                <div style={{ fontSize: 12, color: C.text2, lineHeight: 1.7, fontFamily: FONT, fontWeight: 300 }}>{asset.notes}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {asset.notes.split("\n").filter(l => l.trim()).map((line, i) => {
+                    const text = line.replace(/^[\s•\-+*]+/, "").trim();
+                    if (!text) return null;
+                    return (
+                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                        <span style={{ fontSize: 12, color: "#7eb8ff", flexShrink: 0, marginTop: 1, opacity: 0.8 }}>•</span>
+                        <span style={{ fontSize: 12, color: C.text2, lineHeight: 1.6, fontFamily: FONT, fontWeight: 300 }}>{text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
             {!aiLoading && !asset.notes && (
