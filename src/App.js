@@ -4306,18 +4306,9 @@ export default function App() {
 
       {tab === "watchlist" && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 24 }}>
-            {[{l:"Assets",v:watchlist.length},{l:"Buy now",v:buyableCount},{l:"Watching",v:watchlist.filter(a=>calcSignal(a).signal==="watch").length}].map(s => (
-              <div key={s.l} style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8, padding: "12px 0", textAlign: "center" }}>
-                <div style={{ fontSize: 26, fontWeight: 400, fontFamily: FONT, color: C.text1 }}>{s.v}</div>
-                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginTop: 4 }}>{s.l.toUpperCase()}</div>
-              </div>
-            ))}
-          </div>
-
           {/* Collapsible view controls — keeps the page clean; the button shows
               the current selections and expands to the filter + return toggles. */}
-          <button onClick={() => setFiltersOpen(o => !o)} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%", background:C.surface, border:`1px solid ${C.borderHover}`, color:C.text2, borderRadius:8, padding:"9px 14px", marginBottom: filtersOpen ? 12 : 18, cursor:"pointer", fontFamily:MONO, boxSizing:"border-box" }}>
+          <button onClick={() => setFiltersOpen(o => !o)} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%", background:C.surface, border:`1px solid ${C.borderHover}`, color:C.text2, borderRadius:8, padding:"13px 14px", marginBottom: filtersOpen ? 12 : 14, cursor:"pointer", fontFamily:MONO, boxSizing:"border-box" }}>
             <span style={{ display:"flex", alignItems:"center", gap:10 }}>
               <span style={{ color:C.text3, fontSize:9, letterSpacing:2 }}>VIEW</span>
               <span style={{ color:C.text1, fontSize:11, letterSpacing:0.5 }}>
