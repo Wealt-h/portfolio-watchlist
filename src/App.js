@@ -297,17 +297,6 @@ function AuthScreen({ onAuthed }) {
     setLoading(false);
   };
 
-  const handleOAuth = async (provider) => {
-    setError(null);
-    try {
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({ provider });
-      if (oauthError) throw oauthError;
-      // Browser will redirect away to the provider's login page; nothing more to do here
-    } catch (err) {
-      setError(err.message || "Could not start sign-in — please try again.");
-    }
-  };
-
   return (
     <div style={{
       minHeight: "100vh",
@@ -356,23 +345,6 @@ function AuthScreen({ onAuthed }) {
             {loading ? "Please wait..." : mode === "login" ? "Log in" : "Create account"}
           </button>
         </form>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "20px 0" }}>
-          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
-          <span style={{ fontSize: 10, color: "rgba(240,245,242,0.3)", fontFamily: MONO, letterSpacing: 1 }}>OR</span>
-          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button onClick={() => handleOAuth("apple")}
-            style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.14)", color: "#f0f5f2", borderRadius: 8, padding: "11px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.3 }}>
-            Continue with Apple
-          </button>
-          <button onClick={() => handleOAuth("google")}
-            style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.14)", color: "#f0f5f2", borderRadius: 8, padding: "11px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.3 }}>
-            Continue with Google
-          </button>
-        </div>
       </div>
 
       <div style={{ fontSize: 10, color: "rgba(240,245,242,0.25)", fontFamily: MONO, letterSpacing: 1, marginTop: 28 }}>
