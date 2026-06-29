@@ -3666,7 +3666,21 @@ export default function App() {
         // Auto-apply CNN stock Fear & Greed to stock/etf assets
         const stockFg = (stockFgRes && !stockFgRes.error) ? stockFgRes.score : a.fearGreed;
         const isEquity = a.type === "stock" || a.type === "etf";
-        return { ...a, currentPrice: p.price, change24h: p.change24h, ...(a.type === "crypto" ? { fearGreed: fg } : {}), ...(isEquity ? { fearGreed: stockFg } : {}) };
+        return {
+          ...a,
+          currentPrice: p.price,
+          change24h: p.change24h,
+          // Technical indicators now come live from /api/prices on every refresh
+          // (previously these were only set once at add-time and never updated,
+          // and rsi was hardcoded to 50). Guarded so a transient/missing value
+          // never overwrites a good one back to zero.
+          ...(p.high52w ? { high52w: p.high52w } : {}),
+          ...(p.low52w ? { low52w: p.low52w } : {}),
+          ...(p.ma200 ? { ma200: p.ma200 } : {}),
+          ...(p.rsi ? { rsi: p.rsi } : {}),
+          ...(a.type === "crypto" ? { fearGreed: fg } : {}),
+          ...(isEquity ? { fearGreed: stockFg } : {}),
+        };
       }));
       setLastUpdated(new Date());
       setLiveStatus("ok");

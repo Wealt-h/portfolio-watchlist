@@ -1,3 +1,8 @@
+// Crypto tickers must be suffixed with -USD on Yahoo Finance, or they silently
+// resolve to an unrelated listed equity sharing the same short ticker. Keep in
+// sync with prices.js, sparkline.js, and CRYPTO_TICKERS in App.js.
+const CRYPTO_TICKERS = ["BTC","ETH","SOL","DOGE","ADA","XRP","BNB","AVAX","MATIC","DOT","LINK","LTC","UNI","ATOM","NEAR","APT","SHIB","TRX","TON"];
+
 export default async function handler(req, res) {
   // Browsers (and native app webviews making cross-origin requests) send an
   // automatic OPTIONS "preflight" request before a real POST with a JSON body,
@@ -20,6 +25,10 @@ export default async function handler(req, res) {
   const { symbol } = body;
   if (!symbol) return res.status(400).json({ error: "Missing symbol" });
 
+  // Apply the -USD suffix for crypto so the 52W range and MA200 resolve to the
+  // correct asset (this was previously missing, leaving crypto indicators at 0).
+  const ticker = CRYPTO_TICKERS.includes(symbol.toUpperCase()) ? `${symbol.toUpperCase()}-USD` : symbol;
+
   const headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "application/json",
@@ -28,7 +37,7 @@ export default async function handler(req, res) {
   try {
     // Fetch current quote + 52W range
     const quoteRes = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`,
       { headers }
     );
     const quoteData = await quoteRes.json();
@@ -46,7 +55,7 @@ export default async function handler(req, res) {
     let ma200 = 0;
     try {
       const histRes = await fetch(
-        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1y`,
+        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1y`,
         { headers }
       );
       const histData = await histRes.json();
