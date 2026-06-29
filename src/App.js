@@ -4312,20 +4312,19 @@ export default function App() {
             ))}
           </div>
 
-          <div style={{ display:"flex", gap:6, marginBottom:18, overflowX:"auto", paddingBottom:4, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
+          <div style={{ fontSize:9, color:C.text3, fontFamily:MONO, letterSpacing:2, marginBottom:8 }}>ASSET TYPE</div>
+          <div style={{ display:"flex", gap:6, marginBottom:16, overflowX:"auto", paddingBottom:4, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
             {[["all","All"],["crypto","Crypto"],["etf","ETF"],["stock","Stocks"],["commodity","Commodities"]].map(([f,l]) => (
               <button key={f} onClick={() => setFilterSig(f)} style={{ background: filterSig===f?C.surface:"transparent", border:`1px solid ${filterSig===f?C.borderHover:C.border}`, color:filterSig===f?C.text1:C.text3, borderRadius:4, padding:"4px 12px", fontSize:10, fontFamily:FONT, fontWeight:300, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.3 }}>{l}</button>
             ))}
           </div>
 
           {/* Period toggle — controls which return is shown on each card's % */}
-          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:18 }}>
-            <span style={{ fontSize:9, color:C.text3, fontFamily:MONO, letterSpacing:2, flexShrink:0 }}>RETURN</span>
-            <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
-              {[["day","1D"],["week","1W"],["month","1M"],["year","1Y"],["all","All"]].map(([p,l]) => (
-                <button key={p} onClick={() => setWatchPeriod(p)} style={{ background: watchPeriod===p?C.surface:"transparent", border:`1px solid ${watchPeriod===p?C.borderHover:C.border}`, color:watchPeriod===p?C.text1:C.text3, borderRadius:4, padding:"4px 12px", fontSize:10, fontFamily:MONO, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.5 }}>{l}</button>
-              ))}
-            </div>
+          <div style={{ fontSize:9, color:C.text3, fontFamily:MONO, letterSpacing:2, marginBottom:8 }}>RETURN</div>
+          <div style={{ display:"flex", gap:6, marginBottom:18, overflowX:"auto", paddingBottom:4, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
+            {[["day","1D"],["week","1W"],["month","1M"],["year","1Y"],["all","All"]].map(([p,l]) => (
+              <button key={p} onClick={() => setWatchPeriod(p)} style={{ background: watchPeriod===p?C.surface:"transparent", border:`1px solid ${watchPeriod===p?C.borderHover:C.border}`, color:watchPeriod===p?C.text1:C.text3, borderRadius:4, padding:"4px 12px", fontSize:10, fontFamily:MONO, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.5 }}>{l}</button>
+            ))}
           </div>
 
           {/* Combined Fear & Greed card — crypto + stocks + VIX side by side */}
