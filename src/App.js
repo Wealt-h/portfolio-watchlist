@@ -3576,6 +3576,10 @@ export default function App() {
   const [tab, setTab] = useState("watchlist");
   const [watchlist, setWatchlist] = useState(DEFAULT_WATCHLIST);
   const [portfolio, setPortfolio] = useState(DEFAULT_PORTFOLIO);
+  // Last-known price per symbol, retained even if an asset is removed from the
+  // watchlist — so portfolio positions never lose their price (and drop to $0)
+  // just because they're no longer being watched.
+  const [priceMap, setPriceMap] = useState({});
   const [loaded, setLoaded] = useState(false);
   const [watchModal, setWatchModal] = useState(null);
   const [tradeModal, setTradeModal] = useState(null); // null | { defaultType, symbol? }
@@ -3641,9 +3645,12 @@ export default function App() {
   // ── Live price refresh
   const refreshPrices = async (wl) => {
     const list = wl || watchlist;
-    if (!list.length) return;
+    // Include portfolio holdings, not just watchlist items, so a position that
+    // isn't on the watchlist still gets a live price.
+    const portfolioSymbols = portfolio.map(t => (t.symbol || "").toUpperCase().trim()).filter(Boolean);
+    const symbols = [...new Set([...list.map(a => a.symbol), ...portfolioSymbols])];
+    if (!symbols.length) return;
     setLiveStatus("fetching");
-    const symbols = [...new Set(list.map(a => a.symbol))];
 
     // Fetch prices + Crypto Fear & Greed + Stock Fear & Greed + VIX in parallel
     const [prices, fgRes, stockFgRes, vixRes] = await Promise.all([
@@ -3657,6 +3664,15 @@ export default function App() {
     if (vixRes && !vixRes.error) setVixData(vixRes);
 
     if (Object.keys(prices).length > 0) {
+      // Cache every fetched price by symbol so portfolio positions can read a
+      // last-known price even after an asset leaves the watchlist.
+      setPriceMap(prev => {
+        const next = { ...prev };
+        for (const [sym, p] of Object.entries(prices)) {
+          if (p && p.price) next[sym] = p.price;
+        }
+        return next;
+      });
       // Apply live prices
       setWatchlist(prev => prev.map(a => {
         const p = prices[a.symbol];
@@ -3998,8 +4014,13 @@ export default function App() {
   // Normalise symbols to uppercase to prevent duplicate positions
   const positions = portfolio.reduce((acc, t) => { const sym = (t.symbol||"").toUpperCase().trim(); if (!acc[sym]) acc[sym]=[]; acc[sym].push({...t, symbol: sym}); return acc; }, {});
 
-  // Portfolio summary using live prices from watchlist
-  const getLivePrice = (sym) => { const a = watchlist.find(x => x.symbol===sym); return a?.currentPrice || 0; };
+  // Portfolio summary using live prices. Falls back to the cached last-known
+  // price (priceMap) so removing an asset from the watchlist no longer zeroes
+  // out its portfolio position.
+  const getLivePrice = (sym) => {
+    const a = watchlist.find(x => x.symbol === sym);
+    return a?.currentPrice || priceMap[sym] || 0;
+  };
   const positionSummaries = Object.entries(positions).map(([sym, trades]) => ({ sym, trades, pos: calcPosition(trades, getLivePrice(sym)) }));
 
   // Cash totals

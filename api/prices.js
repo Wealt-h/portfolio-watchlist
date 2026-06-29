@@ -89,13 +89,19 @@ export default async function handler(req) {
 
       const price = meta.regularMarketPrice ?? meta.previousClose;
       if (price == null) return;
-      const prev = meta.chartPreviousClose ?? meta.previousClose ?? price;
-      const change24h = prev ? ((price - prev) / prev) * 100 : 0;
 
       const quote = result?.indicators?.quote?.[0] || {};
       const closes = (quote.close || []).filter(v => v != null && !isNaN(v));
       const highs  = (quote.high  || []).filter(v => v != null && !isNaN(v));
       const lows   = (quote.low   || []).filter(v => v != null && !isNaN(v));
+
+      // True 24h change must use the prior *session* close. We must NOT use
+      // meta.chartPreviousClose here: with a 1-year range that value is the
+      // close ~1 year ago, which turns the daily % into a 1-year return (the
+      // cause of the wildly large percentages that appeared on the cards).
+      const prevClose = meta.previousClose ?? meta.regularMarketPreviousClose
+        ?? (closes.length >= 2 ? closes[closes.length - 2] : price);
+      const change24h = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
 
       // Prefer Yahoo's own 52-week figures; fall back to the year of candles.
       const high52w = meta.fiftyTwoWeekHigh || (highs.length ? Math.max(...highs) : 0);
