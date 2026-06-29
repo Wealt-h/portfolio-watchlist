@@ -1187,13 +1187,18 @@ function AlertModal({ symbol, currentPrice, alerts, onSave, onDelete, onClose })
 }
 
 // ─── WATCH CARD ───────────────────────────────────────────────────────────────
-function WatchCard({ asset, onDelete, onNotesUpdate, onThesisUpdate, onAlert, alertCount, onLogTrade }) {
+function WatchCard({ asset, period = "day", onDelete, onNotesUpdate, onThesisUpdate, onAlert, alertCount, onLogTrade }) {
   const [open, setOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(null);
   const [aiError, setAiError] = useState(null);
   const [sparkData, setSparkData] = useState(null);
   const [sparkLoading, setSparkLoading] = useState(false);
   const sig = calcSignal(asset);
+  // The percentage shown reflects the selected period; falls back to the 24h
+  // change when period data hasn't loaded yet (e.g. first paint before refresh).
+  const periodChange = (asset.periods && asset.periods[period] != null)
+    ? asset.periods[period]
+    : asset.change24h;
 
   useEffect(() => {
     if (!open || sparkData) return;
@@ -1251,8 +1256,8 @@ function WatchCard({ asset, onDelete, onNotesUpdate, onThesisUpdate, onAlert, al
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 20, color: C.text1, letterSpacing: -0.5 }}>{fmtUSD(asset.currentPrice)}</div>
-          <div style={{ fontSize: 11, color: asset.change24h < 0 ? C.red : C.green, fontFamily: MONO, marginTop: 3, fontWeight: 500 }}>
-            {asset.change24h > 0 ? "+" : ""}{asset.change24h}%
+          <div style={{ fontSize: 11, color: periodChange < 0 ? C.red : C.green, fontFamily: MONO, marginTop: 3, fontWeight: 500 }}>
+            {periodChange > 0 ? "+" : ""}{periodChange}%
           </div>
         </div>
       </div>
@@ -1536,7 +1541,7 @@ function AssetSearchModal({ onAdd, onClose }) {
             value={query}
             onChange={handleInput}
             placeholder="Search stocks, crypto, ETFs..."
-            style={{ ...INP, paddingLeft: 36, fontSize: 14 }}
+            style={{ ...INP, paddingLeft: 36, fontSize: 16 }}
           />
           <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: C.labelMute, fontSize: 14 }}>
             {searching ? "⟳" : "⌕"}
@@ -3586,6 +3591,8 @@ export default function App() {
   const [searchModal, setSearchModal] = useState(false);
   const [editTradeModal, setEditTradeModal] = useState(null); // null | trade object
   const [filterSig, setFilterSig] = useState("all");
+  // Selected period for the watchlist % display: day | week | month | year | all
+  const [watchPeriod, setWatchPeriod] = useState("day");
   const [showLegend, setShowLegend] = useState(false);
   const [liveStatus, setLiveStatus] = useState("idle"); // idle | fetching | ok | error
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -3694,6 +3701,7 @@ export default function App() {
           ...(p.low52w ? { low52w: p.low52w } : {}),
           ...(p.ma200 ? { ma200: p.ma200 } : {}),
           ...(p.rsi ? { rsi: p.rsi } : {}),
+          ...(p.periods ? { periods: p.periods } : {}),
           ...(a.type === "crypto" ? { fearGreed: fg } : {}),
           ...(isEquity ? { fearGreed: stockFg } : {}),
         };
@@ -4295,6 +4303,16 @@ export default function App() {
             ))}
           </div>
 
+          {/* Period toggle — controls which return is shown on each card's % */}
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:18 }}>
+            <span style={{ fontSize:9, color:C.text3, fontFamily:MONO, letterSpacing:2, flexShrink:0 }}>RETURN</span>
+            <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
+              {[["day","1D"],["week","1W"],["month","1M"],["year","1Y"],["all","All"]].map(([p,l]) => (
+                <button key={p} onClick={() => setWatchPeriod(p)} style={{ background: watchPeriod===p?C.surface:"transparent", border:`1px solid ${watchPeriod===p?C.borderHover:C.border}`, color:watchPeriod===p?C.text1:C.text3, borderRadius:4, padding:"4px 12px", fontSize:10, fontFamily:MONO, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.5 }}>{l}</button>
+              ))}
+            </div>
+          </div>
+
           {/* Combined Fear & Greed card — crypto + stocks + VIX side by side */}
           {(fearGreedData || stockFearGreed || vixData) && (() => {
             const getColor = v => v <= 25 ? C.red : v <= 45 ? C.amber : v <= 55 ? C.text3 : v <= 75 ? "rgba(74,222,128,0.6)" : C.green;
@@ -4328,7 +4346,7 @@ export default function App() {
 
           {filteredWatch.length === 0
             ? <div style={{ textAlign:"center", color:C.text3, fontFamily:FONT, fontWeight:300, fontSize:13, padding:"40px 0" }}>No assets match filter</div>
-            : filteredWatch.map(a => <WatchCard key={a.id} asset={a}
+            : filteredWatch.map(a => <WatchCard key={a.id} asset={a} period={watchPeriod}
                 onDelete={id => {
                   setWatchlist(w => w.filter(x => x.id !== id));
                   if (session?.user?.id) deleteWatchlistItemFromSupabase(session.user.id, id);

@@ -33,6 +33,21 @@ function computeRSI(closes, period = 14) {
   return Math.round(100 - 100 / (1 + rs));
 }
 
+// Percentage return of `currentPrice` versus the close at-or-before `daysAgo`.
+// `series` is an array of { t (ms), c (close) } sorted oldest→newest. If there
+// isn't enough history to reach that far back, falls back to the earliest close
+// (so e.g. a 6-month-old asset's "1 year" return uses its full available range).
+function returnSince(series, currentPrice, daysAgo) {
+  if (!series.length || !currentPrice) return 0;
+  const cutoff = Date.now() - daysAgo * 86400000;
+  let base = null;
+  for (let i = series.length - 1; i >= 0; i--) {
+    if (series[i].t <= cutoff) { base = series[i].c; break; }
+  }
+  if (base == null) base = series[0].c;
+  return base ? ((currentPrice - base) / base) * 100 : 0;
+}
+
 export default async function handler(req) {
   // Browsers (and native app webviews making cross-origin requests) send an
   // automatic OPTIONS "preflight" before a real POST. Without answering it
@@ -75,13 +90,13 @@ export default async function handler(req) {
     const symUpper = sym.toUpperCase();
     const ticker = CRYPTO_TICKERS.includes(symUpper) ? `${symUpper}-USD` : sym;
     try {
-      // One year of daily candles gives us everything: the live price + 24h
-      // change from meta, the 52-week range, the 200-day moving average, and
-      // enough history to compute a real RSI.
-      const res = await fetch(
-        `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`,
-        { headers }
-      );
+      // One year of daily candles gives us the live price + 24h change, the
+      // 52-week range, the 200-day MA, RSI, and the week/month/year returns.
+      // A second lightweight monthly max-range fetch gives the all-time return.
+      const [res, maxRes] = await Promise.all([
+        fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`, { headers }),
+        fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1mo&range=max`, { headers }).catch(() => null),
+      ]);
       const data = await res.json();
       const result = data?.chart?.result?.[0];
       const meta = result?.meta;
@@ -94,6 +109,14 @@ export default async function handler(req) {
       const closes = (quote.close || []).filter(v => v != null && !isNaN(v));
       const highs  = (quote.high  || []).filter(v => v != null && !isNaN(v));
       const lows   = (quote.low   || []).filter(v => v != null && !isNaN(v));
+
+      // Timestamped series (oldest→newest), used for the period returns.
+      const ts = result?.timestamp || [];
+      const rawCloses = quote.close || [];
+      const series = [];
+      for (let i = 0; i < ts.length; i++) {
+        if (rawCloses[i] != null && !isNaN(rawCloses[i])) series.push({ t: ts[i] * 1000, c: rawCloses[i] });
+      }
 
       // True 24h change must use the prior *session* close. We must NOT use
       // meta.chartPreviousClose here: with a 1-year range that value is the
@@ -116,6 +139,18 @@ export default async function handler(req) {
 
       const rsi = computeRSI(closes, 14);
 
+      // All-time return from the monthly max-range series' earliest close.
+      let allTime = 0;
+      try {
+        const maxData = maxRes ? await maxRes.json() : null;
+        const maxCloses = (maxData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [])
+          .filter(v => v != null && !isNaN(v));
+        if (maxCloses.length) {
+          const first = maxCloses[0];
+          allTime = first ? ((price - first) / first) * 100 : 0;
+        }
+      } catch {}
+
       results[sym] = {
         price: round2(price),
         change24h: round2(change24h),
@@ -123,6 +158,13 @@ export default async function handler(req) {
         low52w: round2(low52w),
         ma200: round2(ma200),
         rsi,
+        periods: {
+          day: round2(change24h),
+          week: round2(returnSince(series, price, 7)),
+          month: round2(returnSince(series, price, 30)),
+          year: round2(returnSince(series, price, 365)),
+          all: round2(allTime),
+        },
       };
     } catch (e) {
       console.error(`Failed to fetch ${sym}:`, e.message);
