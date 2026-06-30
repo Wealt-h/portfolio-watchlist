@@ -128,7 +128,7 @@ function AboutScreen({ onClose }) {
 }
 
 
-function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker, onOpenAbout, theme, onSetTheme, onLogout }) {
+function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker, onOpenAbout, theme, onSetTheme, onLogout, onExport }) {
   if (!open) return null;
 
   const NavItem = ({ icon, label, active, badge, onClick, dim }) => (
@@ -201,6 +201,7 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
           </div>
 
           <NavItem icon="↻" label="Replay intro" dim onClick={() => { onRestartOnboarding(); onClose(); }} />
+          <NavItem icon="⤓" label="Export data (CSV)" dim onClick={() => { onExport(); onClose(); }} />
           <NavItem icon="ⓘ" label="About Accrue" dim onClick={() => { onOpenAbout(); onClose(); }} />
           <NavItem icon="✉" label="Help & feedback" dim onClick={() => { window.location.href = "mailto:?subject=Accrue%20feedback"; onClose(); }} />
         </div>
@@ -3469,6 +3470,88 @@ function SignalLegend() {
   );
 }
 
+// ─── DATA EXPORT (CSV) ──────────────────────────────────────────────────────
+// Escapes a value for safe inclusion in a CSV cell: wraps in quotes and doubles
+// any internal quotes if the value contains a comma, quote, or newline.
+function csvCell(v) {
+  if (v == null) return "";
+  const s = String(v);
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+function csvRow(cells) { return cells.map(csvCell).join(",") + "\r\n"; }
+
+// Builds one combined CSV covering trades, current portfolio positions, cash
+// accounts, properties, and the watchlist — each as its own clearly labeled
+// section so the file opens sensibly in Excel/Numbers/Sheets despite the
+// differing record shapes.
+function buildPortfolioExportCSV({ portfolio, positionSummaries, getLivePrice, cashAccounts, properties, watchlist }) {
+  let out = "";
+
+  out += csvRow(["ACCRUE EXPORT", new Date().toISOString().slice(0, 10)]);
+  out += "\r\n";
+
+  // ── Trades ──
+  out += csvRow(["TRADES"]);
+  out += csvRow(["Date", "Type", "Symbol", "Name", "Units", "Price", "Amount", "Fees", "Brokerage", "Notes"]);
+  [...portfolio].sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(t => {
+    out += csvRow([t.date, t.type, t.symbol, t.name || "", t.units ?? "", t.price ?? "", t.amount ?? "", t.fees ?? "", t.brokerage || "", t.notes || ""]);
+  });
+  out += "\r\n";
+
+  // ── Current portfolio positions ──
+  out += csvRow(["PORTFOLIO POSITIONS (current)"]);
+  out += csvRow(["Symbol", "Name", "Units Held", "Avg Cost", "Cost Basis", "Current Price", "Market Value", "Unrealised P&L", "Unrealised %", "Realised P&L"]);
+  positionSummaries.forEach(({ sym, trades, pos }) => {
+    const name = trades[0]?.name || "";
+    out += csvRow([sym, name, pos.units, pos.avgCost, pos.costBasis, getLivePrice(sym), pos.marketValue, pos.unrealisedPnl, pos.unrealisedPct, pos.realisedPnl]);
+  });
+  out += "\r\n";
+
+  // ── Cash accounts ──
+  out += csvRow(["CASH ACCOUNTS"]);
+  out += csvRow(["Name", "Principal", "Rate %", "Start Date", "Current Value", "Accrued Interest"]);
+  (cashAccounts || []).forEach(a => {
+    const calc = calcCashValue(a);
+    out += csvRow([a.name || "", a.principal ?? "", a.rate ?? "", a.startDate || "", calc.currentValue, calc.accruedInterest]);
+  });
+  out += "\r\n";
+
+  // ── Properties ──
+  out += csvRow(["PROPERTIES"]);
+  out += csvRow(["Name", "Purchase Price", "Current Value", "Loan Principal", "Interest Rate %", "Loan Owing", "Net Equity"]);
+  (properties || []).forEach(p => {
+    const calc = calcPropertyValue(p);
+    out += csvRow([p.name || "", p.purchasePrice ?? "", p.currentValue ?? "", p.loanPrincipal ?? "", p.interestRate ?? "", calc.loanPrincipalOwing, calc.netEquity]);
+  });
+  out += "\r\n";
+
+  // ── Watchlist ──
+  out += csvRow(["WATCHLIST"]);
+  out += csvRow(["Symbol", "Name", "Type", "Current Price", "24h Change %", "RSI", "52W High", "52W Low", "200D MA"]);
+  (watchlist || []).forEach(a => {
+    out += csvRow([a.symbol, a.name || "", a.type || "", a.currentPrice ?? "", a.change24h ?? "", a.rsi ?? "", a.high52w ?? "", a.low52w ?? "", a.ma200 ?? ""]);
+  });
+
+  return out;
+}
+
+// Triggers a browser/WebView download of the CSV. Capacitor's iOS WebView
+// supports the standard Blob + anchor-click download pattern, so this works
+// in both the website and the native app without extra native code.
+function downloadPortfolioCSV(csvContent) {
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `accrue-export-${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
   // ── Auth session — gates the entire app behind login. Starts as "loading" (null +
@@ -4645,7 +4728,8 @@ export default function App() {
         }
         setTradeModal(null);
       }} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
-      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} theme={theme} onSetTheme={setThemeDirect} onLogout={() => supabase.auth.signOut()} />
+      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} theme={theme} onSetTheme={setThemeDirect} onLogout={() => supabase.auth.signOut()}
+        onExport={() => downloadPortfolioCSV(buildPortfolioExportCSV({ portfolio, positionSummaries, getLivePrice, cashAccounts, properties, watchlist }))} />
       {aboutOpen && <AboutScreen onClose={() => setAboutOpen(false)} />}
     </div>}
     </>
