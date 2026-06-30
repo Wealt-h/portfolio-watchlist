@@ -128,7 +128,7 @@ function AboutScreen({ onClose }) {
 }
 
 
-function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding, displayCurrency, onOpenCurrencyPicker, onOpenAbout, theme, onSetTheme, onLogout, onExport }) {
+function NavDrawer({ open, onClose, tab, setTab, onOpenSettings }) {
   if (!open) return null;
 
   const NavItem = ({ icon, label, active, badge, onClick, dim }) => (
@@ -178,42 +178,84 @@ function NavDrawer({ open, onClose, tab, setTab, alertCount, onRestartOnboarding
 
         <div style={{ height: 1, background: C.border, margin: "16px 0" }} />
 
-        {/* Secondary nav */}
+        {/* Settings entry — everything else lives in the dedicated settings screen */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <NavItem icon="◌" label="Alerts" dim badge={alertCount} onClick={() => { setTab("watchlist"); onClose(); }} />
-          <NavItem icon="◎" label={`Currency · ${displayCurrency}`} dim onClick={() => { onOpenCurrencyPicker(); onClose(); }} />
-
-          <div style={{ padding: "11px 12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              <span style={{ fontSize: 16, opacity: 0.6, width: 18, textAlign: "center", color: C.text1 }}>◐</span>
-              <span style={{ fontSize: 13, fontFamily: FONT, fontWeight: 300, color: C.text3 }}>Theme</span>
-            </div>
-            <div style={{ display: "flex", gap: 6, marginLeft: 30 }}>
-              {[["dark","Dark"],["light","Light"],["cyberpunk","Cyberpunk"]].map(([t, l]) => (
-                <button key={t} onClick={() => onSetTheme(t)} style={{
-                  flex: 1, background: theme===t?C.surfaceHigh:"transparent", border: `1px solid ${theme===t?C.borderHover:C.border}`,
-                  color: theme===t?C.text1:C.text3, borderRadius: 6, padding: "6px 4px", fontSize: 10, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.3,
-                }}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <NavItem icon="↻" label="Replay intro" dim onClick={() => { onRestartOnboarding(); onClose(); }} />
-          <NavItem icon="⤓" label="Export data (CSV)" dim onClick={() => { onExport(); onClose(); }} />
-          <NavItem icon="ⓘ" label="About Accrue" dim onClick={() => { onOpenAbout(); onClose(); }} />
-          <NavItem icon="✉" label="Help & feedback" dim onClick={() => { window.location.href = "mailto:?subject=Accrue%20feedback"; onClose(); }} />
+          <NavItem icon="⚙" label="Settings" dim onClick={() => { onOpenSettings(); onClose(); }} />
         </div>
 
         <div style={{ flex: 1 }} />
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
-          <NavItem icon="⏻" label="Log out" dim onClick={() => { onLogout(); onClose(); }} />
-        </div>
-
         <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14, fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 1 }}>
           v1.0.0
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SETTINGS SCREEN ────────────────────────────────────────────────────────
+// Full-screen settings panel, opened from the drawer's "Settings" entry.
+// Groups everything that was previously a flat list in the drawer: alerts
+// shortcut, currency, theme, data export, replay intro, about, help, log out.
+function SettingsScreen({ open, onClose, alertCount, onOpenAlerts, displayCurrency, onOpenCurrencyPicker, theme, onSetTheme, onRestartOnboarding, onExport, onOpenAbout, onLogout }) {
+  if (!open) return null;
+
+  const Row = ({ icon, label, value, badge, onClick, danger }) => (
+    <button onClick={onClick} style={{
+      display: "flex", alignItems: "center", gap: 12, width: "100%",
+      background: "transparent", border: "none", borderBottom: `1px solid ${C.border}`,
+      padding: "14px 4px", cursor: "pointer", textAlign: "left",
+    }}>
+      <span style={{ fontSize: 16, opacity: 0.7, width: 20, textAlign: "center", color: danger ? C.red : C.text1 }}>{icon}</span>
+      <span style={{ fontSize: 13, fontFamily: FONT, fontWeight: 300, color: danger ? C.red : C.text1, flex: 1 }}>{label}</span>
+      {badge > 0 && <span style={{ fontSize: 10, color: C.green, fontFamily: MONO, marginRight: 4 }}>{badge}</span>}
+      {value && <span style={{ fontSize: 12, color: C.text3, fontFamily: MONO }}>{value}</span>}
+      <span style={{ color: C.text3, fontSize: 12 }}>›</span>
+    </button>
+  );
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 600, background: C.bg, display: "flex", flexDirection: "column" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "env(safe-area-inset-top, 20px) 20px 16px" }}>
+        <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text1, fontSize: 18, cursor: "pointer", padding: 0 }}>←</button>
+        <span style={{ fontSize: 16, fontFamily: FONT, fontWeight: 400, color: C.text1 }}>Settings</span>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 32px" }}>
+
+        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, margin: "16px 0 6px" }}>GENERAL</div>
+        <Row icon="◌" label="Alerts" badge={alertCount} onClick={onOpenAlerts} />
+        <Row icon="◎" label="Currency" value={displayCurrency} onClick={onOpenCurrencyPicker} />
+
+        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, margin: "22px 0 6px" }}>APPEARANCE</div>
+        <div style={{ padding: "10px 4px", borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 13, fontFamily: FONT, fontWeight: 300, color: C.text1, marginBottom: 10 }}>Theme</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[["dark","Dark"],["light","Light"],["cyberpunk","Cyberpunk"]].map(([t, l]) => (
+              <button key={t} onClick={() => onSetTheme(t)} style={{
+                flex: 1, background: theme===t?C.surfaceHigh:"transparent", border: `1px solid ${theme===t?C.borderHover:C.border}`,
+                color: theme===t?C.text1:C.text3, borderRadius: 6, padding: "8px 4px", fontSize: 11, fontFamily: FONT, fontWeight: 300, cursor: "pointer", letterSpacing: 0.3,
+              }}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, margin: "22px 0 6px" }}>DATA</div>
+        <Row icon="⤓" label="Export data (CSV)" onClick={onExport} />
+
+        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, margin: "22px 0 6px" }}>ABOUT</div>
+        <Row icon="↻" label="Replay intro" onClick={onRestartOnboarding} />
+        <Row icon="ⓘ" label="About Accrue" onClick={onOpenAbout} />
+        <Row icon="✉" label="Help & feedback" onClick={() => { window.location.href = "mailto:?subject=Accrue%20feedback"; }} />
+
+        <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, margin: "22px 0 6px" }}>ACCOUNT</div>
+        <Row icon="⏻" label="Log out" onClick={onLogout} danger />
+
+        <div style={{ marginTop: 28, fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 1, textAlign: "center" }}>
+          Accrue v1.0.0
         </div>
       </div>
     </div>
@@ -3628,6 +3670,7 @@ export default function App() {
   });
 
   const [navOpen, setNavOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
 
   // ── Theme (dark default; light is a full alternate palette, same component tree)
@@ -4728,8 +4771,18 @@ export default function App() {
         }
         setTradeModal(null);
       }} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
-      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab} alertCount={alerts.filter(al => !al.triggered).length} onRestartOnboarding={restartOnboarding} displayCurrency={displayCurrency} onOpenCurrencyPicker={() => setCurrencyPickerOpen(true)} onOpenAbout={() => setAboutOpen(true)} theme={theme} onSetTheme={setThemeDirect} onLogout={() => supabase.auth.signOut()}
-        onExport={() => downloadPortfolioCSV(buildPortfolioExportCSV({ portfolio, positionSummaries, getLivePrice, cashAccounts, properties, watchlist }))} />
+      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab}
+        onOpenSettings={() => setSettingsOpen(true)} />
+
+      <SettingsScreen open={settingsOpen} onClose={() => setSettingsOpen(false)}
+        alertCount={alerts.filter(al => !al.triggered).length}
+        onOpenAlerts={() => { setSettingsOpen(false); setTab("watchlist"); }}
+        displayCurrency={displayCurrency} onOpenCurrencyPicker={() => { setSettingsOpen(false); setCurrencyPickerOpen(true); }}
+        theme={theme} onSetTheme={setThemeDirect}
+        onRestartOnboarding={() => { setSettingsOpen(false); restartOnboarding(); }}
+        onExport={() => downloadPortfolioCSV(buildPortfolioExportCSV({ portfolio, positionSummaries, getLivePrice, cashAccounts, properties, watchlist }))}
+        onOpenAbout={() => { setSettingsOpen(false); setAboutOpen(true); }}
+        onLogout={() => { setSettingsOpen(false); supabase.auth.signOut(); }} />
       {aboutOpen && <AboutScreen onClose={() => setAboutOpen(false)} />}
     </div>}
     </>
