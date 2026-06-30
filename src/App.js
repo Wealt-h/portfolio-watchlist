@@ -3605,7 +3605,6 @@ export default function App() {
   const [tradeModal, setTradeModal] = useState(null); // null | { defaultType, symbol? }
   const [searchModal, setSearchModal] = useState(false);
   const [editTradeModal, setEditTradeModal] = useState(null); // null | trade object
-  const [filterSig, setFilterSig] = useState("all");
   // Selected period for the watchlist % display: day | week | month | year | all
   const [watchPeriod, setWatchPeriod] = useState("day");
   const [showLegend, setShowLegend] = useState(false);
@@ -4061,15 +4060,7 @@ export default function App() {
   const totalPnl = totalUnrealisedPnl + totalRealisedPnl;
   const totalPnlPct = totalCostBasis > 0 ? (totalPnl/totalCostBasis)*100 : 0;
 
-  const filterMap = {
-    all: watchlist,
-    crypto: watchlist.filter(a => a.type === "crypto"),
-    etf: watchlist.filter(a => a.type === "etf"),
-    stock: watchlist.filter(a => a.type === "stock"),
-    commodity: watchlist.filter(a => a.type === "commodity"),
-  };
-  const filteredWatch = filterMap[filterSig] || watchlist;
-  const buyableCount = watchlist.filter(a => ["strong-buy","dip"].includes(calcSignal(a).signal)).length;
+  const filteredWatch = watchlist;
 
   // Auth gate — show nothing meaningful until we know whether there's a session,
   // then the login/signup screen if there isn't one, before any app data loads.
@@ -4303,17 +4294,11 @@ export default function App() {
 
       {tab === "watchlist" && (
         <>
-          {/* Underline-tab filters: asset type + return period. Active label is
-              brightened with a thin green underline; no boxes, stays minimal. */}
-          <div style={{ display:"flex", gap:18, overflowX:"auto", paddingBottom:2, marginBottom:14, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
-            {[["all","All"],["crypto","Crypto"],["etf","ETF"],["stock","Stocks"],["commodity","Commodities"]].map(([f,l]) => (
-              <button key={f} onClick={() => setFilterSig(f)} style={{ background:"transparent", border:"none", borderBottom:`2px solid ${filterSig===f?C.green:"transparent"}`, color:filterSig===f?C.text1:C.text3, padding:"0 0 5px", fontSize:12, fontFamily:FONT, fontWeight:filterSig===f?400:300, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.3 }}>{l}</button>
-            ))}
-          </div>
-
-          <div style={{ display:"flex", gap:18, overflowX:"auto", paddingBottom:2, marginBottom:20, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
+          {/* Return-period segmented bar (matches the top tab control). The
+              asset-type filter was removed — the watchlist shows all assets. */}
+          <div style={{ display:"flex", gap:0, background:C.surface, borderRadius:8, padding:3, border:`1px solid ${C.borderHover}`, marginBottom:20, boxSizing:"border-box" }}>
             {[["day","1D"],["week","1W"],["month","1M"],["year","1Y"],["all","All"]].map(([p,l]) => (
-              <button key={p} onClick={() => setWatchPeriod(p)} style={{ background:"transparent", border:"none", borderBottom:`2px solid ${watchPeriod===p?C.green:"transparent"}`, color:watchPeriod===p?C.text1:C.text3, padding:"0 0 5px", fontSize:12, fontFamily:MONO, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.5 }}>{l}</button>
+              <button key={p} onClick={() => setWatchPeriod(p)} style={{ flex:1, background: watchPeriod===p?C.surfaceHigh:"transparent", border:`1px solid ${watchPeriod===p?C.border:"transparent"}`, color:watchPeriod===p?C.text1:C.text3, borderRadius:6, padding:"7px 0", fontSize:11, fontFamily:MONO, fontWeight:watchPeriod===p?500:300, cursor:"pointer", letterSpacing:0.5, transition:"all 0.15s" }}>{l}</button>
             ))}
           </div>
 
