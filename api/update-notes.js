@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "API key not configured" });
   }
 
-  const { symbol, name, type, currentPrice, change24h, mode } = req.body;
+  const { symbol, name, type, currentPrice, change24h, mode, rsi, high52w, ma200, periods } = req.body;
   if (!symbol) return res.status(400).json({ error: "Missing symbol" });
 
   const today = new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
@@ -101,15 +101,26 @@ Rules:
 
 You are updating a daily market note for ${name} (${symbol}) — a ${type} asset.
 Today: ${today}
-Current price: $${currentPrice}
-24H change: ${change24h}%
 
-Write a 3-4 sentence professional analyst note covering:
-1. Current price action and what it signals technically
-2. Whether conditions align with disciplined entry criteria (RSI, 52W high distance, 200MA)
-3. Key macro or sector factors relevant to the thesis
+DATA — use ONLY these figures, do not invent any others:
+- Current price: $${currentPrice}
+- 24-hour change: ${change24h}%  (this is the move over the LAST 24 HOURS ONLY)
+${rsi ? `- RSI (14): ${rsi}\n` : ""}${high52w ? `- 52-week high: $${high52w}\n` : ""}${ma200 ? `- 200-day moving average: $${ma200}\n` : ""}${periods ? `- Longer-term returns: 1W ${periods.week}%, 1M ${periods.month}%, 1Y ${periods.year}%\n` : ""}
+Output the note as exactly three sections, in this format:
 
-Be specific with numbers. Write in objective third-person analyst voice. No "your", no "you". Concise. No bullet points.`;
+## Technical Setup
+A 2-3 sentence paragraph on today's price action and whether technicals meet the disciplined entry criteria (RSI < 40, price 10%+ below the 52-week high, price below the 200-day MA), citing the actual numbers above. Reference the 24-hour change as today's move only — do NOT describe a weekly, monthly, or yearly return as if it were today's move.
+
+## Macro & Sector
+A 2-3 sentence paragraph on the most relevant macro or sector context tied to the philosophy.
+
+## Thesis
+A 2-3 sentence paragraph giving the long-term positioning verdict.
+
+Formatting rules:
+- Put exactly "## " before each heading, alone on its line. Use ONLY these three headings.
+- No title line, no "#" single-hash headers, no "**" bold, no bullet points, no other markdown.
+- Objective third-person analyst voice. No "you", no "your".`;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {

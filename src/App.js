@@ -1368,19 +1368,38 @@ function WatchCard({ asset, period = "day", onDelete, onNotesUpdate, onThesisUpd
               </div>
             )}
             {!aiLoading && asset.notes && (
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "12px 14px" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {asset.notes.split("\n").filter(l => l.trim()).map((line, i) => {
-                    const text = line.replace(/^[\s•\-+*]+/, "").trim();
-                    if (!text) return null;
-                    return (
-                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                        <span style={{ fontSize: 12, color: "#7eb8ff", flexShrink: 0, marginTop: 1, opacity: 0.8 }}>•</span>
-                        <span style={{ fontSize: 12, color: C.text2, lineHeight: 1.6, fontFamily: FONT, fontWeight: 300 }}>{text}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "16px 16px 4px" }}>
+                {(() => {
+                  const lines = asset.notes.split("\n").map(l => l.trim()).filter(Boolean);
+                  const sections = [];
+                  let cur = null;
+                  lines.forEach(line => {
+                    const h = line.match(/^#{1,6}\s+(.+)/);
+                    if (h) {
+                      cur = { heading: h[1].replace(/\*\*/g, "").replace(/[:*]+\s*$/, "").trim(), body: [] };
+                      sections.push(cur);
+                    } else {
+                      const clean = line.replace(/\*\*/g, "").replace(/^[-•*]\s+/, "").trim();
+                      if (!clean) return;
+                      if (!cur) { cur = { heading: null, body: [] }; sections.push(cur); }
+                      cur.body.push(clean);
+                    }
+                  });
+                  return sections.map((s, i) => (
+                    <div key={i} style={{ marginBottom: 18 }}>
+                      {s.heading && (
+                        <div style={{ fontSize: 13, color: C.text1, fontFamily: FONT, fontWeight: 500, letterSpacing: 0.2, paddingBottom: 7, borderBottom: `1px solid ${C.borderHover}`, marginBottom: 10 }}>
+                          {s.heading}
+                        </div>
+                      )}
+                      {s.body.map((b, j) => (
+                        <div key={j} style={{ fontSize: 12.5, color: C.text2, fontFamily: FONT, fontWeight: 300, lineHeight: 1.75, marginBottom: 8 }}>
+                          {b}
+                        </div>
+                      ))}
+                    </div>
+                  ));
+                })()}
               </div>
             )}
             {!aiLoading && !asset.notes && (
