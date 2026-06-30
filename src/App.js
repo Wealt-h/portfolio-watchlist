@@ -3608,9 +3608,6 @@ export default function App() {
   const [filterSig, setFilterSig] = useState("all");
   // Selected period for the watchlist % display: day | week | month | year | all
   const [watchPeriod, setWatchPeriod] = useState("day");
-  // Collapsed by default so the watchlist top stays clean; expands to reveal
-  // the asset-type filter and return-period toggle.
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
   const [liveStatus, setLiveStatus] = useState("idle"); // idle | fetching | ok | error
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -4306,34 +4303,19 @@ export default function App() {
 
       {tab === "watchlist" && (
         <>
-          {/* Collapsible view controls — keeps the page clean; the button shows
-              the current selections and expands to the filter + return toggles. */}
-          <button onClick={() => setFiltersOpen(o => !o)} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%", background:C.surface, border:`1px solid ${C.borderHover}`, color:C.text2, borderRadius:8, padding:"13px 14px", marginBottom: filtersOpen ? 12 : 14, cursor:"pointer", fontFamily:MONO, boxSizing:"border-box" }}>
-            <span style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <span style={{ color:C.text3, fontSize:9, letterSpacing:2 }}>VIEW</span>
-              <span style={{ color:C.text1, fontSize:11, letterSpacing:0.5 }}>
-                {({all:"All",crypto:"Crypto",etf:"ETF",stock:"Stocks",commodity:"Commodities"})[filterSig]} · {({day:"1D",week:"1W",month:"1M",year:"1Y",all:"All-time"})[watchPeriod]}
-              </span>
-            </span>
-            <span style={{ color:C.text3, fontSize:10 }}>{filtersOpen ? "▴" : "▾"}</span>
-          </button>
+          {/* Underline-tab filters: asset type + return period. Active label is
+              brightened with a thin green underline; no boxes, stays minimal. */}
+          <div style={{ display:"flex", gap:18, overflowX:"auto", paddingBottom:2, marginBottom:14, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
+            {[["all","All"],["crypto","Crypto"],["etf","ETF"],["stock","Stocks"],["commodity","Commodities"]].map(([f,l]) => (
+              <button key={f} onClick={() => setFilterSig(f)} style={{ background:"transparent", border:"none", borderBottom:`2px solid ${filterSig===f?C.green:"transparent"}`, color:filterSig===f?C.text1:C.text3, padding:"0 0 5px", fontSize:12, fontFamily:FONT, fontWeight:filterSig===f?400:300, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.3 }}>{l}</button>
+            ))}
+          </div>
 
-          {filtersOpen && (
-            <div style={{ marginBottom:18 }}>
-              <div style={{ fontSize:9, color:C.text3, fontFamily:MONO, letterSpacing:2, marginBottom:8 }}>ASSET TYPE</div>
-              <div style={{ display:"flex", gap:6, marginBottom:16, overflowX:"auto", paddingBottom:4, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
-                {[["all","All"],["crypto","Crypto"],["etf","ETF"],["stock","Stocks"],["commodity","Commodities"]].map(([f,l]) => (
-                  <button key={f} onClick={() => setFilterSig(f)} style={{ background: filterSig===f?C.surface:"transparent", border:`1px solid ${filterSig===f?C.borderHover:C.border}`, color:filterSig===f?C.text1:C.text3, borderRadius:4, padding:"4px 12px", fontSize:10, fontFamily:FONT, fontWeight:300, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.3 }}>{l}</button>
-                ))}
-              </div>
-              <div style={{ fontSize:9, color:C.text3, fontFamily:MONO, letterSpacing:2, marginBottom:8 }}>RETURN</div>
-              <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
-                {[["day","1D"],["week","1W"],["month","1M"],["year","1Y"],["all","All"]].map(([p,l]) => (
-                  <button key={p} onClick={() => setWatchPeriod(p)} style={{ background: watchPeriod===p?C.surface:"transparent", border:`1px solid ${watchPeriod===p?C.borderHover:C.border}`, color:watchPeriod===p?C.text1:C.text3, borderRadius:4, padding:"4px 12px", fontSize:10, fontFamily:MONO, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.5 }}>{l}</button>
-                ))}
-              </div>
-            </div>
-          )}
+          <div style={{ display:"flex", gap:18, overflowX:"auto", paddingBottom:2, marginBottom:20, WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }}>
+            {[["day","1D"],["week","1W"],["month","1M"],["year","1Y"],["all","All"]].map(([p,l]) => (
+              <button key={p} onClick={() => setWatchPeriod(p)} style={{ background:"transparent", border:"none", borderBottom:`2px solid ${watchPeriod===p?C.green:"transparent"}`, color:watchPeriod===p?C.text1:C.text3, padding:"0 0 5px", fontSize:12, fontFamily:MONO, cursor:"pointer", whiteSpace:"nowrap", letterSpacing:0.5 }}>{l}</button>
+            ))}
+          </div>
 
           {/* Combined Fear & Greed card — crypto + stocks + VIX side by side */}
           {(fearGreedData || stockFearGreed || vixData) && (() => {
