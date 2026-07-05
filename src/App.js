@@ -1681,8 +1681,43 @@ function TradeModal({ watchlist, portfolio, onSave, onClose, defaultType = "buy"
   const [tradeCurrency, setTradeCurrency] = useState("USD");
   const [converting, setConverting] = useState(false);
   const [convertError, setConvertError] = useState(null);
+  // Live ticker search — same debounced pattern as the watchlist Add Asset flow
+  const [searchQuery, setSearchQuery] = useState(defaultSymbol || "");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchPicked, setSearchPicked] = useState(!!defaultSymbol);
+  const debounceRef = React.useRef(null);
+
+  const runSearch = async (q) => {
+    if (!q || q.length < 1) { setSearchResults([]); return; }
+    setSearching(true);
+    try {
+      const res = await fetch(apiUrl("/api/search"), {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q }),
+      });
+      const data = await res.json();
+      setSearchResults(data.results || []);
+    } catch { setSearchResults([]); }
+    setSearching(false);
+  };
+
+  const handleSearchInput = (e) => {
+    const q = e.target.value;
+    setSearchQuery(q);
+    setSearchPicked(false);
+    setF(p => ({ ...p, symbol: q.toUpperCase().trim(), name: "" }));
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => runSearch(q), 350);
+  };
+
+  const pickResult = (result) => {
+    setSearchQuery(result.symbol);
+    setF(p => ({ ...p, symbol: result.symbol, name: result.name }));
+    setSearchResults([]);
+    setSearchPicked(true);
+  };
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
-  const pick = (sym) => { const a = watchlist.find(x => x.symbol === sym); if (a) setF(p => ({ ...p, symbol: a.symbol, name: a.name })); else setF(p => ({ ...p, symbol: sym })); };
   const subtotal = (parseFloat(f.price)||0) * (parseFloat(f.units)||0);
   const fees = parseFloat(f.fees)||0;
   const total = tradeType === "buy" ? subtotal + fees : subtotal - fees;
@@ -1748,52 +1783,41 @@ function TradeModal({ watchlist, portfolio, onSave, onClose, defaultType = "buy"
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {["buy","sell","dividend"].map(t => (
-              <button key={t} onClick={() => setTradeType(t)} style={{ background: tradeType===t?C.surface:"transparent", border:`1px solid ${tradeType===t?C.borderHover:C.border}`, color:tradeType===t?C.text1:C.text3, borderRadius:4, padding:"7px 16px", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:0.3, lineHeight:1 }}>
+              <button key={t} onClick={() => setTradeType(t)} style={{ background: tradeType===t?C.surface:"transparent", border:`1px solid ${tradeType===t?C.borderHover:C.border}`, color:tradeType===t?C.text1:C.text3, borderRadius:4, padding:"7px 16px", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:0.3, lineHeight:"1" }}>
                 {t.charAt(0).toUpperCase()+t.slice(1)}
               </button>
             ))}
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer", lineHeight:"1" }}>✕</button>
         </div>
 
-        {/* Asset search — free text entry, with watchlist as quick-select suggestions.
-            Previously a dropdown locked to the watchlist, so assets not on the watchlist
-            couldn't be traded. Now any ticker can be typed directly. */}
-        <div style={{ marginBottom: 12 }}>
+        {/* Live asset search — same debounced flow as watchlist Add Asset */}
+        <div style={{ marginBottom: 12, position: "relative" }}>
           <div style={LBL2}>ASSET</div>
           <input
-            value={f.symbol}
-            onChange={e => {
-              const val = e.target.value.toUpperCase().replace(/[^A-Z0-9.\-]/g, "");
-              const match = watchlist.find(x => x.symbol === val);
-              setF(p => ({ ...p, symbol: val, name: match?.name || p.name }));
-            }}
-            placeholder="Enter ticker (e.g. AAPL, BTC, NVDA)"
+            value={searchQuery}
+            onChange={handleSearchInput}
+            placeholder="Search ticker, name (e.g. AAPL, Bitcoin)"
             style={{ ...SML }}
           />
-          {/* Quick-select from watchlist if there's a partial match */}
-          {f.symbol.length >= 1 && watchlist.filter(a => a.symbol.startsWith(f.symbol) && a.symbol !== f.symbol).slice(0, 4).length > 0 && (
-            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-              {watchlist.filter(a => a.symbol.startsWith(f.symbol) && a.symbol !== f.symbol).slice(0, 4).map(a => (
-                <button key={a.symbol} onClick={() => setF(p => ({ ...p, symbol: a.symbol, name: a.name }))}
-                  style={{ background: C.surfaceHigh, border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "4px 10px", fontSize: 11, fontFamily: MONO, cursor: "pointer" }}>
-                  {a.symbol}
+          {searching && (
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: MONO, marginTop: 4 }}>Searching...</div>
+          )}
+          {searchResults.length > 0 && !searchPicked && (
+            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, borderRadius: 8, overflow: "hidden", maxHeight: 220, overflowY: "auto" }}>
+              {searchResults.slice(0, 6).map(r => (
+                <button key={r.symbol} onClick={() => pickResult(r)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "transparent", border: "none", borderBottom: `1px solid ${C.border}`, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}>
+                  <div>
+                    <span style={{ fontSize: 13, fontFamily: FONT, fontWeight: 500, color: C.text1 }}>{r.symbol}</span>
+                    <span style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginLeft: 8 }}>{r.name}</span>
+                  </div>
+                  <span style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 1, textTransform: "uppercase" }}>{r.type}</span>
                 </button>
               ))}
             </div>
           )}
-          {/* Name auto-fill from watchlist */}
-          {watchlist.find(x => x.symbol === f.symbol) && (
-            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, marginTop: 4 }}>{watchlist.find(x => x.symbol === f.symbol).name}</div>
-          )}
-          {/* Manual name entry for assets not on the watchlist */}
-          {f.symbol.length >= 1 && !watchlist.find(x => x.symbol === f.symbol) && (
-            <input
-              value={f.name}
-              onChange={e => setF(p => ({ ...p, name: e.target.value }))}
-              placeholder="Asset name (optional)"
-              style={{ ...SML, marginTop: 6, fontSize: 13 }}
-            />
+          {searchPicked && f.name && (
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, marginTop: 4 }}>{f.name}</div>
           )}
         </div>
 
