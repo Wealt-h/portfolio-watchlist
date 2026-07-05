@@ -2711,15 +2711,75 @@ function CashModal({ account, onSave, onClose }) {
           </div>
         )}
 
-        <button onClick={() => { if (f.rate === "") return; onSave({ ...f, id: account?.id || Date.now(), principal: parseFloat(f.principal) || 0, rate: parseFloat(f.rate) || 0 }); }}
-          disabled={f.rate === ""}
-          style={{ width: "100%", background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: f.rate === "" ? "default" : "pointer", opacity: f.rate === "" ? 0.5 : 1 }}>
-          {isTopUp ? "Add to balance" : (account && account !== "new" ? "Save changes" : "Add account")}
-        </button>
+        {(f.currency && f.currency !== "USD") && (
+          <div style={{ fontSize: 10, color: C.text3, fontFamily: FONT, fontWeight: 300, marginBottom: 10, fontStyle: "italic" }}>
+            Principal entered in {f.currency} — will be converted to USD at today's rate for portfolio calculations. Original amount is saved for reference.
+          </div>
+        )}
+
+        <CashSaveButton f={f} account={account} isTopUp={isTopUp} onSave={onSave} />
       </div>
     </div>
   );
 }
+
+// Separate async save handler for CashModal so currency conversion doesn't
+// block the render cycle. Converts non-USD principals to USD at today's rate
+// (same pattern as the trade modal's fx-historical fetch).
+function CashSaveButton({ f, account, isTopUp, onSave }) {
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+
+  const handleSave = async () => {
+    if (f.rate === "") return;
+    setSaving(true);
+    setErr(null);
+
+    let principalUSD = parseFloat(f.principal) || 0;
+    const currency = f.currency || "USD";
+
+    if (currency !== "USD" && principalUSD > 0) {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const res = await fetch(`/api/fx-historical?date=${today}&currency=${currency}`);
+        const data = await res.json();
+        if (data?.rate) {
+          principalUSD = principalUSD / data.rate;
+        } else {
+          setErr("Could not fetch exchange rate — try again");
+          setSaving(false);
+          return;
+        }
+      } catch {
+        setErr("Could not fetch exchange rate — try again");
+        setSaving(false);
+        return;
+      }
+    }
+
+    onSave({
+      ...f,
+      id: account?.id || Date.now(),
+      principal: principalUSD,
+      rate: parseFloat(f.rate) || 0,
+      // Store original values so the card can display the native currency
+      ...(currency !== "USD" ? {
+        originalCurrency: currency,
+        originalPrincipal: parseFloat(f.principal) || 0,
+      } : {}),
+    });
+    setSaving(false);
+  };
+
+  return (
+    <>
+      {err && <div style={{ fontSize: 11, color: "#ff6b6b", fontFamily: "inherit", marginBottom: 8 }}>{err}</div>}
+      <button onClick={handleSave} disabled={f.rate === "" || saving}
+        style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#f0f5f2", borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: "inherit", fontWeight: 300, cursor: f.rate === "" || saving ? "default" : "pointer", opacity: f.rate === "" ? 0.5 : 1 }}>
+        {saving ? "Converting..." : isTopUp ? "Add to balance" : (account && account !== "new" ? "Save changes" : "Add account")}
+      </button>
+    </>
+  );
 
 // ─── PROPERTY MODAL ─────────────────────────────────────────────────────────────
 function PropertyModal({ property, onSave, onClose }) {
