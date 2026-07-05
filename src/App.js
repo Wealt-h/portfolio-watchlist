@@ -1746,9 +1746,9 @@ function TradeModal({ watchlist, portfolio, onSave, onClose, defaultType = "buy"
       <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto", boxSizing: "border-box" }}>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {["buy","sell","dividend"].map(t => (
-              <button key={t} onClick={() => setTradeType(t)} style={{ background: tradeType===t?C.surface:"transparent", border:`1px solid ${tradeType===t?C.borderHover:C.border}`, color:tradeType===t?C.text1:C.text3, borderRadius:4, padding:"6px 16px", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:0.3 }}>
+              <button key={t} onClick={() => setTradeType(t)} style={{ background: tradeType===t?C.surface:"transparent", border:`1px solid ${tradeType===t?C.borderHover:C.border}`, color:tradeType===t?C.text1:C.text3, borderRadius:4, padding:"7px 16px", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:0.3, lineHeight:1 }}>
                 {t.charAt(0).toUpperCase()+t.slice(1)}
               </button>
             ))}
@@ -1756,33 +1756,43 @@ function TradeModal({ watchlist, portfolio, onSave, onClose, defaultType = "buy"
           <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
         </div>
 
-        {/* Asset dropdown */}
+        {/* Asset search — free text entry, with watchlist as quick-select suggestions.
+            Previously a dropdown locked to the watchlist, so assets not on the watchlist
+            couldn't be traded. Now any ticker can be typed directly. */}
         <div style={{ marginBottom: 12 }}>
           <div style={LBL2}>ASSET</div>
-          <select
-            value={watchlist.find(x => x.symbol === f.symbol) ? f.symbol : ""}
+          <input
+            value={f.symbol}
             onChange={e => {
-              if (e.target.value === "__other__") { setF(p => ({ ...p, symbol: "", name: "" })); }
-              else if (e.target.value === "__cash__") { onAddCash(); onClose(); }
-              else { pick(e.target.value); }
+              const val = e.target.value.toUpperCase().replace(/[^A-Z0-9.\-]/g, "");
+              const match = watchlist.find(x => x.symbol === val);
+              setF(p => ({ ...p, symbol: val, name: match?.name || p.name }));
             }}
-            style={{ ...SML, background: C.surfaceHigh, cursor: "pointer" }}
-          >
-            <option value="" disabled>Select an asset...</option>
-            {watchlist.map(a => (
-              <option key={a.symbol} value={a.symbol}>{a.symbol} — {a.name}</option>
-            ))}
-            <option value="__other__">Other (enter manually)</option>
-            <option value="__cash__">💰 Cash deposit</option>
-          </select>
-
-          {/* Manual entry shown only when "Other" selected or symbol not in watchlist */}
-          {(!watchlist.find(x => x.symbol === f.symbol)) && (
+            placeholder="Enter ticker (e.g. AAPL, BTC, NVDA)"
+            style={{ ...SML }}
+          />
+          {/* Quick-select from watchlist if there's a partial match */}
+          {f.symbol.length >= 1 && watchlist.filter(a => a.symbol.startsWith(f.symbol) && a.symbol !== f.symbol).slice(0, 4).length > 0 && (
+            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+              {watchlist.filter(a => a.symbol.startsWith(f.symbol) && a.symbol !== f.symbol).slice(0, 4).map(a => (
+                <button key={a.symbol} onClick={() => setF(p => ({ ...p, symbol: a.symbol, name: a.name }))}
+                  style={{ background: C.surfaceHigh, border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "4px 10px", fontSize: 11, fontFamily: MONO, cursor: "pointer" }}>
+                  {a.symbol}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* Name auto-fill from watchlist */}
+          {watchlist.find(x => x.symbol === f.symbol) && (
+            <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, marginTop: 4 }}>{watchlist.find(x => x.symbol === f.symbol).name}</div>
+          )}
+          {/* Manual name entry for assets not on the watchlist */}
+          {f.symbol.length >= 1 && !watchlist.find(x => x.symbol === f.symbol) && (
             <input
-              value={f.symbol}
-              onChange={e => pick(e.target.value.toUpperCase())}
-              placeholder="Enter ticker symbol"
-              style={{ ...SML, marginTop: 8 }}
+              value={f.name}
+              onChange={e => setF(p => ({ ...p, name: e.target.value }))}
+              placeholder="Asset name (optional)"
+              style={{ ...SML, marginTop: 6, fontSize: 13 }}
             />
           )}
         </div>
@@ -2195,7 +2205,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
             <StatCard
               label="Win Rate"
               value={`${winRate.toFixed(0)}%`}
-              sub={`${winners}/${positionSummaries.length} positions`}
+              sub={`${winners}/${totalHoldings} positions`}
               color={winRate >= 50 ? C.green : C.red}
             />
           </div>
@@ -2589,7 +2599,7 @@ function calcCashValue(account) {
 // ─── CASH MODAL ───────────────────────────────────────────────────────────────
 function CashModal({ account, onSave, onClose }) {
   const isTopUp = account && typeof account === "object" && account.topUpFor;
-  const blank = { institution: "", accountType: "Savings", principal: "", rate: "", startDate: new Date().toISOString().slice(0,10), notes: "" };
+  const blank = { institution: "", accountType: "Savings", principal: "", rate: "", startDate: new Date().toISOString().slice(0,10), notes: "", currency: "USD" };
   const [f, setF] = useState(() => {
     if (isTopUp) return {
       ...blank,
@@ -2652,7 +2662,16 @@ function CashModal({ account, onSave, onClose }) {
             <input value={f.rate} onChange={e => set("rate", e.target.value)} type="number" placeholder="5.50" style={SML} />
           </div>
           <div>
-            <div style={LBL2}>PRINCIPAL ($)</div>
+            <div style={LBL2}>CURRENCY</div>
+            <select value={f.currency || "USD"} onChange={e => set("currency", e.target.value)}
+              style={{ ...SML, background: C.surfaceHigh, cursor: "pointer" }}>
+              {Object.keys(CURRENCY_SYMBOLS).map(cur => (
+                <option key={cur} value={cur}>{cur}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div style={LBL2}>PRINCIPAL</div>
             <input value={f.principal} onChange={e => set("principal", e.target.value)} type="number" placeholder="10000" style={SML} />
           </div>
           <div>
