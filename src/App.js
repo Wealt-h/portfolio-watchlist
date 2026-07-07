@@ -1157,7 +1157,7 @@ function AssetLogo({ symbol, size = 40, color = C.text2 }) {
     <div style={{ width: size, height: size, borderRadius: size * 0.25, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
       {!failed
         ? <img src={sources[srcIndex]} alt={symbol} onError={() => setSrcIndex(i => i + 1)}
-            style={{ width: size * 0.68, height: size * 0.68, objectFit: "contain", borderRadius: 4 }} />
+            style={{ width: size * 0.68, height: size * 0.68, objectFit: "contain", borderRadius: 4, filter: "grayscale(100%)" }} />
         : <span style={{ fontSize: size * 0.28, fontWeight: 500, color, fontFamily: MONO, letterSpacing: 1 }}>{ticker.slice(0,2)}</span>
       }
     </div>
@@ -3061,6 +3061,19 @@ function CashCard({ account, onEdit, onDelete, onAddCash }) {
             <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, fontStyle: "italic", marginBottom: 12 }}>{account.notes}</div>
           )}
 
+          {/* Deposit history */}
+          {account.deposits && account.deposits.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>DEPOSIT HISTORY</div>
+              {account.deposits.map((d, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 12, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{d.date}</div>
+                  <div style={{ fontSize: 12, color: C.green, fontFamily: MONO }}>+{fmtUSD(d.amount)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => onAddCash(account)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.greenBorder}`, color: C.green, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>+ Add cash</button>
             <button onClick={() => onEdit(account)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Edit</button>
@@ -4735,8 +4748,6 @@ export default function App() {
             </div>
           )}
 
-          <button onClick={() => setPropertyModal("new")} style={{ width: "100%", marginTop: 10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Add property</button>
-
           <button onClick={() => setTradeModal({defaultType:"buy"})} style={{ width: "100%", marginTop: 10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Log trade</button>
         </>
       )}
@@ -4815,18 +4826,20 @@ export default function App() {
           setCashAccounts(c => {
             const existingIdx = c.findIndex(x => x.institution.trim().toLowerCase() === acc.institution.trim().toLowerCase());
             if (existingIdx !== -1) {
-              // Merge: add new principal to existing, keep existing start date (don't reset compounding clock)
+              // Merge: add new principal to existing, keep existing start date, record the deposit
               const existing = c[existingIdx];
+              const newDeposit = { date: new Date().toISOString().slice(0,10), amount: acc.principal };
               const merged = {
                 ...existing,
                 principal: existing.principal + acc.principal,
-                rate: acc.rate, // use latest rate in case it changed
+                rate: acc.rate,
                 notes: acc.notes || existing.notes,
+                deposits: [...(existing.deposits || []), newDeposit],
               };
               if (session?.user?.id) pushCashAccountToSupabase(session.user.id, merged);
               return c.map((x, i) => i === existingIdx ? merged : x);
             }
-            const newAccount = { ...acc, _synced: false };
+            const newAccount = { ...acc, _synced: false, deposits: [{ date: acc.startDate || new Date().toISOString().slice(0,10), amount: acc.principal }] };
             if (session?.user?.id) {
               pushCashAccountToSupabase(session.user.id, newAccount).then(realId => {
                 if (realId) setCashAccounts(cs => cs.map(x => x.id === newAccount.id ? { ...x, id: realId, _synced: true } : x));
