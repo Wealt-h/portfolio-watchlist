@@ -1736,7 +1736,7 @@ function TradeModal({ watchlist, portfolio, onSave, onClose, defaultType = "buy"
       setConverting(true);
       setConvertError(null);
       try {
-        const res = await fetch(`/api/fx-historical?date=${f.date}&currency=${tradeCurrency}`);
+        const res = await fetch(apiUrl(`/api/fx-historical?date=${f.date}&currency=${tradeCurrency}`));
         const data = await res.json();
         if (data?.rate) {
           // data.rate is USD -> tradeCurrency, so divide to go the other way
@@ -2765,7 +2765,7 @@ function CashSaveButton({ f, account, isTopUp, onSave }) {
     if (currency !== "USD" && principalUSD > 0) {
       try {
         const today = new Date().toISOString().slice(0, 10);
-        const res = await fetch(`/api/fx-historical?date=${today}&currency=${currency}`);
+        const res = await fetch(apiUrl(`/api/fx-historical?date=${today}&currency=${currency}`));
         const data = await res.json();
         if (data?.rate) {
           principalUSD = principalUSD / data.rate;
@@ -2804,6 +2804,7 @@ function CashSaveButton({ f, account, isTopUp, onSave }) {
       </button>
     </>
   );
+}
 
 // ─── PROPERTY MODAL ─────────────────────────────────────────────────────────────
 function PropertyModal({ property, onSave, onClose }) {
