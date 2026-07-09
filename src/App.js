@@ -1157,7 +1157,7 @@ function AssetLogo({ symbol, size = 40, color = C.text2 }) {
     <div style={{ width: size, height: size, borderRadius: size * 0.25, background: C.surfaceHigh, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
       {!failed
         ? <img src={sources[srcIndex]} alt={symbol} onError={() => setSrcIndex(i => i + 1)}
-            style={{ width: size * 0.68, height: size * 0.68, objectFit: "contain", borderRadius: 4, filter: "grayscale(100%)" }} />
+            style={{ width: size * 0.68, height: size * 0.68, objectFit: "contain", borderRadius: 4 }} />
         : <span style={{ fontSize: size * 0.28, fontWeight: 500, color, fontFamily: MONO, letterSpacing: 1 }}>{ticker.slice(0,2)}</span>
       }
     </div>
