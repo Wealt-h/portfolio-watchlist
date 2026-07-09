@@ -2524,76 +2524,130 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
 // rate, repayment amount/frequency, and how much time has passed since the loan
 // started. Each payment period, interest accrues on the current balance, and
 // whatever's left of the payment after interest reduces the principal.
+// Returns the rate/repayment in effect on a given date, from a history array
+// sorted ascending by date. Falls back to the first entry if the date is
+// before any recorded change (shouldn't normally happen).
+function rateInEffectOn(history, date) {
+  let active = history[0];
+  for (const entry of history) {
+    if (new Date(entry.date) <= date) active = entry;
+    else break;
+  }
+  return active;
+}
+
 function calcPropertyValue(property) {
   const purchasePrice = property.purchasePrice || 0;
   const currentValue = property.currentValue || purchasePrice;
   const originalLoan = property.loanPrincipal || 0;
-  const rate = (property.interestRate || 0) / 100;
-  const repayment = property.repaymentAmount || 0;
   const freq = property.repaymentFrequency || "monthly"; // weekly | fortnightly | monthly
   const periodsPerYear = freq === "weekly" ? 52 : freq === "fortnightly" ? 26 : 12;
+  const periodLengthDays = 365 / periodsPerYear;
   const startDate = new Date(property.loanStartDate || property.purchaseDate || Date.now());
   const today = new Date();
-  const daysElapsed = Math.max(0, Math.floor((today - startDate) / (1000 * 60 * 60 * 24)));
-  const periodsElapsed = Math.floor(daysElapsed / (365 / periodsPerYear));
 
-  // Walk the amortization schedule forward period-by-period to find today's balance.
-  // (A closed-form formula exists, but the iterative walk is simpler to verify and
-  // naturally floors the balance at 0 if the loan would already be paid off.)
+  // Rate/repayment history — refinancing support. If no history has been
+  // recorded yet (the common case for a loan that's never been refinanced),
+  // synthesize a single entry from the property's current flat fields so old
+  // saved properties keep working with no migration needed. Every period's
+  // interest is calculated using whichever rate was actually in effect on
+  // that date, so a later refinance never retroactively changes past figures.
+  const rateHistory = (property.rateHistory && property.rateHistory.length > 0)
+    ? [...property.rateHistory].sort((a, b) => new Date(a.date) - new Date(b.date))
+    : [{ date: property.loanStartDate || property.purchaseDate || Date.now(), rate: property.interestRate || 0, repayment: property.repaymentAmount || 0 }];
+
+  // One-off lump-sum extra payments, applied as an immediate balance
+  // reduction on their date (before that period's interest is calculated).
+  const extraPayments = (property.extraPayments || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+
   let balance = originalLoan;
-  if (originalLoan > 0 && repayment > 0) {
-    const periodRate = rate / periodsPerYear;
-    for (let i = 0; i < periodsElapsed && balance > 0; i++) {
+  let totalInterestAccrued = 0;
+  let totalInterestPaidToDate = 0;
+  let loanPrincipalOwing = originalLoan;
+  let periodsElapsed = 0;
+  let estimatedPayoffDate = null;
+  let payoffNeverHappens = false;
+  let toDateSnapshotTaken = false;
+  let extraPaymentsAppliedToDate = 0;
+
+  if (originalLoan > 0) {
+    const maxPeriods = periodsPerYear * 100; // 100-year safety cap
+    let periodDate = new Date(startDate);
+    let i = 0;
+    while (balance > 0 && i < maxPeriods) {
+      const periodStart = new Date(startDate.getTime() + i * periodLengthDays * 86400000);
+      const periodEnd = new Date(startDate.getTime() + (i + 1) * periodLengthDays * 86400000);
+
+      // Apply any extra payments that fall within this period, before interest accrues.
+      for (const ep of extraPayments) {
+        const epDate = new Date(ep.date);
+        if (epDate >= periodStart && epDate < periodEnd) {
+          balance = Math.max(0, balance - (ep.amount || 0));
+          if (periodStart <= today) extraPaymentsAppliedToDate += (ep.amount || 0);
+        }
+      }
+      if (balance <= 0) { balance = 0; break; }
+
+      const { rate, repayment } = rateInEffectOn(rateHistory, periodStart);
+      const periodRate = (rate || 0) / 100 / periodsPerYear;
       const interestThisPeriod = balance * periodRate;
-      const principalThisPeriod = Math.max(0, repayment - interestThisPeriod);
+
+      if ((repayment || 0) <= interestThisPeriod && (repayment || 0) > 0) {
+        // Current repayment doesn't cover accruing interest — balance would
+        // grow forever under these terms. Stop projecting further.
+        payoffNeverHappens = true;
+        break;
+      }
+      const principalThisPeriod = (repayment || 0) > 0 ? Math.max(0, repayment - interestThisPeriod) : 0;
       balance = Math.max(0, balance - principalThisPeriod);
+      totalInterestAccrued += interestThisPeriod;
+
+      i++;
+      periodDate = periodEnd;
+
+      // Snapshot "as of today" the first time we cross today's date.
+      if (!toDateSnapshotTaken && periodEnd > today) {
+        loanPrincipalOwing = balance;
+        totalInterestPaidToDate = totalInterestAccrued;
+        periodsElapsed = i;
+        toDateSnapshotTaken = true;
+      }
+
+      if (balance <= 0) {
+        balance = 0;
+        estimatedPayoffDate = periodEnd;
+        break;
+      }
     }
-  } else if (originalLoan > 0 && repayment === 0) {
-    // No repayment entered yet — balance stays at original principal (interest-only view)
-    balance = originalLoan;
+
+    // If the loop never crossed "today" (e.g. loan already fully repaid, or
+    // repayment is 0 so nothing progresses), fall back to sensible values.
+    if (!toDateSnapshotTaken) {
+      loanPrincipalOwing = balance;
+      totalInterestPaidToDate = totalInterestAccrued;
+      periodsElapsed = i;
+    }
+    if (balance <= 0 && !estimatedPayoffDate) {
+      estimatedPayoffDate = periodDate;
+    }
   }
 
-  const loanPrincipalOwing = balance;
+  const lifetimeTotalInterestCost = payoffNeverHappens ? null : totalInterestAccrued;
   const netEquity = currentValue - loanPrincipalOwing;
   const totalCapitalGain = currentValue - purchasePrice;
 
-  // Project forward from today's balance to estimate the loan completion date —
-  // continue the same period-by-period amortization walk until the balance hits zero.
-  let estimatedPayoffDate = null;
-  let payoffNeverHappens = false;
-  if (originalLoan > 0 && repayment > 0 && loanPrincipalOwing > 0) {
-    const periodRate = rate / periodsPerYear;
-    const minViablePayment = loanPrincipalOwing * periodRate;
-    if (repayment <= minViablePayment) {
-      // Repayment doesn't even cover the interest accruing — balance would grow forever, not shrink
-      payoffNeverHappens = true;
-    } else {
-      let projBalance = loanPrincipalOwing;
-      let periodsToPayoff = 0;
-      const maxPeriods = periodsPerYear * 100; // 100-year safety cap, prevents any runaway loop
-      while (projBalance > 0 && periodsToPayoff < maxPeriods) {
-        const interestThisPeriod = projBalance * periodRate;
-        const principalThisPeriod = Math.max(0, repayment - interestThisPeriod);
-        projBalance = Math.max(0, projBalance - principalThisPeriod);
-        periodsToPayoff++;
-      }
-      const daysToPayoff = Math.round(periodsToPayoff * (365 / periodsPerYear));
-      estimatedPayoffDate = new Date(today.getTime() + daysToPayoff * 24 * 60 * 60 * 1000);
-    }
-  }
-
-  // Daily cash flow — weekly figures divided down to a daily rate, matching how
-  // cash interest accrues continuously rather than only on payment dates.
+  // Daily cash flow — based on today's balance and the currently active rate.
+  const { rate: currentRate } = rateInEffectOn(rateHistory, today);
   const weeklyRent = property.weeklyRent || 0;
   const weeklyCosts = property.weeklyCosts || 0;
-  const dailyInterestCost = (loanPrincipalOwing * rate) / 365;
+  const dailyInterestCost = (loanPrincipalOwing * ((currentRate || 0) / 100)) / 365;
   const dailyRent = weeklyRent / 7;
   const dailyCosts = weeklyCosts / 7;
   const dailyNetCashFlow = dailyRent - dailyCosts - dailyInterestCost;
   const weeklyNetCashFlow = dailyNetCashFlow * 7;
   const annualNetCashFlow = dailyNetCashFlow * 365;
 
-  // Accrued net cash flow since the property was added — this is what folds into realised P&L
+  // Accrued net cash flow since the property was added — folds into realised P&L
   const propertyAddedDate = new Date(property.dateAdded || property.purchaseDate || Date.now());
   const daysSinceAdded = Math.max(0, Math.floor((today - propertyAddedDate) / (1000 * 60 * 60 * 24)));
   const accruedNetCashFlow = dailyNetCashFlow * daysSinceAdded;
@@ -2603,6 +2657,8 @@ function calcPropertyValue(property) {
     dailyRent, dailyCosts, dailyInterestCost, dailyNetCashFlow,
     weeklyNetCashFlow, annualNetCashFlow, accruedNetCashFlow,
     daysSinceAdded, periodsElapsed, estimatedPayoffDate, payoffNeverHappens,
+    totalInterestPaidToDate, lifetimeTotalInterestCost, extraPaymentsAppliedToDate,
+    currentRate: currentRate || 0, rateHistory,
   };
 }
 
@@ -3086,7 +3142,7 @@ function CashCard({ account, onEdit, onDelete, onAddCash }) {
 }
 
 // ─── PROPERTY CARD ──────────────────────────────────────────────────────────────
-function PropertyCard({ property, onEdit, onDelete }) {
+function PropertyCard({ property, onEdit, onDelete, onExtraPayment, onRefinance }) {
   const [open, setOpen] = useState(false);
   const calc = calcPropertyValue(property);
   const hasLoan = (property.loanPrincipal || 0) > 0;
@@ -3170,14 +3226,17 @@ function PropertyCard({ property, onEdit, onDelete }) {
               ["Purchase date", property.purchaseDate],
               ...(hasLoan ? [
                 ["Loan owing", fmtUSD(calc.loanPrincipalOwing)],
-                ["Interest rate", `${property.interestRate}% p.a.`],
+                ["Interest rate", `${calc.currentRate}% p.a.`],
                 ["Est. payoff date", calc.payoffNeverHappens
                   ? "Won't pay off at this rate"
                   : calc.estimatedPayoffDate
                     ? calc.estimatedPayoffDate.toLocaleDateString("en-US", { month: "short", year: "numeric" })
                     : "—"],
+                ["Lifetime interest cost", calc.payoffNeverHappens
+                  ? "—"
+                  : fmtUSD(calc.lifetimeTotalInterestCost)],
+                ["Total interest paid", fmtUSD(calc.totalInterestPaidToDate)],
               ] : []),
-              ["Accrued P&L since added", `${calc.accruedNetCashFlow>=0?"+":""}${fmtUSD(calc.accruedNetCashFlow)}`],
               ["Annual cash flow", `${calc.annualNetCashFlow>=0?"+":""}${fmtUSD(calc.annualNetCashFlow)}`],
             ].map(([l, v]) => (
               <div key={l}>
@@ -3191,12 +3250,130 @@ function PropertyCard({ property, onEdit, onDelete }) {
             <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, fontStyle: "italic", marginBottom: 12 }}>{property.notes}</div>
           )}
 
-          <div style={{ display: "flex", gap: 8 }}>
+          {/* Rate history — only shown once a refinance has actually happened */}
+          {calc.rateHistory.length > 1 && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>RATE HISTORY</div>
+              {calc.rateHistory.map((r, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 12, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{new Date(r.date).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</div>
+                  <div style={{ fontSize: 12, color: C.text2, fontFamily: MONO }}>{r.rate}% · {fmtUSD(r.repayment)}/{property.repaymentFrequency === "weekly" ? "wk" : property.repaymentFrequency === "fortnightly" ? "fn" : "mo"}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Extra payment log */}
+          {(property.extraPayments || []).length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>EXTRA PAYMENTS</div>
+              {property.extraPayments.map((ep, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 12, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{ep.date}</div>
+                  <div style={{ fontSize: 12, color: C.green, fontFamily: MONO }}>+{fmtUSD(ep.amount)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, marginBottom: hasLoan ? 8 : 0 }}>
             <button onClick={() => onEdit(property)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Edit</button>
             <button onClick={() => onDelete(property.id)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: "rgba(248,113,113,0.4)", borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Remove</button>
           </div>
+          {hasLoan && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => onExtraPayment(property)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.greenBorder}`, color: C.green, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>+ Extra payment</button>
+              <button onClick={() => onRefinance(property)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>Refinance</button>
+            </div>
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── EXTRA PAYMENT MODAL ────────────────────────────────────────────────────
+// Logs a one-off lump-sum payment against a property's loan. Applied on its
+// date as an immediate balance reduction — reflected in the payoff date and
+// lifetime interest cost the moment it's saved.
+function ExtraPaymentModal({ property, onSave, onClose }) {
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState("");
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 700, display: "flex", alignItems: "flex-end" }} onClick={onClose}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontFamily: FONT, fontWeight: 400, color: C.text1 }}>Extra payment — {property.name}</div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
+        </div>
+        <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginBottom: 16 }}>
+          A lump-sum payment reduces your loan balance immediately, shortening the payoff date and lowering total interest.
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={LBL2}>AMOUNT</div>
+          <input value={amount} onChange={e => setAmount(e.target.value)} type="number" placeholder="10000" style={SML} />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={LBL2}>DATE</div>
+          <input value={date} onChange={e => setDate(e.target.value)} type="date" style={SML} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={LBL2}>NOTE (OPTIONAL)</div>
+          <input value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Bonus payment" style={SML} />
+        </div>
+        <button onClick={() => { if (!amount || parseFloat(amount) <= 0) return; onSave({ date, amount: parseFloat(amount), note }); }}
+          disabled={!amount || parseFloat(amount) <= 0}
+          style={{ width: "100%", background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: (!amount || parseFloat(amount) <= 0) ? "default" : "pointer", opacity: (!amount || parseFloat(amount) <= 0) ? 0.5 : 1 }}>
+          Log payment
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── REFINANCE MODAL ────────────────────────────────────────────────────────
+// Records a new rate/repayment taking effect from a given date, WITHOUT
+// altering how interest was calculated for any period before that date. This
+// is what makes refinancing safe: past figures stay exactly as they were,
+// only periods from the effective date forward use the new terms.
+function RefinanceModal({ property, onSave, onClose }) {
+  const currentRate = calcPropertyValue(property).currentRate;
+  const [rate, setRate] = useState(String(currentRate || ""));
+  const [repayment, setRepayment] = useState(String(property.repaymentAmount || ""));
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 700, display: "flex", alignItems: "flex-end" }} onClick={onClose}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontFamily: FONT, fontWeight: 400, color: C.text1 }}>Refinance — {property.name}</div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
+        </div>
+        <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, marginBottom: 16 }}>
+          The new rate applies only from the effective date forward. All interest already calculated before this date stays exactly as it was.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div>
+            <div style={LBL2}>NEW RATE (% P.A.)</div>
+            <input value={rate} onChange={e => setRate(e.target.value)} type="number" step="0.01" placeholder="5.5" style={SML} />
+          </div>
+          <div>
+            <div style={LBL2}>NEW REPAYMENT</div>
+            <input value={repayment} onChange={e => setRepayment(e.target.value)} type="number" placeholder="3000" style={SML} />
+          </div>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={LBL2}>EFFECTIVE DATE</div>
+          <input value={date} onChange={e => setDate(e.target.value)} type="date" style={SML} />
+        </div>
+        <button onClick={() => { if (!rate || !repayment) return; onSave({ date, rate: parseFloat(rate), repayment: parseFloat(repayment) }); }}
+          disabled={!rate || !repayment}
+          style={{ width: "100%", background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: (!rate || !repayment) ? "default" : "pointer", opacity: (!rate || !repayment) ? 0.5 : 1 }}>
+          Confirm refinance
+        </button>
+      </div>
     </div>
   );
 }
@@ -3918,6 +4095,8 @@ export default function App() {
   const [properties, setProperties] = useState([]);
   const [propertiesLoaded, setPropertiesLoaded] = useState(false);
   const [propertyModal, setPropertyModal] = useState(null); // null | property object | "new"
+  const [extraPaymentModal, setExtraPaymentModal] = useState(null); // null | property object
+  const [refinanceModal, setRefinanceModal] = useState(null); // null | property object
   const [alerts, setAlerts] = useState([]);
   const [alertsLoaded, setAlertsLoaded] = useState(false);
   const [alertModal, setAlertModal] = useState(null); // null | { symbol, currentPrice }
@@ -4743,6 +4922,8 @@ export default function App() {
               {properties.map(p => (
                 <PropertyCard key={p.id} property={p}
                   onEdit={p => setPropertyModal(p)}
+                  onExtraPayment={p => setExtraPaymentModal(p)}
+                  onRefinance={p => setRefinanceModal(p)}
                   onDelete={id => {
                     setProperties(ps => ps.filter(x => x.id !== id));
                     if (session?.user?.id) deletePropertyFromSupabase(session.user.id, id);
@@ -4877,6 +5058,36 @@ export default function App() {
         }
         setPropertyModal(null);
       }} onClose={() => setPropertyModal(null)} />}
+      {extraPaymentModal !== null && <ExtraPaymentModal property={extraPaymentModal} onSave={payment => {
+        const updated = {
+          ...extraPaymentModal,
+          extraPayments: [...(extraPaymentModal.extraPayments || []), payment],
+        };
+        setProperties(ps => ps.map(x => x.id === updated.id ? updated : x));
+        if (session?.user?.id) pushPropertyToSupabase(session.user.id, updated);
+        setExtraPaymentModal(null);
+      }} onClose={() => setExtraPaymentModal(null)} />}
+      {refinanceModal !== null && <RefinanceModal property={refinanceModal} onSave={entry => {
+        // Seed history with the current single rate if this is the first-ever
+        // refinance, so the ORIGINAL rate is preserved as its own entry rather
+        // than being overwritten — this is what keeps past interest calculations
+        // untouched by the new rate.
+        const existingHistory = (refinanceModal.rateHistory && refinanceModal.rateHistory.length > 0)
+          ? refinanceModal.rateHistory
+          : [{ date: refinanceModal.loanStartDate || refinanceModal.purchaseDate, rate: refinanceModal.interestRate || 0, repayment: refinanceModal.repaymentAmount || 0 }];
+        const updated = {
+          ...refinanceModal,
+          rateHistory: [...existingHistory, entry],
+          // Mirror the new terms onto the flat fields too, so anywhere in the
+          // app that still reads property.interestRate/repaymentAmount directly
+          // (e.g. as a fallback) shows the current rate, not the original one.
+          interestRate: entry.rate,
+          repaymentAmount: entry.repayment,
+        };
+        setProperties(ps => ps.map(x => x.id === updated.id ? updated : x));
+        if (session?.user?.id) pushPropertyToSupabase(session.user.id, updated);
+        setRefinanceModal(null);
+      }} onClose={() => setRefinanceModal(null)} />}
       {editTradeModal && <EditTradeModal trade={editTradeModal} portfolio={portfolio} onSave={(updated) => {
         const withFlag = { ...updated, _synced: editTradeModal._synced };
         setPortfolio(p => p.map(t => t.id === withFlag.id ? withFlag : t));
