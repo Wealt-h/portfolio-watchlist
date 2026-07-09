@@ -3926,12 +3926,16 @@ export default function App() {
   const [vixData, setVixData] = useState(null); // { value, changePct, level, label }
 
   // ── Live price refresh
-  const refreshPrices = async (wl) => {
+  const refreshPrices = async (wl, extraSymbols) => {
     const list = wl || watchlist;
     // Include portfolio holdings, not just watchlist items, so a position that
-    // isn't on the watchlist still gets a live price.
+    // isn't on the watchlist still gets a live price. `extraSymbols` covers a
+    // symbol just added via a trade that hasn't landed in the `portfolio`
+    // state/closure yet (setPortfolio is async), so it can be priced immediately
+    // instead of waiting up to 60s for the next scheduled refresh.
     const portfolioSymbols = portfolio.map(t => (t.symbol || "").toUpperCase().trim()).filter(Boolean);
-    const symbols = [...new Set([...list.map(a => a.symbol), ...portfolioSymbols])];
+    const extra = (extraSymbols || []).map(s => (s || "").toUpperCase().trim()).filter(Boolean);
+    const symbols = [...new Set([...list.map(a => a.symbol), ...portfolioSymbols, ...extra])];
     if (!symbols.length) return;
     setLiveStatus("fetching");
 
@@ -4889,6 +4893,11 @@ export default function App() {
           });
         }
         setTradeModal(null);
+        // Immediately refresh prices so a newly-traded symbol that isn't on the
+        // watchlist gets priced right away, instead of showing a false 100% loss
+        // (currentPrice falling through to 0) until the next 60s scheduled refresh.
+        // Passed explicitly since setPortfolio hasn't landed in the closure yet.
+        refreshPrices(undefined, [newTrade.symbol]);
       }} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
       <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab}
         onOpenSettings={() => setSettingsOpen(true)} />
