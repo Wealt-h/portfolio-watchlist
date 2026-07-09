@@ -197,7 +197,7 @@ function NavDrawer({ open, onClose, tab, setTab, onOpenSettings }) {
 // Full-screen settings panel, opened from the drawer's "Settings" entry.
 // Groups everything that was previously a flat list in the drawer: alerts
 // shortcut, currency, theme, data export, replay intro, about, help, log out.
-function SettingsScreen({ open, onClose, alertCount, onOpenAlerts, displayCurrency, onOpenCurrencyPicker, theme, onSetTheme, onRestartOnboarding, onExport, onOpenAbout, onLogout }) {
+function SettingsScreen({ open, onClose, alertCount, onOpenAlerts, displayCurrency, onOpenCurrencyPicker, theme, onSetTheme, onRestartOnboarding, onExport, onOpenAbout, onLogout, onDeleteAccount }) {
   if (!open) return null;
 
   const Row = ({ icon, label, value, badge, onClick, danger }) => (
@@ -253,6 +253,7 @@ function SettingsScreen({ open, onClose, alertCount, onOpenAlerts, displayCurren
 
         <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, margin: "22px 0 6px" }}>ACCOUNT</div>
         <Row icon="⏻" label="Log out" onClick={onLogout} danger />
+        <Row icon="⌫" label="Delete account" onClick={onDeleteAccount} danger />
 
         <div style={{ marginTop: 28, fontSize: 10, color: C.text3, fontFamily: MONO, letterSpacing: 1, textAlign: "center" }}>
           Accrue v1.0.0
@@ -3382,6 +3383,56 @@ function RefinanceModal({ property, onSave, onClose }) {
   );
 }
 
+// ─── DELETE ACCOUNT MODAL ───────────────────────────────────────────────────
+// Requires typing DELETE to confirm — this is irreversible (removes all data
+// and the login itself), so it needs real friction, not a single tap.
+function DeleteAccountModal({ onConfirm, onClose }) {
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState(null);
+  const canDelete = confirmText.trim().toUpperCase() === "DELETE";
+  const LBL2 = { ...LBL, marginBottom: 3 };
+  const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
+
+  const handleConfirm = async () => {
+    if (!canDelete || deleting) return;
+    setDeleting(true);
+    setError(null);
+    const result = await onConfirm();
+    if (result?.error) {
+      setError(result.error);
+      setDeleting(false);
+    }
+    // On success the parent handles sign-out/navigation; this component
+    // unmounts, so no further state update is needed here.
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 800 }} onClick={onClose}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontFamily: FONT, fontWeight: 400, color: C.red }}>Delete account</div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
+        </div>
+        <div style={{ fontSize: 12, color: C.text2, fontFamily: FONT, fontWeight: 300, lineHeight: 1.6, marginBottom: 18 }}>
+          This permanently deletes your account and everything in it — watchlist, trades, cash accounts, properties, and alerts. This cannot be undone.
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={LBL2}>TYPE "DELETE" TO CONFIRM</div>
+          <input value={confirmText} onChange={e => setConfirmText(e.target.value)} placeholder="DELETE" autoCapitalize="characters" style={SML} />
+        </div>
+        {error && (
+          <div style={{ fontSize: 11, color: C.red, fontFamily: FONT, fontWeight: 300, marginBottom: 12 }}>{error}</div>
+        )}
+        <button onClick={handleConfirm} disabled={!canDelete || deleting}
+          style={{ width: "100%", background: canDelete ? "rgba(248,113,113,0.12)" : "transparent", border: `1px solid ${canDelete ? C.red : C.border}`, color: canDelete ? C.red : C.text3, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 400, cursor: (!canDelete || deleting) ? "default" : "pointer", opacity: deleting ? 0.6 : 1 }}>
+          {deleting ? "Deleting..." : "Permanently delete my account"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── ANALYTICS CARD ──────────────────────────────────────────────────────────
 function AnalyticsCard({ donutData, chartData, hasChart, showToggle, lineColor, isUp, total, chartData0, truePnl, totalCostBasisNow, pnlHistory, pnlHistoryLoading }) {
   const [view, setView] = useState("chart"); // "chart" | "allocation"
@@ -3892,8 +3943,45 @@ function downloadPortfolioCSV(csvContent) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// ─── ERROR BOUNDARY ─────────────────────────────────────────────────────────
+// Catches any render-time crash anywhere in the app and shows a friendly
+// recovery screen instead of a silent blank/black screen. Without this, a
+// single bug in any component (a bad prop, a stray undefined reference, etc.)
+// unmounts the entire React tree with zero feedback to the user.
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    // Logged for our own visibility; could later be piped to a real error
+    // tracking service, but never sent anywhere by default (no analytics SDK).
+    console.error("Accrue crashed:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ position: "fixed", inset: 0, background: "#07080a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, textAlign: "center", fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+          <div style={{ fontSize: 15, letterSpacing: 4, color: "rgba(240,245,242,0.9)", fontWeight: 200, marginBottom: 24 }}>ACCRUE</div>
+          <div style={{ fontSize: 15, color: "#f0f5f2", fontWeight: 400, marginBottom: 10 }}>Something went wrong</div>
+          <div style={{ fontSize: 13, color: "rgba(240,245,242,0.5)", fontWeight: 300, marginBottom: 28, maxWidth: 280, lineHeight: 1.6 }}>
+            An unexpected error occurred. Your data is safe — reloading should fix this.
+          </div>
+          <button onClick={() => window.location.reload()} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#f0f5f2", borderRadius: 8, padding: "12px 28px", fontSize: 13, fontFamily: "inherit", fontWeight: 300, cursor: "pointer", letterSpacing: 0.5 }}>
+            Reload Accrue
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ─── APP ──────────────────────────────────────────────────────────────────────
-export default function App() {
+function AppInner() {
   // ── Auth session — gates the entire app behind login. Starts as "loading" (null +
   // sessionChecked false) so we don't flash the login screen for an instant before
   // Supabase has had a chance to report an existing session from a previous visit.
@@ -3969,6 +4057,7 @@ export default function App() {
 
   const [navOpen, setNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [deleteAccountModal, setDeleteAccountModal] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
 
   // ── Theme (dark default; light is a full alternate palette, same component tree)
@@ -5125,9 +5214,41 @@ export default function App() {
         onRestartOnboarding={() => { setSettingsOpen(false); restartOnboarding(); }}
         onExport={() => downloadPortfolioCSV(buildPortfolioExportCSV({ portfolio, positionSummaries, getLivePrice, cashAccounts, properties, watchlist }))}
         onOpenAbout={() => { setSettingsOpen(false); setAboutOpen(true); }}
-        onLogout={() => { setSettingsOpen(false); supabase.auth.signOut(); }} />
+        onLogout={() => { setSettingsOpen(false); supabase.auth.signOut(); }}
+        onDeleteAccount={() => { setSettingsOpen(false); setDeleteAccountModal(true); }} />
+      {deleteAccountModal && <DeleteAccountModal
+        onClose={() => setDeleteAccountModal(false)}
+        onConfirm={async () => {
+          try {
+            const res = await fetch(apiUrl("/api/delete-account"), {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${session?.access_token || ""}`,
+              },
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) {
+              return { error: data.error || "Could not delete account. Please try again." };
+            }
+            // Success — sign out locally, which naturally returns to the auth screen.
+            await supabase.auth.signOut();
+            setDeleteAccountModal(false);
+            return {};
+          } catch {
+            return { error: "Network error. Please check your connection and try again." };
+          }
+        }} />}
       {aboutOpen && <AboutScreen onClose={() => setAboutOpen(false)} />}
     </div>}
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
