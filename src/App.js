@@ -3297,6 +3297,8 @@ function PropertyCard({ property, onEdit, onDelete, onExtraPayment, onRefinance 
 // date as an immediate balance reduction — reflected in the payoff date and
 // lifetime interest cost the moment it's saved.
 function ExtraPaymentModal({ property, onSave, onClose }) {
+  const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
+  const LBL2 = { ...LBL, marginBottom: 3 };
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState("");
@@ -3339,6 +3341,8 @@ function ExtraPaymentModal({ property, onSave, onClose }) {
 // is what makes refinancing safe: past figures stay exactly as they were,
 // only periods from the effective date forward use the new terms.
 function RefinanceModal({ property, onSave, onClose }) {
+  const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
+  const LBL2 = { ...LBL, marginBottom: 3 };
   const currentRate = calcPropertyValue(property).currentRate;
   const [rate, setRate] = useState(String(currentRate || ""));
   const [repayment, setRepayment] = useState(String(property.repaymentAmount || ""));
