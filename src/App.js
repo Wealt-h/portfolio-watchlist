@@ -3304,8 +3304,8 @@ function ExtraPaymentModal({ property, onSave, onClose }) {
   const [note, setNote] = useState("");
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 700, display: "flex", alignItems: "flex-end" }} onClick={onClose}>
-      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }} onClick={onClose}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "90vh", overflowY: "auto", boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 15, fontFamily: FONT, fontWeight: 400, color: C.text1 }}>Extra payment — {property.name}</div>
           <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
@@ -3349,8 +3349,8 @@ function RefinanceModal({ property, onSave, onClose }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 700, display: "flex", alignItems: "flex-end" }} onClick={onClose}>
-      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300 }} onClick={onClose}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "90vh", overflowY: "auto", boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 15, fontFamily: FONT, fontWeight: 400, color: C.text1 }}>Refinance — {property.name}</div>
           <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
