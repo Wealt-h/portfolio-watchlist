@@ -1673,7 +1673,7 @@ function AssetSearchModal({ onAdd, onClose }) {
 }
 
 // ─── TRADE MODAL (BUY + SELL) ─────────────────────────────────────────────────
-function TradeModal({ watchlist, portfolio, onSave, onClose, defaultType = "buy", defaultSymbol = "", onAddCash }) {
+function TradeModal({ watchlist, portfolio, onSave, onClose, defaultType = "buy", defaultSymbol = "" }) {
   const [tradeType, setTradeType] = useState(defaultType);
   const [f, setF] = useState(() => {
     const match = watchlist.find(x => x.symbol === defaultSymbol);
@@ -1682,6 +1682,7 @@ function TradeModal({ watchlist, portfolio, onSave, onClose, defaultType = "buy"
   const [tradeCurrency, setTradeCurrency] = useState("USD");
   const [converting, setConverting] = useState(false);
   const [convertError, setConvertError] = useState(null);
+  const [saveError, setSaveError] = useState(null);
   // Live ticker search — same debounced pattern as the watchlist Add Asset flow
   const [searchQuery, setSearchQuery] = useState(defaultSymbol || "");
   const [searchResults, setSearchResults] = useState([]);
@@ -1730,6 +1731,27 @@ function TradeModal({ watchlist, portfolio, onSave, onClose, defaultType = "buy"
   const knownBrokerages = [...new Set((portfolio || []).filter(t => t.brokerage).sort((a,b) => new Date(b.date)-new Date(a.date)).map(t => t.brokerage))];
 
   const handleSave = async () => {
+    const symUpper = f.symbol.toUpperCase().trim();
+    const priceEntered = parseFloat(f.price) || 0;
+    const unitsEntered = parseFloat(f.units) || 0;
+
+    // Guard against submitting an empty/incomplete trade — previously the save
+    // button had no validation at all, so tapping it with nothing filled in
+    // would silently create a broken $0 "ghost" position in the portfolio.
+    if (!symUpper) {
+      setSaveError("Select an asset first");
+      return;
+    }
+    if (tradeType === "dividend" && priceEntered <= 0) {
+      setSaveError("Enter a dividend amount");
+      return;
+    }
+    if (tradeType !== "dividend" && (priceEntered <= 0 || unitsEntered <= 0)) {
+      setSaveError("Enter a price and number of units");
+      return;
+    }
+    setSaveError(null);
+
     let priceUSD = parseFloat(f.price) || 0;
     let feesUSD = parseFloat(f.fees) || 0;
 
@@ -1934,6 +1956,7 @@ function TradeModal({ watchlist, portfolio, onSave, onClose, defaultType = "buy"
         </div>
 
         {convertError && <div style={{ fontSize: 11, color: C.red, fontFamily: FONT, fontWeight: 300, marginBottom: 10 }}>{convertError}</div>}
+        {saveError && <div style={{ fontSize: 11, color: C.red, fontFamily: FONT, fontWeight: 300, marginBottom: 10 }}>{saveError}</div>}
 
         <button onClick={handleSave} disabled={converting}
           style={{ width: "100%", background: C.surface, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 8, padding: "13px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: converting ? "default" : "pointer", letterSpacing: 0.5, opacity: converting ? 0.6 : 1 }}>
@@ -3659,9 +3682,13 @@ function calcPosition(trades, currentPrice) {
 }
 
 // ─── POSITION CARD ────────────────────────────────────────────────────────────
-function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
+function PositionCard({ trades, currentPrice, onDelete, onDeletePosition, onAddTrade, onEdit }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState("summary"); // summary | trades
+  const [swipeX, setSwipeX] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const touchStartX = useRef(null);
+  const REVEAL_WIDTH = 84;
   const symbol = trades[0].symbol;
   const name = trades[0].name;
   const pos = calcPosition(trades, currentPrice);
@@ -3669,8 +3696,39 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
   const hasSells = trades.some(t => t.type === "sell");
   const hasDividends = trades.some(t => t.type === "dividend");
 
+  // Swipe-left-to-delete, implemented with plain touch events (no gesture
+  // library) since this runs inside a Capacitor WebView. Swiping left reveals
+  // a red Delete button behind the card; tapping it opens a confirmation
+  // before removing the whole position (all trades for this symbol).
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchMove = (e) => {
+    if (touchStartX.current == null) return;
+    const delta = e.touches[0].clientX - touchStartX.current;
+    const base = swipeX === 0 ? 0 : -REVEAL_WIDTH;
+    setSwipeX(Math.max(-REVEAL_WIDTH, Math.min(0, base + delta)));
+  };
+  const handleTouchEnd = () => {
+    touchStartX.current = null;
+    setSwipeX(prev => (prev < -REVEAL_WIDTH / 2 ? -REVEAL_WIDTH : 0));
+  };
+  const handleCardClick = () => {
+    if (swipeX !== 0) { setSwipeX(0); return; } // tap while revealed just closes the reveal
+    setOpen(o => !o);
+  };
+
   return (
-    <div onClick={() => setOpen(!open)} style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `3px solid ${isUp ? C.green : C.red}` : `1px solid ${C.borderHover}`, transition: "border-color 0.2s, background 0.2s" }}>
+    <div style={{ position: "relative", marginBottom: 10, borderRadius: 12, overflow: "hidden" }}>
+      {/* Delete button revealed by the swipe */}
+      <div style={{ position: "absolute", inset: 0, display: "flex", justifyContent: "flex-end" }}>
+        <button onClick={() => setConfirmDelete(true)}
+          style={{ width: REVEAL_WIDTH, background: C.red, border: "none", color: "#fff", fontFamily: FONT, fontSize: 12, fontWeight: 500, cursor: "pointer", letterSpacing: 0.3 }}>
+          Delete
+        </button>
+      </div>
+
+    <div onClick={handleCardClick}
+      onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      style={{ position: "relative", transform: `translateX(${swipeX}px)`, transition: touchStartX.current ? "none" : "transform 0.2s ease", background: open ? C.surfaceHigh : C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", borderLeft: open ? `3px solid ${isUp ? C.green : C.red}` : `1px solid ${C.borderHover}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <AssetLogo symbol={symbol} size={40} color={isUp ? C.green : C.red} />
@@ -3832,6 +3890,28 @@ function PositionCard({ trades, currentPrice, onDelete, onAddTrade, onEdit }) {
 
         </div>
       )}
+    </div>
+
+    {confirmDelete && (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setConfirmDelete(false)}>
+        <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 14, padding: 24, maxWidth: 360, width: "100%", boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+          <div style={{ fontSize: 15, fontFamily: FONT, fontWeight: 400, color: C.text1, marginBottom: 10 }}>Delete {symbol} position?</div>
+          <div style={{ fontSize: 12, color: C.text3, fontFamily: FONT, fontWeight: 300, lineHeight: 1.6, marginBottom: 20 }}>
+            This removes all {trades.length} trade{trades.length !== 1 ? "s" : ""} for {symbol} from your portfolio — buys, sells, and dividends. This cannot be undone.
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setConfirmDelete(false)}
+              style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 8, padding: "12px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>
+              Cancel
+            </button>
+            <button onClick={() => { onDeletePosition(trades.map(t => t.id)); setConfirmDelete(false); }}
+              style={{ flex: 1, background: "rgba(248,113,113,0.12)", border: `1px solid ${C.red}`, color: C.red, borderRadius: 8, padding: "12px 0", fontSize: 12, fontFamily: FONT, fontWeight: 400, cursor: "pointer" }}>
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
@@ -4313,37 +4393,23 @@ function AppInner() {
     if (!sessionChecked || !session) return; // wait until we actually know who's logged in
     (async () => {
       const userId = session.user.id;
-      const localWatchlist = await load("pf_watchlist_v3", null);
       const remoteWatchlist = await fetchWatchlistFromSupabase(userId);
 
       if (remoteWatchlist !== null && remoteWatchlist.length > 0) {
         // Supabase already has data for this account — that's the source of truth now
         setWatchlist(remoteWatchlist);
-      } else if (localWatchlist && localWatchlist.length > 0) {
-        // First time this account has synced, but there's existing local data from
-        // before accounts existed — migrate it up to Supabase once, then use it
-        const migrated = [];
-        for (const asset of localWatchlist) {
-          const newId = await pushWatchlistItemToSupabase(userId, asset);
-          migrated.push({ ...asset, id: newId || asset.id, _synced: !!newId });
-        }
-        setWatchlist(migrated);
       } else {
+        // Fresh account: seed the standard starter watchlist. No longer pulls in
+        // anything from local device storage — that legacy migration path (for
+        // pre-account users) was also silently adopting leftover dev/test data
+        // on shared/reused devices, so it's been removed for good.
         setWatchlist(DEFAULT_WATCHLIST);
       }
 
-      const localPortfolio = await load("pf_portfolio_v4", null);
       const remotePortfolio = await fetchTradesFromSupabase(userId);
 
       if (remotePortfolio !== null && remotePortfolio.length > 0) {
         setPortfolio(remotePortfolio);
-      } else if (localPortfolio && localPortfolio.length > 0) {
-        const migratedTrades = [];
-        for (const trade of localPortfolio) {
-          const newId = await pushTradeToSupabase(userId, trade);
-          migratedTrades.push({ ...trade, id: newId || trade.id, _synced: !!newId });
-        }
-        setPortfolio(migratedTrades);
       } else {
         setPortfolio(DEFAULT_PORTFOLIO);
       }
@@ -4480,18 +4546,10 @@ function AppInner() {
     if (!sessionChecked || !session) return;
     (async () => {
       const userId = session.user.id;
-      const localAlerts = await load("pf_alerts_v1", null);
       const remoteAlerts = await fetchAlertsFromSupabase(userId);
 
       if (remoteAlerts !== null && remoteAlerts.length > 0) {
         setAlerts(remoteAlerts);
-      } else if (localAlerts && localAlerts.length > 0) {
-        const migrated = [];
-        for (const alert of localAlerts) {
-          const newId = await pushAlertToSupabase(userId, alert);
-          migrated.push({ ...alert, id: newId || alert.id, _synced: !!newId });
-        }
-        setAlerts(migrated);
       } else {
         setAlerts([]);
       }
@@ -4505,18 +4563,10 @@ function AppInner() {
     if (!sessionChecked || !session) return;
     (async () => {
       const userId = session.user.id;
-      const localCash = await load("pf_cash_v1", null);
       const remoteCash = await fetchCashAccountsFromSupabase(userId);
 
       if (remoteCash !== null && remoteCash.length > 0) {
         setCashAccounts(remoteCash);
-      } else if (localCash && localCash.length > 0) {
-        const migrated = [];
-        for (const account of localCash) {
-          const newId = await pushCashAccountToSupabase(userId, account);
-          migrated.push({ ...account, id: newId || account.id, _synced: !!newId });
-        }
-        setCashAccounts(migrated);
       } else {
         setCashAccounts([]);
       }
@@ -4530,18 +4580,10 @@ function AppInner() {
     if (!sessionChecked || !session) return;
     (async () => {
       const userId = session.user.id;
-      const localProperties = await load("pf_properties_v1", null);
       const remoteProperties = await fetchPropertiesFromSupabase(userId);
 
       if (remoteProperties !== null && remoteProperties.length > 0) {
         setProperties(remoteProperties);
-      } else if (localProperties && localProperties.length > 0) {
-        const migrated = [];
-        for (const property of localProperties) {
-          const newId = await pushPropertyToSupabase(userId, property);
-          migrated.push({ ...property, id: newId || property.id, _synced: !!newId });
-        }
-        setProperties(migrated);
       } else {
         setProperties([]);
       }
@@ -4559,8 +4601,13 @@ function AppInner() {
         if (realId) setWatchlist(w => w.map(x => x.id === updated.id ? { ...x, id: realId, _synced: true } : x));
       }
     } else {
+      const symUpper = (form.symbol || "").toUpperCase().trim();
+      if (watchlist.some(x => x.symbol === symUpper)) {
+        // Already on the watchlist — silently skip rather than create a duplicate card.
+        return;
+      }
       const tempId = Date.now();
-      const newAsset = { ...form, id: tempId, _synced: false };
+      const newAsset = { ...form, symbol: symUpper, id: tempId, _synced: false };
       setWatchlist(w => [...w, newAsset]);
       if (session?.user?.id) {
         const realId = await pushWatchlistItemToSupabase(session.user.id, newAsset);
@@ -4985,6 +5032,14 @@ function AppInner() {
                       setPortfolio(p => p.filter(x => x.id !== id));
                       if (session?.user?.id) deleteTradeFromSupabase(session.user.id, id);
                     }}
+                    onDeletePosition={tradeIds => {
+                      // Removes every trade for this symbol at once — used by the
+                      // whole-position swipe-to-delete action on the collapsed card.
+                      setPortfolio(p => p.filter(x => !tradeIds.includes(x.id)));
+                      if (session?.user?.id) {
+                        tradeIds.forEach(id => deleteTradeFromSupabase(session.user.id, id));
+                      }
+                    }}
                     onAddTrade={(sym) => setTradeModal({ defaultType:"buy", symbol:sym })}
                     onEdit={(trade) => setEditTradeModal(trade)} />
                 ))}
@@ -5025,6 +5080,8 @@ function AppInner() {
               ))}
             </div>
           )}
+
+          <button onClick={() => setCashModal("new")} style={{ width: "100%", marginTop: 10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Add cash account</button>
 
           <button onClick={() => setPropertyModal("new")} style={{ width: "100%", marginTop: 10, background:"transparent", border:`1px dashed ${C.border}`, color:C.text3, borderRadius:8, padding:"14px 0", fontSize:11, fontFamily:FONT, fontWeight:300, cursor:"pointer", letterSpacing:1 }}>+ Add property</button>
 
@@ -5076,7 +5133,9 @@ function AppInner() {
 
       {watchModal !== null && <WatchModal asset={watchModal.asset} onSave={saveWatch} onClose={() => setWatchModal(null)} />}
       {searchModal && <AssetSearchModal onAdd={asset => {
-        setWatchlist(w => [...w, { ...asset, _synced: false }]);
+        const symUpper = (asset.symbol || "").toUpperCase().trim();
+        if (watchlist.some(x => x.symbol === symUpper)) return; // already on the watchlist
+        setWatchlist(w => [...w, { ...asset, symbol: symUpper, _synced: false }]);
         if (session?.user?.id) {
           pushWatchlistItemToSupabase(session.user.id, asset).then(realId => {
             if (realId) setWatchlist(w => w.map(x => x.id === asset.id ? { ...x, id: realId, _synced: true } : x));
@@ -5202,7 +5261,7 @@ function AppInner() {
         // (currentPrice falling through to 0) until the next 60s scheduled refresh.
         // Passed explicitly since setPortfolio hasn't landed in the closure yet.
         refreshPrices(undefined, [newTrade.symbol]);
-      }} onClose={() => setTradeModal(null)} onAddCash={() => setCashModal("new")} />}
+      }} onClose={() => setTradeModal(null)} />}
       <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} tab={tab} setTab={setTab}
         onOpenSettings={() => setSettingsOpen(true)} />
 
