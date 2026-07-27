@@ -2046,9 +2046,14 @@ function EditTradeModal({ trade, portfolio, onSave, onClose }) {
 // ─── INSIGHTS TAB ────────────────────────────────────────────────────────────
 function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPeriod, spyPeriodData, getLivePrice, cashAccounts, priceHistoryBySymbol, priceHistoryLoading, benchmarkData, selectedBenchmark, setSelectedBenchmark }) {
 
-  // Period days mapping
-  const periodDays = { daily: 1, weekly: 7, monthly: 30 };
+  // Period days mapping. "all" uses Infinity as a sentinel — calcPeriodReturn's
+  // date-filter approach handles that gracefully (a cutoff of -Infinity just
+  // includes every point), but the portfolio-side date-arithmetic helpers below
+  // (getPriceDaysAgo, the dividend cutoff, cash lookback) each need an explicit
+  // "all" branch since subtracting Infinity days from a real Date is invalid.
+  const periodDays = { daily: 1, weekly: 7, monthly: 30, quarterly: 91, yearly: 365, all: Infinity };
   const days = periodDays[period];
+  const isAllTime = period === "all";
 
   // Look up a symbol's price N days ago, walking backward up to 5 days to cover
   // weekends/holidays when the market was closed (same approach used for the
@@ -2056,6 +2061,12 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   const getPriceDaysAgo = (sym, daysAgo) => {
     const hist = priceHistoryBySymbol?.[sym];
     if (!hist) return null;
+    if (daysAgo === Infinity) {
+      // All-time: use the earliest price we actually have on record, rather
+      // than trying to do date math with Infinity.
+      const dates = Object.keys(hist).sort();
+      return dates.length ? hist[dates[0]] : null;
+    }
     const d = new Date();
     d.setDate(d.getDate() - daysAgo);
     for (let i = 0; i < 6; i++) {
@@ -2073,7 +2084,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   // from price movement, so it's added on top rather than baked into the price-based figure).
   // Falls back to all-time unrealised P&L for a symbol if no historical price is available yet,
   // so the page still shows sensible numbers while history is loading rather than zeroing out.
-  const cutoffDateStr = (() => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); })();
+  const cutoffDateStr = isAllTime ? "0000-01-01" : (() => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); })();
   const periodPerformers = positionSummaries.map(({ sym, pos }) => {
     const priceNow = getLivePrice ? getLivePrice(sym) : null;
     const priceAgo = getPriceDaysAgo(sym, days);
@@ -2160,7 +2171,13 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   }
   positionSummaries.forEach(({sym, pos}) => {
     const asset = watchlist.find(a => a.symbol === sym);
-    const type = asset?.type || "stock";
+    // Fall back to crypto-suffix detection when the symbol isn't on the
+    // watchlist (e.g. logged as a trade via free-text search and never
+    // added there) — previously this silently defaulted to "stock" for
+    // any crypto position that wasn't also being watched.
+    const tickerBase = sym.replace(/-USD$/, "");
+    const looksLikeCrypto = CRYPTO_TICKERS.includes(tickerBase) || sym.includes("-USD");
+    const type = asset?.type || (looksLikeCrypto ? "crypto" : "stock");
     if (!assetClasses[type]) assetClasses[type] = { pnl: 0, value: 0, cost: 0, assets: [] };
     assetClasses[type].pnl += pos.unrealisedPnl;
     assetClasses[type].value += pos.currentValue;
@@ -2197,11 +2214,11 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   return (
     <div>
       {/* Period toggle */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-        {["daily","weekly","monthly"].map(p => (
+      <div style={{ display: "flex", gap: 6, marginBottom: 8, overflowX: "auto", paddingBottom: 2, WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+        {[["daily","1D"],["weekly","1W"],["monthly","1M"],["quarterly","3M"],["yearly","1Y"],["all","All"]].map(([p,l]) => (
           <button key={p} onClick={() => setPeriod(p)}
-            style={{ flex: 1, background: period===p?C.surfaceHigh:"transparent", border: `1px solid ${period===p?C.borderHover:C.border}`, color: period===p?C.text1:C.text3, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: FONT, fontWeight: period===p?500:300, cursor: "pointer", letterSpacing: 0.3, textTransform: "capitalize" }}>
-            {p.charAt(0).toUpperCase() + p.slice(1)}
+            style={{ flex: "1 0 auto", minWidth: 48, background: period===p?C.surfaceHigh:"transparent", border: `1px solid ${period===p?C.borderHover:C.border}`, color: period===p?C.text1:C.text3, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, fontWeight: period===p?500:300, cursor: "pointer", letterSpacing: 0.3 }}>
+            {l}
           </button>
         ))}
       </div>
@@ -2226,7 +2243,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
                   {totalPnl >= 0 ? "+" : ""}{fmtUSD(totalPnl)}
                 </div>
                 <div style={{ fontFamily: MONO, fontSize: 11, color: totalPnl >= 0 ? "rgba(61,220,132,0.7)" : "rgba(255,107,107,0.7)", marginTop: 3 }}>
-                  {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}% this {period === "daily" ? "day" : period === "weekly" ? "week" : "month"}
+                  {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}% this {period === "daily" ? "day" : period === "weekly" ? "week" : period === "monthly" ? "month" : period === "quarterly" ? "quarter" : period === "yearly" ? "year" : "period (all time)"}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -2266,7 +2283,9 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
             const allItems = [
               ...periodPerformers.map(p => {
                 const asset = watchlist.find(a => a.symbol === p.sym);
-                return { sym: p.sym, type: asset?.type || "stock", pct: p.pct, pnl: p.pnl, isBenchmark: false };
+                const tickerBase = p.sym.replace(/-USD$/, "");
+                const looksLikeCrypto = CRYPTO_TICKERS.includes(tickerBase) || p.sym.includes("-USD");
+                return { sym: p.sym, type: asset?.type || (looksLikeCrypto ? "crypto" : "stock"), pct: p.pct, pnl: p.pnl, isBenchmark: false };
               }),
               ...cashPeriodPerformers.map(p => ({ sym: p.sym, type: "cash", pct: p.pct, pnl: p.pnl, isBenchmark: false })),
               ...(spyChange !== null ? [{ sym: benchmarkLabel, type: "index", pct: spyChange, pnl: null, isBenchmark: true }] : []),
@@ -4452,6 +4471,11 @@ function AppInner() {
           daily: calcPeriodReturn(points, 1),
           weekly: calcPeriodReturn(points, 7),
           monthly: calcPeriodReturn(points, 30),
+          quarterly: calcPeriodReturn(points, 91),
+          yearly: calcPeriodReturn(points, 365),
+          // calcPeriodReturn's date-filter approach naturally handles Infinity —
+          // a cutoff of -Infinity just includes every point in the series.
+          all: calcPeriodReturn(points, Infinity),
         };
       } catch {
         return null;
