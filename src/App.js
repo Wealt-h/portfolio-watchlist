@@ -1244,6 +1244,42 @@ function WatchCard({ asset, period = "day", onDelete, onNotesUpdate, onThesisUpd
     ? asset.periods[period]
     : asset.change24h;
 
+  // Swipe-left-to-delete, matching the pattern used on portfolio position
+  // cards. Direction is "locked" after a small movement threshold so a
+  // normal vertical scroll never gets mistaken for a horizontal swipe.
+  const [swipeX, setSwipeX] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const touchStart = useRef(null);
+  const swipeLock = useRef(null);
+  const REVEAL_WIDTH = 84;
+  const handleTouchStart = (e) => {
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    swipeLock.current = null;
+  };
+  const handleTouchMove = (e) => {
+    if (!touchStart.current) return;
+    const dx = e.touches[0].clientX - touchStart.current.x;
+    const dy = e.touches[0].clientY - touchStart.current.y;
+    if (swipeLock.current === null) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      swipeLock.current = Math.abs(dx) > Math.abs(dy) * 1.5 ? "horizontal" : "vertical";
+    }
+    if (swipeLock.current !== "horizontal") return;
+    const base = swipeX === 0 ? 0 : -REVEAL_WIDTH;
+    setSwipeX(Math.max(-REVEAL_WIDTH, Math.min(0, base + dx)));
+  };
+  const handleTouchEnd = () => {
+    touchStart.current = null;
+    if (swipeLock.current === "horizontal") {
+      setSwipeX(prev => (prev < -REVEAL_WIDTH / 2 ? -REVEAL_WIDTH : 0));
+    }
+    swipeLock.current = null;
+  };
+  const handleCardClick = () => {
+    if (swipeX !== 0) { setSwipeX(0); return; }
+    setOpen(o => !o);
+  };
+
   useEffect(() => {
     if (!open || sparkData) return;
     setSparkLoading(true);
@@ -1293,7 +1329,16 @@ function WatchCard({ asset, period = "day", onDelete, onNotesUpdate, onThesisUpd
   };
 
   return (
-    <div onClick={() => setOpen(!open)} style={{ background: open ? C.surfaceHigh : C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "18px 20px", marginBottom: 10, cursor: "pointer", borderLeft: open ? `3px solid ${C.green}` : `1px solid ${C.borderHover}`, transition: "border-color 0.2s, background 0.2s" }}>
+    <div style={{ position: "relative", marginBottom: 10, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ position: "absolute", inset: 0, display: "flex", justifyContent: "flex-end" }}>
+        <button onClick={() => setConfirmDelete(true)}
+          style={{ width: REVEAL_WIDTH, background: C.red, border: "none", color: "#fff", fontFamily: FONT, fontSize: 12, fontWeight: 500, cursor: "pointer", letterSpacing: 0.3 }}>
+          Delete
+        </button>
+      </div>
+      <div onClick={handleCardClick}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+        style={{ position: "relative", transform: `translateX(${swipeX}px)`, transition: touchStart.current ? "none" : "transform 0.2s ease", background: open ? C.surfaceHigh : C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", borderLeft: open ? `3px solid ${C.green}` : `1px solid ${C.borderHover}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <AssetLogo symbol={asset.symbol} size={40} />
@@ -1461,6 +1506,28 @@ function WatchCard({ asset, period = "day", onDelete, onNotesUpdate, onThesisUpd
           </div>
         </div>
       )}
+    </div>
+
+    {confirmDelete && (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setConfirmDelete(false)}>
+        <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 14, padding: 24, maxWidth: 360, width: "100%", boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+          <div style={{ fontSize: 15, fontFamily: FONT, fontWeight: 400, color: C.text1, marginBottom: 10 }}>Remove {asset.symbol}?</div>
+          <div style={{ fontSize: 12, color: C.text3, fontFamily: FONT, fontWeight: 300, lineHeight: 1.6, marginBottom: 20 }}>
+            This removes {asset.symbol} from your watchlist. Any positions you hold won't be affected.
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setConfirmDelete(false)}
+              style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 8, padding: "12px 0", fontSize: 12, fontFamily: FONT, fontWeight: 300, cursor: "pointer" }}>
+              Cancel
+            </button>
+            <button onClick={() => { onDelete(asset.id); setConfirmDelete(false); }}
+              style={{ flex: 1, background: "rgba(248,113,113,0.12)", border: `1px solid ${C.red}`, color: C.red, borderRadius: 8, padding: "12px 0", fontSize: 12, fontFamily: FONT, fontWeight: 400, cursor: "pointer" }}>
+              Remove
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
@@ -2128,9 +2195,7 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   const totalPeriodPnlPct = periodValueAgoTotal > 0 ? (totalPeriodPnl / periodValueAgoTotal) * 100 : 0;
 
   // Filter trades within period
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cutoffStr = isAllTime ? "0000-01-01" : (() => { const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days); return cutoff.toISOString().slice(0, 10); })();
   const periodTrades = portfolio.filter(t => t.date >= cutoffStr);
 
   // Overall P&L — includes cash interest as "growth"
@@ -3064,7 +3129,7 @@ function PropertyModal({ property, onSave, onClose }) {
 }
 
 // ─── CASH CARD ────────────────────────────────────────────────────────────────
-function CashCard({ account, onEdit, onDelete, onAddCash }) {
+function CashCard({ account, onEdit, onDelete, onAddCash, onManageDeposits }) {
   const [open, setOpen] = useState(false);
   const calc = calcCashValue(account);
 
@@ -3163,7 +3228,12 @@ function CashCard({ account, onEdit, onDelete, onAddCash }) {
           {/* Deposit history */}
           {account.deposits && account.deposits.length > 0 && (
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2, marginBottom: 8 }}>DEPOSIT HISTORY</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2 }}>DEPOSIT HISTORY</div>
+                <button onClick={() => onManageDeposits(account)} style={{ background: "transparent", border: "none", color: C.accentLink, fontSize: 10, fontFamily: MONO, cursor: "pointer", letterSpacing: 0.5 }}>
+                  Manage
+                </button>
+              </div>
               {account.deposits.map((d, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
                   <div style={{ fontSize: 12, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{d.date}</div>
@@ -3183,6 +3253,110 @@ function CashCard({ account, onEdit, onDelete, onAddCash }) {
     </div>
   );
 }
+
+// ─── DEPOSIT HISTORY MODAL ───────────────────────────────────────────────────
+// Lists every deposit for a cash account, each editable (date/amount) or
+// removable in place. Every change recomputes the account's principal as the
+// sum of all remaining deposits, and its start date as the earliest deposit
+// date, so interest accrual always stays consistent with the real history.
+function DepositHistoryModal({ account, onSave, onClose }) {
+  const [deposits, setDeposits] = useState([...(account.deposits || [])]);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [confirmDeleteIndex, setConfirmDeleteIndex] = useState(null);
+  const [editDate, setEditDate] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
+
+  const sorted = deposits.map((d, i) => ({ ...d, _i: i })).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const commit = (nextDeposits) => {
+    setDeposits(nextDeposits);
+    const principal = nextDeposits.reduce((s, d) => s + (d.amount || 0), 0);
+    const startDate = nextDeposits.length
+      ? nextDeposits.reduce((min, d) => (d.date < min ? d.date : min), nextDeposits[0].date)
+      : account.startDate;
+    onSave({ ...account, deposits: nextDeposits, principal, startDate });
+  };
+
+  const startEdit = (i) => {
+    setEditingIndex(i);
+    setEditDate(deposits[i].date);
+    setEditAmount(String(deposits[i].amount));
+  };
+  const saveEdit = () => {
+    const amt = parseFloat(editAmount);
+    if (!editDate || !amt || amt <= 0) return;
+    const next = deposits.map((d, idx) => idx === editingIndex ? { ...d, date: editDate, amount: amt } : d);
+    commit(next);
+    setEditingIndex(null);
+  };
+  const confirmDelete = (i) => {
+    const next = deposits.filter((_, idx) => idx !== i);
+    commit(next);
+    setConfirmDeleteIndex(null);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={onClose}>
+      <div style={{ background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: "14px 14px 0 0", padding: "20px 18px 32px", width: "100%", maxWidth: 520, maxHeight: "85vh", overflowY: "auto", boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontFamily: FONT, fontWeight: 400, color: C.text1 }}>Deposits — {account.institution}</div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
+        </div>
+
+        {sorted.length === 0 && (
+          <div style={{ fontSize: 12, color: C.text3, fontFamily: FONT, fontWeight: 300, textAlign: "center", padding: "24px 0" }}>No deposits recorded.</div>
+        )}
+
+        {sorted.map(d => {
+          const i = d._i;
+          if (editingIndex === i) {
+            return (
+              <div key={i} style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                  <div>
+                    <div style={LBL}>DATE</div>
+                    <input value={editDate} onChange={e => setEditDate(e.target.value)} type="date" style={SML} />
+                  </div>
+                  <div>
+                    <div style={LBL}>AMOUNT</div>
+                    <input value={editAmount} onChange={e => setEditAmount(e.target.value)} type="number" style={SML} />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setEditingIndex(null)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={saveEdit} style={{ flex: 1, background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer" }}>Save</button>
+                </div>
+              </div>
+            );
+          }
+          if (confirmDeleteIndex === i) {
+            return (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 12, color: C.red, fontFamily: FONT, fontWeight: 300 }}>Remove this deposit?</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => setConfirmDeleteIndex(null)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "6px 12px", fontSize: 10, fontFamily: MONO, cursor: "pointer" }}>No</button>
+                  <button onClick={() => confirmDelete(i)} style={{ background: "rgba(248,113,113,0.12)", border: `1px solid ${C.red}`, color: C.red, borderRadius: 6, padding: "6px 12px", fontSize: 10, fontFamily: MONO, cursor: "pointer" }}>Yes, remove</button>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 12, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{d.date}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ fontSize: 12, color: C.green, fontFamily: MONO }}>+{fmtUSD(d.amount)}</div>
+                <button onClick={() => startEdit(i)} style={{ background: "transparent", border: "none", color: C.accentLink, fontSize: 11, fontFamily: MONO, cursor: "pointer" }}>Edit</button>
+                <button onClick={() => setConfirmDeleteIndex(i)} style={{ background: "transparent", border: "none", color: "rgba(248,113,113,0.5)", fontSize: 11, fontFamily: MONO, cursor: "pointer" }}>Remove</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 
 // ─── PROPERTY CARD ──────────────────────────────────────────────────────────────
 function PropertyCard({ property, onEdit, onDelete, onExtraPayment, onRefinance }) {
@@ -3706,7 +3880,8 @@ function PositionCard({ trades, currentPrice, onDelete, onDeletePosition, onAddT
   const [view, setView] = useState("summary"); // summary | trades
   const [swipeX, setSwipeX] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const touchStartX = useRef(null);
+  const touchStart = useRef(null); // { x, y }
+  const swipeLock = useRef(null); // null (undecided) | "horizontal" | "vertical"
   const REVEAL_WIDTH = 84;
   const symbol = trades[0].symbol;
   const name = trades[0].name;
@@ -3719,16 +3894,38 @@ function PositionCard({ trades, currentPrice, onDelete, onDeletePosition, onAddT
   // library) since this runs inside a Capacitor WebView. Swiping left reveals
   // a red Delete button behind the card; tapping it opens a confirmation
   // before removing the whole position (all trades for this symbol).
-  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  //
+  // Direction is "locked" after a small movement threshold rather than
+  // reacting to the very first pixel of horizontal drift — without this, a
+  // normal vertical scroll (which never moves in a perfectly straight line)
+  // would keep triggering the swipe reveal, making the list feel twitchy.
+  const handleTouchStart = (e) => {
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    swipeLock.current = null;
+  };
   const handleTouchMove = (e) => {
-    if (touchStartX.current == null) return;
-    const delta = e.touches[0].clientX - touchStartX.current;
+    if (!touchStart.current) return;
+    const dx = e.touches[0].clientX - touchStart.current.x;
+    const dy = e.touches[0].clientY - touchStart.current.y;
+
+    if (swipeLock.current === null) {
+      // Not enough movement yet to know the user's intent — wait.
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      // Require horizontal movement to clearly dominate before treating this
+      // as a swipe; otherwise it's a scroll, and we leave it alone entirely.
+      swipeLock.current = Math.abs(dx) > Math.abs(dy) * 1.5 ? "horizontal" : "vertical";
+    }
+    if (swipeLock.current !== "horizontal") return; // let the page scroll normally
+
     const base = swipeX === 0 ? 0 : -REVEAL_WIDTH;
-    setSwipeX(Math.max(-REVEAL_WIDTH, Math.min(0, base + delta)));
+    setSwipeX(Math.max(-REVEAL_WIDTH, Math.min(0, base + dx)));
   };
   const handleTouchEnd = () => {
-    touchStartX.current = null;
-    setSwipeX(prev => (prev < -REVEAL_WIDTH / 2 ? -REVEAL_WIDTH : 0));
+    touchStart.current = null;
+    if (swipeLock.current === "horizontal") {
+      setSwipeX(prev => (prev < -REVEAL_WIDTH / 2 ? -REVEAL_WIDTH : 0));
+    }
+    swipeLock.current = null;
   };
   const handleCardClick = () => {
     if (swipeX !== 0) { setSwipeX(0); return; } // tap while revealed just closes the reveal
@@ -3747,7 +3944,7 @@ function PositionCard({ trades, currentPrice, onDelete, onDeletePosition, onAddT
 
     <div onClick={handleCardClick}
       onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-      style={{ position: "relative", transform: `translateX(${swipeX}px)`, transition: touchStartX.current ? "none" : "transform 0.2s ease", background: open ? C.surfaceHigh : C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", borderLeft: open ? `3px solid ${isUp ? C.green : C.red}` : `1px solid ${C.borderHover}` }}>
+      style={{ position: "relative", transform: `translateX(${swipeX}px)`, transition: touchStart.current ? "none" : "transform 0.2s ease", background: open ? C.surfaceHigh : C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", borderLeft: open ? `3px solid ${isUp ? C.green : C.red}` : `1px solid ${C.borderHover}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <AssetLogo symbol={symbol} size={40} color={isUp ? C.green : C.red} />
@@ -4284,6 +4481,7 @@ function AppInner() {
   const [cashAccounts, setCashAccounts] = useState([]);
   const [cashLoaded, setCashLoaded] = useState(false);
   const [cashModal, setCashModal] = useState(null); // null | account object | "new"
+  const [depositHistoryModal, setDepositHistoryModal] = useState(null); // null | account object
   const [properties, setProperties] = useState([]);
   const [propertiesLoaded, setPropertiesLoaded] = useState(false);
   const [propertyModal, setPropertyModal] = useState(null); // null | property object | "new"
@@ -5082,6 +5280,7 @@ function AppInner() {
                     if (session?.user?.id) deleteCashAccountFromSupabase(session.user.id, id);
                   }}
                   onAddCash={a => setCashModal({ topUpFor: a.institution, existingRate: a.rate, existingAccountType: a.accountType })}
+                  onManageDeposits={a => setDepositHistoryModal(a)}
                 />
               ))}
             </div>
@@ -5217,6 +5416,13 @@ function AppInner() {
         }
         setCashModal(null);
       }} onClose={() => setCashModal(null)} />}
+      {depositHistoryModal !== null && <DepositHistoryModal account={depositHistoryModal}
+        onSave={updated => {
+          setCashAccounts(c => c.map(x => x.id === updated.id ? updated : x));
+          if (session?.user?.id) pushCashAccountToSupabase(session.user.id, updated);
+          setDepositHistoryModal(updated); // keep the modal's local view in sync with the latest saved state
+        }}
+        onClose={() => setDepositHistoryModal(null)} />}
       {propertyModal !== null && <PropertyModal property={propertyModal} onSave={p => {
         if (propertyModal === "new") {
           const tempId = p.id || Date.now();
