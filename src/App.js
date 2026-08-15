@@ -2152,18 +2152,34 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
   // Falls back to all-time unrealised P&L for a symbol if no historical price is available yet,
   // so the page still shows sensible numbers while history is loading rather than zeroing out.
   const cutoffDateStr = isAllTime ? "0000-01-01" : (() => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); })();
-  const periodPerformers = positionSummaries.map(({ sym, pos }) => {
+  const periodPerformers = positionSummaries.map(({ sym, pos, trades }) => {
     const priceNow = getLivePrice ? getLivePrice(sym) : null;
     const priceAgo = getPriceDaysAgo(sym, days);
     const dividendsInPeriod = portfolio.filter(t => t.symbol === sym && t.type === "dividend" && t.date >= cutoffDateStr).reduce((s, t) => s + (t.amount || 0), 0);
-    if (priceAgo != null && priceNow != null && pos.unitsHeld > 0) {
+
+    // If the position was only opened partway through the selected period —
+    // and for "All-time" this is true of every real trade, since nothing can
+    // predate the "0000-01-01" cutoff — a market-price lookback to a date
+    // before the user actually owned anything compares today's price to
+    // whatever the market happened to be doing before their entry, which has
+    // nothing to do with their actual position. That's what was producing a
+    // loss here while the Portfolio tab (built from real cost basis) correctly
+    // showed a gain. In that case, use the position's actual cost basis as the
+    // starting value instead, so this always reconciles with the Portfolio tab.
+    const earliestTradeDate = trades && trades.length
+      ? trades.reduce((min, t) => (t.date < min ? t.date : min), trades[0].date)
+      : null;
+    const positionPredatesPeriod = earliestTradeDate && earliestTradeDate <= cutoffDateStr;
+
+    if (positionPredatesPeriod && priceAgo != null && priceNow != null && pos.unitsHeld > 0) {
       const valueNow = priceNow * pos.unitsHeld;
       const valueAgo = priceAgo * pos.unitsHeld;
       const periodPnl = valueNow - valueAgo + dividendsInPeriod;
       const periodPct = valueAgo > 0 ? (periodPnl / valueAgo) * 100 : 0;
       return { sym, pct: periodPct, pnl: periodPnl };
     }
-    // No historical price yet — fall back to all-time figures rather than showing nothing
+    // Position opened during the period (or no historical price yet) — use
+    // actual cost basis as the baseline so this matches the Portfolio tab.
     return { sym, pct: pos.unrealisedPct, pnl: pos.unrealisedPnl + dividendsInPeriod };
   });
 
@@ -2182,9 +2198,13 @@ function InsightsTab({ portfolio, watchlist, positionSummaries, period, setPerio
 
   // Overall period P&L — real change in value over the selected window, not all-time P&L
   const totalPeriodPnl = periodPerformers.reduce((s, p) => s + p.pnl, 0) + cashPeriodPerformers.reduce((s, p) => s + p.pnl, 0);
-  const periodValueAgoTotal = positionSummaries.reduce((s, {sym, pos}) => {
+  const periodValueAgoTotal = positionSummaries.reduce((s, {sym, pos, trades}) => {
     const priceAgo = getPriceDaysAgo(sym, days);
-    return s + (priceAgo != null ? priceAgo * pos.unitsHeld : pos.costBasis);
+    const earliestTradeDate = trades && trades.length
+      ? trades.reduce((min, t) => (t.date < min ? t.date : min), trades[0].date)
+      : null;
+    const positionPredatesPeriod = earliestTradeDate && earliestTradeDate <= cutoffDateStr;
+    return s + (positionPredatesPeriod && priceAgo != null ? priceAgo * pos.unitsHeld : pos.costBasis);
   }, 0) + (cashAccounts || []).reduce((s, a) => {
     const startDate = new Date(a.startDate);
     const daysRunningNow = Math.max(0, Math.floor((new Date() - startDate) / (1000*60*60*24)));
@@ -3225,23 +3245,29 @@ function CashCard({ account, onEdit, onDelete, onAddCash, onManageDeposits }) {
             <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, fontStyle: "italic", marginBottom: 12 }}>{account.notes}</div>
           )}
 
-          {/* Deposit history */}
-          {account.deposits && account.deposits.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2 }}>DEPOSIT HISTORY</div>
-                <button onClick={() => onManageDeposits(account)} style={{ background: "transparent", border: "none", color: C.accentLink, fontSize: 10, fontFamily: MONO, cursor: "pointer", letterSpacing: 0.5 }}>
-                  Manage
-                </button>
-              </div>
-              {account.deposits.map((d, i) => (
+          {/* Deposit history — the Manage entry point always shows, even with
+              zero recorded deposits, so accounts created before this feature
+              existed (or via a path that never wrote a deposits array) aren't
+              permanently locked out of ever having their history tracked. */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 9, color: C.text3, fontFamily: MONO, letterSpacing: 2 }}>DEPOSIT HISTORY</div>
+              <button onClick={() => onManageDeposits(account)} style={{ background: "transparent", border: "none", color: C.accentLink, fontSize: 10, fontFamily: MONO, cursor: "pointer", letterSpacing: 0.5 }}>
+                Manage
+              </button>
+            </div>
+            {account.deposits && account.deposits.length > 0 ? (
+              account.deposits.map((d, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
                   <div style={{ fontSize: 12, color: C.text2, fontFamily: FONT, fontWeight: 300 }}>{d.date}</div>
                   <div style={{ fontSize: 12, color: C.green, fontFamily: MONO }}>+{fmtUSD(d.amount)}</div>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            ) : (
+              <div style={{ fontSize: 11, color: C.text3, fontFamily: FONT, fontWeight: 300, fontStyle: "italic" }}>No deposits recorded yet.</div>
+            )}
+          </div>
+
 
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => onAddCash(account)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.greenBorder}`, color: C.green, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1.5 }}>+ Add cash</button>
@@ -3263,6 +3289,7 @@ function DepositHistoryModal({ account, onSave, onClose }) {
   const [deposits, setDeposits] = useState([...(account.deposits || [])]);
   const [editingIndex, setEditingIndex] = useState(null);
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState(null);
+  const [adding, setAdding] = useState(false);
   const [editDate, setEditDate] = useState("");
   const [editAmount, setEditAmount] = useState("");
   const SML = { ...INP, padding: "9px 10px", fontSize: 16 };
@@ -3278,8 +3305,21 @@ function DepositHistoryModal({ account, onSave, onClose }) {
     onSave({ ...account, deposits: nextDeposits, principal, startDate });
   };
 
+  const startAdd = () => {
+    setAdding(true);
+    setEditingIndex(null);
+    setEditDate(new Date().toISOString().slice(0, 10));
+    setEditAmount("");
+  };
+  const saveAdd = () => {
+    const amt = parseFloat(editAmount);
+    if (!editDate || !amt || amt <= 0) return;
+    commit([...deposits, { date: editDate, amount: amt }]);
+    setAdding(false);
+  };
   const startEdit = (i) => {
     setEditingIndex(i);
+    setAdding(false);
     setEditDate(deposits[i].date);
     setEditAmount(String(deposits[i].amount));
   };
@@ -3303,6 +3343,29 @@ function DepositHistoryModal({ account, onSave, onClose }) {
           <div style={{ fontSize: 15, fontFamily: FONT, fontWeight: 400, color: C.text1 }}>Deposits — {account.institution}</div>
           <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.text3, fontSize: 18, cursor: "pointer" }}>✕</button>
         </div>
+
+        {adding ? (
+          <div style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}`, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+              <div>
+                <div style={LBL}>DATE</div>
+                <input value={editDate} onChange={e => setEditDate(e.target.value)} type="date" style={SML} />
+              </div>
+              <div>
+                <div style={LBL}>AMOUNT</div>
+                <input value={editAmount} onChange={e => setEditAmount(e.target.value)} type="number" style={SML} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setAdding(false)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer" }}>Cancel</button>
+              <button onClick={saveAdd} style={{ flex: 1, background: C.surfaceHigh, border: `1px solid ${C.borderHover}`, color: C.text1, borderRadius: 6, padding: "8px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer" }}>Add</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={startAdd} style={{ width: "100%", background: "transparent", border: `1px dashed ${C.greenBorder}`, color: C.green, borderRadius: 8, padding: "12px 0", fontSize: 11, fontFamily: MONO, cursor: "pointer", letterSpacing: 1, marginBottom: 16 }}>
+            + Add deposit
+          </button>
+        )}
 
         {sorted.length === 0 && (
           <div style={{ fontSize: 12, color: C.text3, fontFamily: FONT, fontWeight: 300, textAlign: "center", padding: "24px 0" }}>No deposits recorded.</div>
