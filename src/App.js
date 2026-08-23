@@ -4398,9 +4398,11 @@ function AppInner() {
     };
   }, []);
 
-  const [onboarded, setOnboarded] = useState(() => {
-    try { return localStorage.getItem("accrue_onboarded") === "true"; } catch { return false; }
-  });
+  const [onboarded, setOnboarded] = useState(false);
+  // Same device-wide-cache issue as the other preferences above — but this one
+  // was the most consequential version of the bug: a stale "true" left behind
+  // by a previous account on the same device could cause a genuinely new user
+  // to silently skip onboarding entirely before Supabase corrects it.
 
   const completeOnboarding = () => {
     try { localStorage.setItem("accrue_onboarded", "true"); } catch {}
@@ -4420,9 +4422,9 @@ function AppInner() {
   const [aboutOpen, setAboutOpen] = useState(false);
 
   // ── Theme (dark default; light is a full alternate palette, same component tree)
-  const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem("accrue_theme") || "dark"; } catch { return "dark"; }
-  });
+  const [theme, setTheme] = useState("dark");
+  // Same device-wide-cache issue as displayCurrency above — defaults cleanly
+  // and lets the per-account Supabase fetch set the real value.
 
   // Keep the mutable C object and its derived tokens (INP/LBL) in sync with the live
   // theme on every render — same approach as setDisplayCurrencyGlobals above, since C
@@ -4448,9 +4450,14 @@ function AppInner() {
   }, [theme]);
 
   // ── Display currency (USD is always source of truth; this only affects display)
-  const [displayCurrency, setDisplayCurrency] = useState(() => {
-    try { return localStorage.getItem("accrue_currency") || "USD"; } catch { return "USD"; }
-  });
+  const [displayCurrency, setDisplayCurrency] = useState("USD");
+  // Previously seeded from a device-wide localStorage key on first render,
+  // before the real per-account preference loaded from Supabase — but that
+  // key isn't scoped to any specific account, so switching between different
+  // accounts on the same device could briefly flash a stale currency left
+  // over from whichever account last used the app on that device. Now this
+  // always starts neutral and the real value comes in shortly after from the
+  // Supabase fetch below, which is correctly isolated per user.
   const [fxRates, setFxRates] = useState({});
   const [fxLoaded, setFxLoaded] = useState(false);
 
@@ -4505,9 +4512,8 @@ function AppInner() {
   const [insightsPeriod, setInsightsPeriod] = useState("weekly"); // daily | weekly | monthly
   const [spyPeriodData, setSpyPeriodData] = useState({}); // { daily, weekly, monthly } each { pct } — kept for backward compat with existing spyChange references
   const [benchmarkData, setBenchmarkData] = useState({}); // { SPY: {...}, QQQ: {...}, BTC: {...} }
-  const [selectedBenchmark, setSelectedBenchmark] = useState(() => {
-    try { return localStorage.getItem("accrue_benchmark") || "SPY"; } catch { return "SPY"; }
-  });
+  const [selectedBenchmark, setSelectedBenchmark] = useState("SPY");
+  // Same device-wide-cache issue as displayCurrency/theme above.
 
   // Load preferences from Supabase once the session is known. If no remote row exists
   // yet (first sync for this account), migrate up whatever's currently in local state —
@@ -4723,7 +4729,12 @@ function AppInner() {
         const res = await fetch(apiUrl("/api/sparkline"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ symbol }),
+          // Without an explicit range, this endpoint falls back to a short
+          // default window — meaning Quarterly/Yearly/All-time all ended up
+          // reading from the same limited data and collapsed to identical
+          // numbers. Requesting 5 years matches the range already used for
+          // the per-asset price chart elsewhere in the app.
+          body: JSON.stringify({ symbol, range: "5y" }),
         });
         const data = await res.json();
         const points = data.points || [];
@@ -4772,7 +4783,14 @@ function AppInner() {
             const res = await fetch(apiUrl("/api/sparkline"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ symbol: sym, range: "3mo" }),
+              // Was "3mo" — far too short to correctly support the Quarterly/
+              // Yearly/All-time period toggle. With only 3 months of history,
+              // a "yearly" lookback had no real year-old price to reference and
+              // silently fell back to the oldest available (~90-day-old) price
+              // instead — producing distorted, effectively-arbitrary returns
+              // for any period beyond a month. 5y matches every other price
+              // history fetch elsewhere in the app.
+              body: JSON.stringify({ symbol: sym, range: "5y" }),
             });
             const data = await res.json();
             return { symbol: sym, points: data.points || [] };
